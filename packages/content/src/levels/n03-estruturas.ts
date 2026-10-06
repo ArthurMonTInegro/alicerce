@@ -1,4 +1,9 @@
 import type { Level } from '../types.ts';
+import { lessons as m3_1 } from './modulos/m3-1.ts';
+import { lessons as m3_2 } from './modulos/m3-2.ts';
+import { lessons as m3_3 } from './modulos/m3-3.ts';
+import { lessons as m3_4 } from './modulos/m3-4.ts';
+import { lessons as m3_5 } from './modulos/m3-5.ts';
 import { dedent, deep, english, info, lesson, md, py, t, tip, trace, warn } from '../helpers.ts';
 
 const arrays = lesson({
@@ -823,7 +828,7 @@ export const level3: Level = {
       prerequisites: ['m2-2'],
       skills: [{ id: 'ed-arrays', pt: 'Arrays e listas dinâmicas', en: 'Arrays and dynamic arrays' }],
       outline: ['Memória contígua', 'Custos de operações', 'Crescimento amortizado', 'Dois ponteiros'],
-      lessons: [arrays],
+      lessons: [arrays, ...m3_1],
       references: ['clrs', 'mit-6006'],
     },
     {
@@ -832,7 +837,7 @@ export const level3: Level = {
       prerequisites: ['m3-1'],
       skills: [{ id: 'ed-pilhas-filas', pt: 'Pilhas e filas', en: 'Stacks and queues' }],
       outline: ['LIFO e FIFO', 'list como pilha, deque como fila', 'Parênteses balanceados', 'Notação polonesa reversa', 'Filas de prioridade (introdução)'],
-      lessons: [pilhasFilas],
+      lessons: [pilhasFilas, ...m3_2],
       references: ['clrs', 'sedgewick-algs'],
     },
     {
@@ -841,7 +846,7 @@ export const level3: Level = {
       prerequisites: ['m3-1'],
       skills: [{ id: 'ed-hash', pt: 'Tabelas hash', en: 'Hash tables' }],
       outline: ['Funções hash', 'Colisões', 'Fator de carga e redimensionamento', 'Two Sum', 'Imutabilidade das chaves'],
-      lessons: [hash],
+      lessons: [hash, ...m3_3],
       references: ['clrs', 'mit-6006'],
     },
     {
@@ -850,7 +855,7 @@ export const level3: Level = {
       prerequisites: ['m3-2', 'm4-4'],
       skills: [{ id: 'ed-arvores', pt: 'Árvores', en: 'Trees' }],
       outline: ['Vocabulário de árvores', 'BST: busca e inserção', 'Percursos', 'Balanceamento (AVL, rubro-negra)', 'Heaps e filas de prioridade (heapq)', 'Tries'],
-      lessons: [arvores],
+      lessons: [arvores, ...m3_4],
       references: ['clrs', 'sedgewick-algs'],
     },
     {
@@ -859,7 +864,7 @@ export const level3: Level = {
       prerequisites: ['m3-4'],
       skills: [{ id: 'ed-grafos', pt: 'Grafos', en: 'Graphs' }],
       outline: ['Vértices e arestas', 'Lista × matriz de adjacência', 'BFS e menor caminho', 'DFS', 'Union-Find (estruturas avançadas)'],
-      lessons: [grafos],
+      lessons: [grafos, ...m3_5],
       references: ['clrs', 'stanford-cs161'],
     },
   ],

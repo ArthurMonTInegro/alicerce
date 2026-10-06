@@ -1,4 +1,10 @@
 import type { Level } from '../types.ts';
+import { lessons as m4_1 } from './modulos/m4-1.ts';
+import { lessons as m4_2 } from './modulos/m4-2.ts';
+import { lessons as m4_3 } from './modulos/m4-3.ts';
+import { lessons as m4_4 } from './modulos/m4-4.ts';
+import { lessons as m4_5 } from './modulos/m4-5.ts';
+import { lessons as m4_6 } from './modulos/m4-6.ts';
 import { dedent, deep, info, lesson, md, py, t, tip, trace, warn } from '../helpers.ts';
 
 const bigO = lesson({
@@ -951,7 +957,7 @@ export const level4: Level = {
       prerequisites: ['m3-1'],
       skills: [{ id: 'alg-complexidade', pt: 'Análise de complexidade', en: 'Complexity analysis' }],
       outline: ['Crescimento de funções', 'Big O, Ω e Θ', 'Tempo e espaço', 'Operações escondidas', 'Análise amortizada'],
-      lessons: [bigO],
+      lessons: [bigO, ...m4_1],
       references: ['clrs', 'mit-6006'],
     },
     {
@@ -960,7 +966,7 @@ export const level4: Level = {
       prerequisites: ['m4-1'],
       skills: [{ id: 'alg-busca', pt: 'Algoritmos de busca', en: 'Searching algorithms' }],
       outline: ['Busca linear', 'Busca binária e invariantes', 'Primeira/última ocorrência', 'bisect', 'Busca binária na resposta'],
-      lessons: [busca],
+      lessons: [busca, ...m4_2],
       references: ['clrs', 'bentley-pearls'],
     },
     {
@@ -969,7 +975,7 @@ export const level4: Level = {
       prerequisites: ['m4-2', 'm4-4'],
       skills: [{ id: 'alg-ordenacao', pt: 'Algoritmos de ordenação', en: 'Sorting algorithms' }],
       outline: ['Bubble e insertion', 'Merge sort', 'Quick sort', 'Estabilidade', 'Limite n log n', 'Counting e radix sort'],
-      lessons: [ordenacao],
+      lessons: [ordenacao, ...m4_3],
       references: ['clrs', 'sedgewick-algs'],
     },
     {
@@ -978,7 +984,7 @@ export const level4: Level = {
       prerequisites: ['m2-4'],
       skills: [{ id: 'alg-recursao', pt: 'Recursão', en: 'Recursion' }],
       outline: ['Caso base e passo recursivo', 'Pilha de chamadas', 'Memoização', 'Dividir para conquistar', 'Backtracking'],
-      lessons: [recursao],
+      lessons: [recursao, ...m4_4],
       references: ['cs61a', 'sicp'],
     },
     {
@@ -987,7 +993,7 @@ export const level4: Level = {
       prerequisites: ['m4-4', 'm3-3'],
       skills: [{ id: 'alg-pd', pt: 'Programação dinâmica e algoritmos gulosos', en: 'Dynamic programming and greedy algorithms' }],
       outline: ['Estado e recorrência', 'Top-down e bottom-up', 'Troco, mochila, LCS, edição', 'Escolha gulosa e prova', 'Escalonamento de intervalos'],
-      lessons: [pd],
+      lessons: [pd, ...m4_5],
       references: ['clrs', 'kleinberg-tardos'],
     },
     {
@@ -996,7 +1002,7 @@ export const level4: Level = {
       prerequisites: ['m3-5', 'm4-1'],
       skills: [{ id: 'alg-grafos', pt: 'Algoritmos em grafos', en: 'Graph algorithms' }],
       outline: ['Dijkstra', 'Bellman-Ford', 'Ordenação topológica', 'Árvore geradora mínima (Kruskal, Prim)', 'Union-Find'],
-      lessons: [algGrafos],
+      lessons: [algGrafos, ...m4_6],
       references: ['clrs', 'sedgewick-algs'],
     },
   ],
