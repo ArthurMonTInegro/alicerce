@@ -41,6 +41,8 @@ function load() {
   } catch {
     state = emptyProgress();
   }
+  window.addEventListener('pagehide', flush);
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush());
   window.addEventListener('storage', (e) => {
     if (e.key !== KEY || !e.newValue) return;
     try {
@@ -58,7 +60,9 @@ function emit() {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
+let unsaved = false;
 function persist() {
+  unsaved = false;
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
   } catch {
@@ -72,7 +76,15 @@ function update(fn: (draft: ProgressState) => ProgressState) {
   state = fn(state);
   emit();
   clearTimeout(saveTimer);
+  unsaved = true;
   saveTimer = setTimeout(persist, 150);
+}
+
+/** Grava já o que ainda espera o atraso de 150 ms (fechar a aba ou trocar de app não perde a última ação). */
+function flush() {
+  if (!unsaved) return;
+  clearTimeout(saveTimer);
+  persist();
 }
 
 function subscribe(cb: () => void) {

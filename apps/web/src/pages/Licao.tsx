@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { lessonById, levelById, moduleById, modules, referenceById, STAGE_LABEL, useLesson, type LessonMeta, type Stage } from '../content.ts';
-import { topologicalOrder } from '@alicerce/engine';
+import { exercisesToRedo, topologicalOrder } from '@alicerce/engine';
 import { useHead } from '../lib/head.tsx';
 import { Link, setSearchParam, useSearchParam } from '../lib/router.tsx';
 import { Markdown } from '../lib/markdown.tsx';
@@ -57,6 +57,8 @@ export function Licao({ id }: { id: string }) {
   const practice = lesson.exercises.filter((e) => e.stage === 'exercicio');
   const attempted = new Set(progress.attempts.map((a) => a.exerciseId));
   const pending = practice.filter((e) => !attempted.has(e.id));
+  const toRedo = new Set(exercisesToRedo(progress));
+  const redoHere = lesson.exercises.filter((e) => toRedo.has(e.id)).length;
   const next = nextLesson(lesson.id);
   const go = (s: Stage) => setSearchParam('etapa', s, false);
 
@@ -192,10 +194,15 @@ export function Licao({ id }: { id: string }) {
                   <p>Muito bem! Os cartões desta lição estão na sua fila de revisão.</p>
                 ) : pending.length ? (
                   <p>
-                    Antes de concluir, tente os exercícios da etapa <a href="?etapa=exercicio" onClick={(e) => (e.preventDefault(), go('exercicio'))}>Exercícios</a>: faltam {pending.length} de {practice.length}. Errar faz parte; o que conta é tentar.
+                    Antes de concluir, resolva os exercícios da etapa <a href="?etapa=exercicio" onClick={(e) => (e.preventDefault(), go('exercicio'))}>Exercícios</a>: faltam {pending.length} de {practice.length}. Errar faz parte. Se travar, peça uma pista ao tutor; depois de tentar de verdade, você também pode ver a solução, e o exercício volta na revisão para você refazer sozinho.
                   </p>
                 ) : (
                   <p>Você praticou tudo. Concluir coloca os cartões desta lição na revisão espaçada.</p>
+                )}
+                {redoHere > 0 && (
+                  <p className="small">
+                    Você viu a solução de {redoHere} {redoHere === 1 ? 'exercício' : 'exercícios'} desta lição. {redoHere === 1 ? 'Ele está' : 'Eles estão'} em <Link to="/revisao#refazer">Revisão → Para refazer</Link> até você resolver sem ajuda.
+                  </p>
                 )}
                 <div className="row">
                   {!done && (

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { levels, moduleById, skillById } from '../content.ts';
-import { activityByDay, gamification, isDue, skillStatus, streak } from '@alicerce/engine';
+import { activityByDay, exercisesToRedo, gamification, isDue, skillStatus, streak } from '@alicerce/engine';
 import { Link } from '../lib/router.tsx';
 import { useDerived, useProgress } from '../state/store.ts';
 import { nextModules } from '../lib/progress-helpers.ts';
@@ -25,14 +25,15 @@ export function PlanoDoDia() {
       .filter((x) => x.st === 'reforco' || x.st === 'revisar')
       .sort((a, b) => a.s.mastery - b.s.mastery)[0];
     const weakModule = weak ? moduleById.get(skillById.get(weak.s.skill)?.moduleId ?? '') : undefined;
+    const redo = exercisesToRedo(p).length;
     const next = nextModules(d, 1)[0];
     const completedLevels = levels.filter((l) => l.modules.length && l.modules.every((m) => d.completedModules.has(m.id))).map((l) => l.number);
     const g = gamification(p, { completedLevels, tzOffsetMin: tz });
-    return { due, weak, weakModule, next, g, days: streak(activityByDay(p, tz), now, tz) };
+    return { due, redo, weak, weakModule, next, g, days: streak(activityByDay(p, tz), now, tz) };
   }, [p, d, now]);
 
   if (!plan) return null;
-  const { due, weak, weakModule, next, g, days } = plan;
+  const { due, redo, weak, weakModule, next, g, days } = plan;
   return (
     <section className="card plano" aria-labelledby="h-plano">
       <h2 id="h-plano" style={{ marginTop: 0 }}>
@@ -45,6 +46,14 @@ export function PlanoDoDia() {
               Revisar {due} {due === 1 ? 'cartão' : 'cartões'}
             </Link>{' '}
             <span className="small muted">antes que você esqueça (poucos minutos).</span>
+          </li>
+        )}
+        {redo > 0 && (
+          <li>
+            <Link to="/revisao#refazer">
+              Refazer {redo} {redo === 1 ? 'exercício' : 'exercícios'} sem olhar a solução
+            </Link>{' '}
+            <span className="small muted">você viu a resposta; agora é fixar.</span>
           </li>
         )}
         {weak && weakModule && (

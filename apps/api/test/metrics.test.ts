@@ -38,10 +38,20 @@ describe('métricas', () => {
     expect(m.hardestExercises[0]).toMatchObject({ users: 6, firstTry: 0, revealed: 0.5 });
   });
 
+  it('aprendizado que dura: só conta quem começou há 30 dias ou mais', () => {
+    const veterana = user(NOW - 60 * DAY, [att('a', NOW - 60 * DAY), att('b', NOW - 20 * DAY)]); // mesma habilidade 40 dias depois
+    const esqueceu = user(NOW - 60 * DAY, [att('a', NOW - 60 * DAY)]);
+    esqueceu.progress.reviews = [{ cardId: 'c', grade: 3, at: NOW - 59 * DAY }, { cardId: 'c', grade: 1, at: NOW - 10 * DAY }];
+    const nova = user(NOW - 5 * DAY, [att('a', NOW - 5 * DAY)]);
+    const m = computeMetrics([veterana, esqueceu, nova], NOW, 1);
+    expect(m.retainedLearning).toEqual({ eligible: 2, learners: 1, rate: 0.5, cardChecks: 1, cardRecallRate: 0 });
+  });
+
   it('funciona sem contas', () => {
     const m = computeMetrics([], NOW);
     expect(m.users.total).toBe(0);
     expect(m.retention.d1.rate).toBe(0);
+    expect(m.retainedLearning.rate).toBe(0);
     expect(sanitizeProgress(null).attempts).toEqual([]);
   });
 });

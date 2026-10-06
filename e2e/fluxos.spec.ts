@@ -33,6 +33,27 @@ test('lição: etapas, exercício de múltipla escolha e conclusão', async ({ p
   expect(errors).toEqual([]);
 });
 
+test('ver a solução manda o exercício para "Para refazer" na revisão', async ({ page }) => {
+  const errors = watchConsole(page);
+  page.on('dialog', (d) => d.accept());
+  await page.goto('/trilha');
+  await page.getByRole('button', { name: 'Lista por nível' }).click();
+  await page.locator('.module-row').first().click();
+  await page.locator('a[href^="/licao/"]').first().click();
+  await page.getByRole('navigation', { name: 'Etapas da lição' }).getByRole('link', { name: /Exercícios/ }).click();
+  const ex = page.locator('section.exercise').first();
+  const hint = ex.getByRole('button', { name: /Dica/ });
+  while (await hint.count()) await hint.click();
+  await ex.getByRole('button', { name: 'Ver solução' }).click();
+  await expect(ex.getByText('Solução', { exact: true })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Etapas da lição' }).getByRole('link', { name: /Revisão/ }).click();
+  await expect(page.getByText(/Você viu a solução de 1 exercício/)).toBeVisible();
+  await page.goto('/revisao');
+  await expect(page.getByRole('heading', { name: 'Para refazer' })).toBeVisible();
+  await expect(page.locator('#refazer section.exercise')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
 test('laboratório executa Python de verdade', async ({ page }) => {
   const errors = watchConsole(page);
   await page.goto('/laboratorio');

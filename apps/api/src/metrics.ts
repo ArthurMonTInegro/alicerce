@@ -4,7 +4,7 @@
  * rastreamento extra de comportamento: só contas que sincronizam entram aqui,
  * e nada identifica a pessoa no relatório.
  */
-import type { ProgressState } from '@alicerce/engine';
+import { hasRetainedLearning, retentionEvidence, RETENTION_GAP_DAYS, type ProgressState } from '@alicerce/engine';
 
 const DAY = 86_400_000;
 
@@ -31,6 +31,12 @@ export interface Metrics {
   retention: Record<'d1' | 'd7' | 'd30', { eligible: number; rate: number }>;
   funnel: { anyActivity: number; firstLesson: number; fiveLessons: number; diagnostic: number; reviews: number };
   learning: { attempts: number; solveRate: number; reviewsLast30d: number; lessonsCompleted: number };
+  /**
+   * Métrica principal: aprendizado que dura. Entre as contas que começaram a
+   * estudar há 30 dias ou mais, quantas mostraram que lembram algo depois desse
+   * intervalo (habilidade resolvida de novo sem ver a solução, ou cartão lembrado).
+   */
+  retainedLearning: { eligible: number; learners: number; rate: number; cardChecks: number; cardRecallRate: number };
   hardestExercises: ExerciseStat[];
   lessonDropOff: Array<{ lessonId: string; started: number; completed: number; rate: number }>;
 }
@@ -89,6 +95,16 @@ export function computeMetrics(users: UserSnapshot[], now = Date.now(), minUsers
     .sort((a, b) => a.rate - b.rate)
     .slice(0, 15);
 
+  const gap = RETENTION_GAP_DAYS * DAY;
+  const started = users.filter((u) => {
+    const t = activityTimes(u.progress);
+    return t.length > 0 && Math.min(...t) <= now - gap;
+  });
+  const evidence = started.map((u) => retentionEvidence(u.progress));
+  const learners = evidence.filter(hasRetainedLearning).length;
+  const cardChecks = evidence.reduce((n, e) => n + e.cardChecks, 0);
+  const cardRecalls = evidence.reduce((n, e) => n + e.cardRecalls, 0);
+
   return {
     generatedAt: now,
     users: {
@@ -111,6 +127,13 @@ export function computeMetrics(users: UserSnapshot[], now = Date.now(), minUsers
       solveRate: attempts ? correct / attempts : 0,
       reviewsLast30d: users.reduce((n, u) => n + u.progress.reviews.filter((r) => r.at > now - 30 * DAY).length, 0),
       lessonsCompleted: users.reduce((n, u) => n + lessonsDone(u.progress), 0),
+    },
+    retainedLearning: {
+      eligible: started.length,
+      learners,
+      rate: started.length ? learners / started.length : 0,
+      cardChecks,
+      cardRecallRate: cardChecks ? cardRecalls / cardChecks : 0,
     },
     hardestExercises: hardest,
     lessonDropOff: dropOff,

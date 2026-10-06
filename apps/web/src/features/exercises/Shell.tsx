@@ -56,7 +56,7 @@ export function ExerciseShell({ ex, st, children, actions, solution, lessonId, f
             type="button"
             className="btn small ghost"
             onClick={() => {
-              if (window.confirm('Ver a solução conta como "não resolvido" para o seu domínio da habilidade. Você ainda pode tentar de novo depois. Ver agora?')) st.reveal();
+              if (window.confirm('Ver a solução conta como "não resolvido" para o seu domínio da habilidade, e o exercício volta em Revisão para você refazer sem ajuda. Ver agora?')) st.reveal();
             }}
           >
             Ver solução

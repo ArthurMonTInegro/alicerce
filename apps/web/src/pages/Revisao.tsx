@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { exercises, findExercise, lessons, skillById, useLesson } from '../content.ts';
-import { isDue, previewIntervals, skillStatus, type Grade } from '@alicerce/engine';
+import { exerciseById, exercises, findExercise, lessons, lessonById, skillById, useLesson } from '../content.ts';
+import { exercisesToRedo, isDue, previewIntervals, skillStatus, type Grade } from '@alicerce/engine';
 import { useHead } from '../lib/head.tsx';
 import { Markdown } from '../lib/markdown.tsx';
 import { Link } from '../lib/router.tsx';
@@ -69,6 +69,9 @@ export function Revisao() {
     }
     return out;
   }, [d, now]);
+
+  // exercícios em que a pessoa viu a solução: voltam aqui até serem resolvidos sem ajuda
+  const redo = useMemo(() => exercisesToRedo(p).flatMap((id) => exerciseById.get(id) ?? []), [p]);
 
   const totalCards = Object.keys(p.cards).length;
   const nextDue = now ? Math.min(...Object.values(p.cards).map((c) => c.due).filter((t) => t > now)) : Infinity;
@@ -153,6 +156,24 @@ export function Revisao() {
           </p>
         )}
       </section>
+
+      {redo.length > 0 && (
+        <section id="refazer" aria-labelledby="h-redo" style={{ marginTop: '2.5rem' }}>
+          <h2 id="h-redo">Para refazer</h2>
+          <p className="prose">
+            Exercícios em que você viu a solução. Tente de novo sem olhar: resolver sozinho é o que fixa. Cada um sai desta lista quando você acerta sem revelar a resposta.
+          </p>
+          {redo.slice(0, 5).map((x) => (
+            <div key={x.exercise.id}>
+              <p className="small" style={{ margin: '0 0 0.3rem' }}>
+                Da lição <Link to={`/licao/${x.lessonId}`}>{lessonById.get(x.lessonId)?.title}</Link>
+              </p>
+              <ChallengeExercise id={x.exercise.id} lessonId={x.lessonId} />
+            </div>
+          ))}
+          {redo.length > 5 && <p className="small muted">E mais {redo.length - 5}. Eles aparecem aqui conforme você resolve os primeiros.</p>}
+        </section>
+      )}
 
       <section aria-labelledby="h-ret" style={{ marginTop: '2.5rem' }}>
         <h2 id="h-ret">Desafios de retenção</h2>

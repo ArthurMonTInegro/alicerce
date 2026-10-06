@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { exercises, lessons, levels, skillById } from '../content.ts';
-import { activityByDay, gamification, mergeProgress, sanitizeProgress, skillStatus, streak, type SkillStatus } from '@alicerce/engine';
+import { activityByDay, gamification, mergeProgress, retentionEvidence, RETENTION_GAP_DAYS, sanitizeProgress, skillStatus, streak, type SkillStatus } from '@alicerce/engine';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
 import { getProgress, replaceProgress, resetProgress, useAuth, useDerived, useProgress } from '../state/store.ts';
@@ -49,6 +49,7 @@ export function Progresso() {
   const mastered = skillRows.filter((r) => r.status === 'dominada').length;
   const completedLevels = useMemo(() => levels.filter((l) => l.modules.length && l.modules.every((m) => d.completedModules.has(m.id))).map((l) => l.number), [d]);
   const g = useMemo(() => gamification(p, { completedLevels, tzOffsetMin: tz }), [p, completedLevels, tz]);
+  const kept = useMemo(() => retentionEvidence(p), [p]);
   const tierPct = Math.round(((g.xp - g.tierFloor) / (g.nextTierAt - g.tierFloor)) * 100);
 
   const exportJson = () => {
@@ -119,6 +120,29 @@ export function Progresso() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section aria-labelledby="h-mem" style={{ marginBottom: '2rem', maxWidth: '760px' }}>
+        <h2 id="h-mem">Memória de longo prazo</h2>
+        {kept.retainedSkills.length || kept.cardChecks ? (
+          <ul>
+            {kept.retainedSkills.length > 0 && (
+              <li>
+                Você mostrou que ainda domina {kept.retainedSkills.length} {kept.retainedSkills.length === 1 ? 'habilidade' : 'habilidades'} {RETENTION_GAP_DAYS} dias ou mais depois de aprender:{' '}
+                {kept.retainedSkills.map((id) => skillById.get(id)?.pt ?? id).join(', ')}.
+              </li>
+            )}
+            {kept.cardChecks > 0 && (
+              <li>
+                Dos {kept.cardChecks} cartões revistos {RETENTION_GAP_DAYS} dias ou mais depois da primeira revisão, você lembrou {kept.cardRecalls} ({Math.round((kept.cardRecalls / kept.cardChecks) * 100)}%).
+              </li>
+            )}
+          </ul>
+        ) : (
+          <p className="small muted">
+            Aqui aparece o que você ainda sabe {RETENTION_GAP_DAYS} dias depois de aprender: habilidades resolvidas de novo sem ver a solução e cartões lembrados na revisão. É a melhor medida de que o estudo valeu.
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="h-act">

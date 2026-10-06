@@ -32,6 +32,8 @@ if (process.argv.includes('--json')) {
   const of = (n: number) => `${n} (${pct(m.users.total ? n / m.users.total : 0)})`;
   console.log(`Alicerce · métricas em ${new Date(now).toISOString().slice(0, 16)}Z\n`);
   console.log(`Contas: ${m.users.total} (novas: ${m.users.new7d} em 7 dias, ${m.users.new30d} em 30) · premium: ${of(m.users.premium)}`);
+  const r = m.retainedLearning;
+  console.log(`Aprendizado que dura (métrica principal): ${pct(r.rate)} das ${r.eligible} contas que começaram há 30+ dias lembraram algo depois de 30 dias · cartões revistos após 30 dias: ${r.cardChecks}, lembrados ${pct(r.cardRecallRate)}`);
   console.log(`Ativos: ${m.active.dau} hoje · ${m.active.wau} em 7 dias · ${m.active.mau} em 30 dias`);
   for (const [k, r] of Object.entries(m.retention)) console.log(`Retenção ${k.toUpperCase()}: ${pct(r.rate)} (${r.eligible} contas elegíveis)`);
   console.log(`Funil: alguma atividade ${of(m.funnel.anyActivity)} → 1ª lição ${of(m.funnel.firstLesson)} → 5 lições ${of(m.funnel.fiveLessons)}; diagnóstico ${of(m.funnel.diagnostic)}; revisão ${of(m.funnel.reviews)}`);
