@@ -4,6 +4,7 @@ import { emptyProgress } from '@alicerce/engine';
 import { buildApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db.ts';
+import { setPlan } from '../src/plans.ts';
 import { ClaudeTutor, parseTutorRequest, type TutorProvider } from '../src/tutor.ts';
 
 const H = { 'content-type': 'application/json', 'x-alicerce': '1' };
@@ -115,6 +116,31 @@ describe('API', () => {
     expect((await ask()).json().mode).toBe('ia');
     expect((await ask()).json().mode).toBe('offline'); // limite diário = 2
     expect(calls).toBe(2);
+  });
+
+  it('planos: conta nasce gratuita; premium e vencimento refletem nos direitos e no limite do tutor', async () => {
+    const db = openDb(':memory:');
+    const config = { ...loadConfig({}), webDist: '/nao-existe', tutorDailyLimit: 2 };
+    app = await buildApp({ config, db, tutor: { name: 'ia', answer: async () => 'pista' } });
+    const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'p@p.co', password: 'uma frase longa' } });
+    expect(reg.json().entitlements.plan).toBe('free');
+    const cookie = cookieOf(reg);
+    const me = async () => (await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie } })).json();
+    const id = (await me()).user.id as string;
+    expect((await me()).entitlements).toMatchObject({ plan: 'free', tutorDailyLimit: 2 });
+    expect((await me()).entitlements.features).toContain('tutor-ia');
+
+    setPlan(db, id, 'premium', Date.now() + 86_400_000, 'teste');
+    const e = (await me()).entitlements;
+    expect(e.plan).toBe('premium');
+    expect(e.tutorDailyLimit).toBeGreaterThan(2);
+    const ask = () => app.inject({ method: 'POST', url: '/api/tutor', headers: { ...H, cookie }, payload: { message: 'oi' } });
+    for (let i = 0; i < 3; i++) expect((await ask()).json().mode).toBe('ia'); // passou do limite gratuito
+
+    setPlan(db, id, 'premium', Date.now() - 1, 'teste');
+    expect((await me()).entitlements.plan).toBe('free');
+    expect((db.prepare('SELECT COUNT(*) AS n FROM plan_changes WHERE user_id = ?').get(id) as { n: number }).n).toBe(2);
+    expect((await app.inject({ method: 'GET', url: '/api/auth/me' })).json()).toEqual({ user: null, entitlements: null });
   });
 
   it('rota de API inexistente devolve 404 JSON', async () => {

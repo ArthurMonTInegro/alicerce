@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { levelById, moduleById, projects, referenceById } from '@alicerce/content';
+import { levelById, moduleById, projects, referenceById } from '../content.ts';
 import { skillStatus } from '@alicerce/engine';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';

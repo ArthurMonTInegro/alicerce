@@ -76,10 +76,11 @@ Migrações versionadas por `PRAGMA user_version` (`apps/api/src/db.ts`).
 
 | Tabela | Colunas | Observação |
 |---|---|---|
-| `users` | `id`, `email` (único, sem diferenciar maiúsculas), `name`, `password_hash`, `created_at` | Senha em scrypt (N=32768) com sal por usuário |
+| `users` | `id`, `email` (único, sem diferenciar maiúsculas), `name`, `password_hash`, `created_at`, `plan`, `plan_expires_at` | Senha em scrypt (N=32768) com sal por usuário; plano `free` por padrão |
 | `sessions` | `token_hash`, `user_id`, `created_at`, `expires_at` | Guarda só o SHA-256 do token; 30 dias |
 | `progress` | `user_id`, `data` (JSON), `updated_at` | Um documento de progresso por pessoa |
 | `tutor_usage` | `user_id`, `day`, `count` | Limite diário do tutor com IA |
+| `plan_changes` | `user_id`, `plan`, `expires_at`, `source`, `at` | Histórico auditável de mudanças de plano |
 
 Todas as tabelas filhas usam `ON DELETE CASCADE`, então excluir a conta apaga tudo.
 
@@ -90,7 +91,7 @@ Toda mutação exige o cabeçalho `x-alicerce: 1` (defesa contra CSRF somada ao 
 | Método e rota | Faz | Limites |
 |---|---|---|
 | `GET /api/health` | Situação do servidor e se o tutor com IA está ligado | global 600/min por IP |
-| `GET /api/auth/me` | `{ user }` ou `{ user: null }` | |
+| `GET /api/auth/me` | `{ user, entitlements }` ou `{ user: null, entitlements: null }` | |
 | `POST /api/auth/register` | Cria conta (senha de 10 a 200 caracteres) e já entra | 10 por 15 min por IP e por e-mail |
 | `POST /api/auth/login` | Entra; tempo constante para e-mail inexistente | idem |
 | `POST /api/auth/logout` | Sai (204) | |
@@ -120,3 +121,26 @@ O mesmo `harness.py` roda no CPython local em `scripts/verify-solutions.ts`, ent
 
 - `OfflineTutor`: usa `offlineTutor()` do motor (pistas guiadas pelo tipo de erro e pelas dicas do exercício).
 - `ClaudeTutor`: monta um prompt de sistema com o enunciado, a lição e as regras pedagógicas (nunca dar a solução, responder com pergunta ou pista, um passo por vez). O código e o erro do estudante entram na mensagem do usuário, delimitados por tags e tratados como dados. A solução oficial nunca é enviada ao modelo. Em qualquer erro ou recusa, o servidor responde com o tutor offline.
+
+## Conteúdo sob demanda
+
+`apps/web/scripts/gen-content.ts` roda antes do build, do `dev` e do typecheck e gera em `apps/web/src/generated/` (fora do git):
+
+- `catalog.json`: níveis, módulos, metadados de cada lição (sem o texto das etapas, mas com a lista de etapas e de exercícios), habilidades e glossário;
+- `lessons/<id>.json`: o texto completo de cada lição.
+
+O front-end importa conteúdo só por `apps/web/src/content.ts`, que expõe o catálogo e carrega cada lição com `import.meta.glob` na primeira vez que ela é aberta (`useLesson`, `loadLesson`). A pré-renderização chama `seedLessons` com o conteúdo inteiro, e `main.tsx` baixa a lição da URL antes de hidratar, para o HTML e o React baterem. Resultado: o JavaScript inicial caiu de 1,09 MB (344 KB com gzip) para 739 KB (229 KB com gzip).
+
+## Gamificação
+
+`packages/engine/src/achievements.ts` calcula XP, patamar e conquistas a partir do progresso, sem estado novo. XP vem da primeira resolução correta de cada exercício (mais 50% se foi de primeira e sem dica), de lições concluídas, revisões, etapas de projeto e do diagnóstico. Revelar a resposta não dá XP, e repetir um exercício não soma de novo.
+
+## Planos e direitos de uso
+
+`packages/engine/src/plans.ts` é a única tabela do que cada plano pode fazer. O código pergunta `can(entitlements, 'tutor-ia')`, nunca "é premium?". Recursos com status `planejado` aparecem na página de planos mas não são concedidos. Um plano vencido volta a `free` sem perder progresso.
+
+No servidor, `apps/api/src/plans.ts` lê e muda o plano (`setPlan` grava também em `plan_changes`). Não há provedor de pagamento: quando houver, o webhook dele chama `setPlan`, e nenhum dado de cartão passa pelo Alicerce. Para testes e cortesias: `node apps/api/scripts/plano.ts <email> <free|premium> [dias]`.
+
+## Métricas
+
+`apps/api/src/metrics.ts` calcula, a partir do progresso já sincronizado (sem rastreamento extra), usuários ativos por dia, semana e mês, retenção D1/D7/D30, funil (cadastro → diagnóstico → primeira lição → primeiro nível), exercícios mais difíceis e lições onde as pessoas param. Grupos com menos de 5 pessoas não são mostrados. Relatório: `node apps/api/scripts/metricas.ts [--json]`.

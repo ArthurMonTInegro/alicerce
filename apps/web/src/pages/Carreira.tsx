@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { careerGuide, interviewQuestions, type InterviewQuestion } from '@alicerce/content';
+import { careerGuide, interviewQuestions, type InterviewQuestion } from '../content.ts';
 import { useHead } from '../lib/head.tsx';
 import { Markdown } from '../lib/markdown.tsx';
 import { saveInterview, useProgress } from '../state/store.ts';

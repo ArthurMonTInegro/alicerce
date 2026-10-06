@@ -1,4 +1,4 @@
-import { learningEvidence, STAGE_LABEL, STAGES } from '@alicerce/content';
+import { learningEvidence, STAGE_LABEL, STAGES } from '../content.ts';
 import { MASTERY_THRESHOLD, MIN_EVIDENCE } from '@alicerce/engine';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';

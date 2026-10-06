@@ -21,7 +21,7 @@ import {
   type ProgressState,
   type SkillState,
 } from '@alicerce/engine';
-import { lessonById, modules, type Exercise } from '@alicerce/content';
+import { lessonById, modules, type Exercise } from '../content.ts';
 import { api, type User } from './api.ts';
 
 const KEY = 'alicerce:progresso:v1';

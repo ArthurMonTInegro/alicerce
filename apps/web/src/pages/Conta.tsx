@@ -4,6 +4,7 @@ import { Link } from '../lib/router.tsx';
 import { api, ApiError } from '../state/api.ts';
 import { signIn, signOut, syncNow, useAuth } from '../state/store.ts';
 import { STATIC_SITE } from '../lib/base.ts';
+import { FEATURES, PLANS } from '@alicerce/engine';
 
 const SYNC_LABEL = { offline: 'Sem conta: progresso só neste navegador', idle: 'Sincronizado', syncing: 'Sincronizando…', error: 'Falha ao sincronizar; tentaremos de novo' } as const;
 
@@ -70,6 +71,21 @@ export function Conta() {
           <strong>Situação:</strong> {SYNC_LABEL[syncStatus]}
         </p>
         <p className="small muted">O progresso é salvo no navegador e enviado para sua conta automaticamente. Se você estudar em dois aparelhos, os dois progressos são somados, nada se perde.</p>
+        {user.entitlements && (
+          <section aria-labelledby="h-plano" style={{ margin: '1.5rem 0' }}>
+            <h2 id="h-plano">
+              Seu plano: {PLANS[user.entitlements.plan].name}
+              {user.entitlements.expiresAt ? <span className="small muted"> (até {new Date(user.entitlements.expiresAt).toLocaleDateString('pt-BR')})</span> : null}
+            </h2>
+            <ul>
+              {user.entitlements.features.map((f) => (
+                <li key={f}>{FEATURES[f].title}</li>
+              ))}
+              <li>Tutor com IA: até {user.entitlements.tutorDailyLimit} perguntas por dia</li>
+            </ul>
+            <p className="small muted">Hoje, a trilha inteira é gratuita. Se recursos pagos vierem a existir, a ideia é que somem ao que você já tem, sem tirar nada.</p>
+          </section>
+        )}
         <div className="row">
           <button type="button" className="btn" onClick={() => void syncNow()} disabled={syncStatus === 'syncing'}>
             Sincronizar agora

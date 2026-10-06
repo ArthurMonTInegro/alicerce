@@ -1,5 +1,5 @@
-import type { VizId } from '@alicerce/content';
-import { levelById } from '@alicerce/content';
+import type { VizId } from '../content.ts';
+import { levelById } from '../content.ts';
 import { Viz, VIZ } from '../features/viz/index.tsx';
 import { useHead } from '../lib/head.tsx';
 import { Link, setSearchParam, useSearchParam } from '../lib/router.tsx';

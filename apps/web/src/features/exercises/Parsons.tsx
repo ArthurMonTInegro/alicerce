@@ -1,5 +1,5 @@
 import { useState, type DragEvent } from 'react';
-import type { ParsonsExercise } from '@alicerce/content';
+import type { ParsonsExercise } from '../../content.ts';
 import { CodeView } from '../../lib/markdown.tsx';
 import { ExerciseShell } from './Shell.tsx';
 import { seededShuffle, useExercise } from './useExercise.ts';

@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { glossary, lessonById } from '@alicerce/content';
+import { glossary, lessonById } from '../content.ts';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
 import { SpeakButton, speak } from '../components/Speak.tsx';

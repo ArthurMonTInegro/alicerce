@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { McqExercise } from '@alicerce/content';
+import type { McqExercise } from '../../content.ts';
 import { CodeView, inline } from '../../lib/markdown.tsx';
 import { ExerciseShell } from './Shell.tsx';
 import { seededShuffle, useExercise } from './useExercise.ts';

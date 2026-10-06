@@ -32,6 +32,18 @@ const MIGRATIONS: string[] = [
      count INTEGER NOT NULL DEFAULT 0,
      PRIMARY KEY (user_id, day)
    );`,
+  // Planos: o plano vigente fica no usuário; plan_changes guarda o histórico.
+  `ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free';
+   ALTER TABLE users ADD COLUMN plan_expires_at INTEGER;
+   CREATE TABLE plan_changes (
+     id INTEGER PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     plan TEXT NOT NULL,
+     expires_at INTEGER,
+     source TEXT NOT NULL,
+     at INTEGER NOT NULL
+   );
+   CREATE INDEX plan_changes_user ON plan_changes(user_id);`,
 ];
 
 export function openDb(path: string): DatabaseSync {

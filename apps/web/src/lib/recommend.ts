@@ -1,4 +1,4 @@
-import { moduleById, placementRules } from '@alicerce/content';
+import { moduleById, placementRules } from '../content.ts';
 import { testedOutModules, type AreaResult, type DiagnosticArea } from '@alicerce/engine';
 
 export interface Recommendation {

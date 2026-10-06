@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import type { FillExercise } from '@alicerce/content';
+import type { FillExercise } from '../../content.ts';
 import { ExerciseShell } from './Shell.tsx';
 import { useExercise } from './useExercise.ts';
 

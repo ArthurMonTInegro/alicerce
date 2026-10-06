@@ -37,6 +37,13 @@ Todas são opcionais; veja `.env.example`.
 
 O workflow `.github/workflows/pages.yml` gera, a cada push na main, uma versão só com o site estático (`BASE_PATH=/alicerce/`, `VITE_STATIC=1`) e a publica no branch `gh-pages`. Nela tudo roda no navegador; contas, sincronização e o tutor com IA ficam desligados, e o tutor usa o modo offline.
 
+### Administração
+
+```bash
+node apps/api/scripts/metricas.ts            # retenção, funil e pontos difíceis (agregados, sem dados pessoais)
+node apps/api/scripts/plano.ts <email> premium 30   # muda o plano de uma conta (cortesia, teste)
+```
+
 ### Docker
 
 ```bash

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { PredictExercise } from '@alicerce/content';
+import type { PredictExercise } from '../../content.ts';
 import { CodeView } from '../../lib/markdown.tsx';
 import { ExerciseShell } from './Shell.tsx';
 import { normalizeOutput, useExercise } from './useExercise.ts';

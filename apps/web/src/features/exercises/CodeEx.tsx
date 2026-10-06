@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { CodeExercise } from '@alicerce/content';
+import type { CodeExercise } from '../../content.ts';
 import { CodeView } from '../../lib/markdown.tsx';
 import { CodeEditor } from '../editor/CodeEditor.tsx';
 import { ErrorBox } from '../runner/ErrorBox.tsx';

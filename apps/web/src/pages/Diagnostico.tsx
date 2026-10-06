@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { diagnosticItems, moduleById, NAO_SEI_LABEL } from '@alicerce/content';
+import { diagnosticItems, moduleById, NAO_SEI_LABEL } from '../content.ts';
 import { AREAS, ITEMS_PER_AREA, nextItem, scoreAreas, type DiagnosticAnswer } from '@alicerce/engine';
 import { useHead } from '../lib/head.tsx';
 import { CodeView, inline, Markdown } from '../lib/markdown.tsx';

@@ -1,4 +1,4 @@
-import { moduleById, projectById, projects, skillById } from '@alicerce/content';
+import { moduleById, projectById, projects, skillById } from '../content.ts';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
 import { toggleMilestone, useDerived, useProgress } from '../state/store.ts';

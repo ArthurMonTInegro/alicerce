@@ -1,9 +1,10 @@
-import { exercises, glossary, lessons, levels, projects, STAGES, STAGE_LABEL } from '@alicerce/content';
+import { exercises, glossary, lessons, levels, projects, STAGES, STAGE_LABEL } from '../content.ts';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
 import { useDerived } from '../state/store.ts';
 import { moduleProgress, nextModules } from '../lib/progress-helpers.ts';
 import { VIZ } from '../features/viz/index.tsx';
+import { PlanoDoDia } from '../components/PlanoDoDia.tsx';
 
 const DIFFERENTIATORS = [
   { icon: '🧠', title: 'Você pratica, não só assiste', text: 'Cada lição alterna explicação curta e exercício. Recuperar da memória (retrieval practice) fixa mais que reler ou rever um vídeo.' },
@@ -53,6 +54,7 @@ export function Home() {
       </section>
 
       <div className="container">
+        {started && <PlanoDoDia />}
         <section aria-labelledby="h-metodo">
           <h2 id="h-metodo">Como cada lição funciona</h2>
           <ol className="steps-inline" aria-label="Etapas de cada lição">

@@ -1,4 +1,4 @@
-import { countryCurricula, referenceById, universityPrograms, usUniversityRefs, type ResearchSource } from '@alicerce/content';
+import { countryCurricula, referenceById, universityPrograms, usUniversityRefs, type ResearchSource } from '../content.ts';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SETUP_ESCOLA } from '@alicerce/content';
+import { SETUP_ESCOLA } from '../content.ts';
 import { useHead } from '../lib/head.tsx';
 import { BASE } from '../lib/base.ts';
 import { CodeView } from '../lib/markdown.tsx';

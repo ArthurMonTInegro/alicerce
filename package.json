@@ -16,7 +16,7 @@
     "dev:api": "npm run dev --workspace @alicerce/api",
     "build": "npm run build --workspace @alicerce/web",
     "start": "npm run start --workspace @alicerce/api",
-    "typecheck": "tsc -p packages/engine && tsc -p packages/content && tsc -p apps/api && tsc -p apps/web",
+    "typecheck": "tsc -p packages/engine && tsc -p packages/content && tsc -p apps/api && node apps/web/scripts/gen-content.ts && tsc -p apps/web",
     "test": "vitest run",
     "test:content": "vitest run packages/content",
     "test:solutions": "node scripts/verify-solutions.ts",

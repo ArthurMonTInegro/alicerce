@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { exercises, lessons, skillById } from '@alicerce/content';
+import { exercises, findExercise, lessons, skillById, useLesson } from '../content.ts';
 import { isDue, previewIntervals, skillStatus, type Grade } from '@alicerce/engine';
 import { useHead } from '../lib/head.tsx';
 import { Markdown } from '../lib/markdown.tsx';
@@ -166,7 +166,7 @@ export function Revisao() {
                   ({skillById.get(c.skill)?.en})
                 </span>
               </p>
-              <Exercise key={c.ex.exercise.id} ex={c.ex.exercise} lessonId={c.ex.lessonId} />
+              <ChallengeExercise key={c.ex.exercise.id} id={c.ex.exercise.id} lessonId={c.ex.lessonId} />
             </div>
           ))
         ) : (
@@ -174,5 +174,24 @@ export function Revisao() {
         )}
       </section>
     </div>
+  );
+}
+
+/** Exercício de retenção: o enunciado completo vem da lição, baixada sob demanda. */
+function ChallengeExercise({ id, lessonId }: { id: string; lessonId: string }) {
+  const { lesson, failed, retry } = useLesson(lessonId);
+  const ex = findExercise(lesson, id);
+  if (ex) return <Exercise ex={ex} lessonId={lessonId} />;
+  return failed ? (
+    <p className="notice">
+      Não foi possível carregar este exercício.{' '}
+      <button type="button" className="btn small" onClick={retry}>
+        Tentar de novo
+      </button>
+    </p>
+  ) : (
+    <p className="muted" role="status">
+      Carregando exercício…
+    </p>
   );
 }

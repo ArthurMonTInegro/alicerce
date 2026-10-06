@@ -1,4 +1,4 @@
-import { levelById } from '@alicerce/content';
+import { levelById } from '../content.ts';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
 import { useDerived } from '../state/store.ts';

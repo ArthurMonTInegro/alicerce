@@ -4,7 +4,7 @@
  * Em qualquer modo, a regra é a mesma: ajudar a pensar, nunca entregar a resposta.
  */
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { exerciseById, lessonById } from '@alicerce/content';
+import { exerciseById, findExercise, lessonById, useLesson } from '../../content.ts';
 import { offlineTutor } from '@alicerce/engine';
 import { Markdown } from '../../lib/markdown.tsx';
 import { api } from '../../state/api.ts';
@@ -27,7 +27,9 @@ export function TutorPanel() {
   const input = useRef<HTMLTextAreaElement>(null);
   const opener = useRef<Element | null>(null);
 
-  const ex = ctx.exerciseId ? exerciseById.get(ctx.exerciseId)?.exercise : undefined;
+  const exRef = ctx.exerciseId ? exerciseById.get(ctx.exerciseId) : undefined;
+  const { lesson: exLesson } = useLesson(exRef?.lessonId);
+  const ex = exRef ? findExercise(exLesson, exRef.exercise.id) : undefined;
   const lesson = ctx.lessonId ? lessonById.get(ctx.lessonId) : undefined;
 
   const send = async (message: string) => {

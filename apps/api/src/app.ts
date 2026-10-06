@@ -24,6 +24,7 @@ import {
   type UserRow,
 } from './auth.ts';
 import type { Config } from './config.ts';
+import { getEntitlements } from './plans.ts';
 import { RateLimiter, securityHeaders } from './security.ts';
 import { ClaudeTutor, OfflineTutor, parseTutorRequest, type TutorProvider, type TutorReply } from './tutor.ts';
 
@@ -95,7 +96,11 @@ export async function buildApp({ config, db, tutor, logger = false }: AppDeps) {
 
   /* ---------- autenticação ---------- */
   // Sem sessão devolve user: null (200), e não 401: visitante anônimo é o caso normal.
-  app.get('/api/auth/me', async (req) => ({ user: currentUser(req) }));
+  const ent = (userId: string) => getEntitlements(db, userId, config.tutorDailyLimit);
+  app.get('/api/auth/me', async (req) => {
+    const user = currentUser(req);
+    return { user, entitlements: user ? ent(user.id) : null };
+  });
 
   app.post('/api/auth/register', async (req, reply) => {
     const retry = limits.auth.take(`reg:${req.ip}`);
@@ -111,7 +116,7 @@ export async function buildApp({ config, db, tutor, logger = false }: AppDeps) {
     const id = randomUUID();
     db.prepare('INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)').run(id, email, name, await hashPassword(password), Date.now());
     startSession(reply, id);
-    return reply.code(201).send({ user: { id, email, name } });
+    return reply.code(201).send({ user: { id, email, name }, entitlements: ent(id) });
   });
 
   app.post('/api/auth/login', async (req, reply) => {
@@ -125,7 +130,7 @@ export async function buildApp({ config, db, tutor, logger = false }: AppDeps) {
     if (!row || !ok) return reply.code(401).send({ error: 'E-mail ou senha incorretos.' });
     purgeExpiredSessions(db);
     startSession(reply, row.id);
-    return { user: { id: row.id, email: row.email, name: row.name } };
+    return { user: { id: row.id, email: row.email, name: row.name }, entitlements: ent(row.id) };
   });
 
   app.post('/api/auth/logout', async (req, reply) => {
@@ -181,7 +186,7 @@ export async function buildApp({ config, db, tutor, logger = false }: AppDeps) {
     if (ai && u) {
       const day = new Date().toISOString().slice(0, 10);
       const used = (db.prepare('SELECT count FROM tutor_usage WHERE user_id = ? AND day = ?').get(u.id, day) as { count: number } | undefined)?.count ?? 0;
-      if (used < config.tutorDailyLimit) {
+      if (used < ent(u.id).tutorDailyLimit) {
         db.prepare('INSERT INTO tutor_usage (user_id, day, count) VALUES (?, ?, 1) ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1').run(u.id, day);
         try {
           return { reply: await ai.answer(parsed), mode: 'ia' };

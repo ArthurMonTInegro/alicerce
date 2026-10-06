@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { levels, references, type ReferenceKind } from '@alicerce/content';
+import { levels, references, type ReferenceKind } from '../content.ts';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
 

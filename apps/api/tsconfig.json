@@ -1,1 +1,1 @@
-{ "extends": "../../tsconfig.base.json", "compilerOptions": { "types": ["node"], "module": "NodeNext", "moduleResolution": "NodeNext" }, "include": ["src", "test"] }
+{ "extends": "../../tsconfig.base.json", "compilerOptions": { "types": ["node"], "module": "NodeNext", "moduleResolution": "NodeNext" }, "include": ["src", "test", "scripts"] }

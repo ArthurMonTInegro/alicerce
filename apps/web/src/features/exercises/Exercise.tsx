@@ -1,4 +1,4 @@
-import type { Exercise as Ex } from '@alicerce/content';
+import type { Exercise as Ex } from '../../content.ts';
 import { Mcq } from './Mcq.tsx';
 import { Predict } from './Predict.tsx';
 import { CodeEx } from './CodeEx.tsx';

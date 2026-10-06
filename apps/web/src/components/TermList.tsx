@@ -1,4 +1,4 @@
-import type { Term } from '@alicerce/content';
+import type { Term } from '../content.ts';
 import { SpeakButton } from './Speak.tsx';
 
 export function TermList({ terms }: { terms: Term[] }) {

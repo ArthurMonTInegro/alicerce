@@ -1,5 +1,5 @@
-import type { Block } from '@alicerce/content';
-import { projectById } from '@alicerce/content';
+import type { Block } from '../content.ts';
+import { projectById } from '../content.ts';
 import { Markdown, inline } from '../lib/markdown.tsx';
 import { Link } from '../lib/router.tsx';
 import { Exercise } from '../features/exercises/Exercise.tsx';

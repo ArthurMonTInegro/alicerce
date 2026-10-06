@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { exercises, lessons, levels, skillById } from '@alicerce/content';
-import { activityByDay, mergeProgress, sanitizeProgress, skillStatus, streak, type SkillStatus } from '@alicerce/engine';
+import { exercises, lessons, levels, skillById } from '../content.ts';
+import { activityByDay, gamification, mergeProgress, sanitizeProgress, skillStatus, streak, type SkillStatus } from '@alicerce/engine';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
 import { getProgress, replaceProgress, resetProgress, useAuth, useDerived, useProgress } from '../state/store.ts';
@@ -47,6 +47,9 @@ export function Progresso() {
     [d, now],
   );
   const mastered = skillRows.filter((r) => r.status === 'dominada').length;
+  const completedLevels = useMemo(() => levels.filter((l) => l.modules.length && l.modules.every((m) => d.completedModules.has(m.id))).map((l) => l.number), [d]);
+  const g = useMemo(() => gamification(p, { completedLevels, tzOffsetMin: tz }), [p, completedLevels, tz]);
+  const tierPct = Math.round(((g.xp - g.tierFloor) / (g.nextTierAt - g.tierFloor)) * 100);
 
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(getProgress(), null, 2)], { type: 'application/json' });
@@ -84,6 +87,39 @@ export function Progresso() {
         <Stat n={d.solved.size} label={`de ${exercises.length} exercícios resolvidos`} />
         <Stat n={mastered} label={`habilidades dominadas (de ${skillById.size})`} />
       </div>
+
+      <section aria-labelledby="h-xp" style={{ marginBottom: '2rem', maxWidth: '760px' }}>
+        <h2 id="h-xp">Experiência e conquistas</h2>
+        <p>
+          <strong>{g.xp} XP</strong> · patamar {g.tier}{' '}
+          <span className="small muted">
+            ({g.nextTierAt - g.xp} XP para o patamar {g.tier + 1})
+          </span>
+        </p>
+        <div className="progress" role="progressbar" aria-label={`Progresso até o patamar ${g.tier + 1}`} aria-valuenow={tierPct} aria-valuemin={0} aria-valuemax={100}>
+          <span style={{ width: `${tierPct}%` }} />
+        </div>
+        <p className="small muted">
+          XP vem do que faz você aprender: resolver exercícios (com bônus de 50% quando acerta de primeira sem dica), concluir lições, revisar e avançar em projetos. Ver a solução não rende XP. Cada exercício conta uma vez.
+        </p>
+        <ul className="badges">
+          {g.badges.map((b) => (
+            <li key={b.id} className={b.done ? 'done' : undefined}>
+              <span className="badge-icon" aria-hidden="true">
+                {b.done ? '★' : '☆'}
+              </span>
+              <span>
+                <strong>{b.title}</strong>
+                <span className="small muted"> {b.description}</span>
+                <span className="small">
+                  {' '}
+                  {b.done ? 'Conquistada' : `${b.current} de ${b.target}`}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section aria-labelledby="h-act">
         <h2 id="h-act">Atividade nas últimas {WEEKS} semanas</h2>

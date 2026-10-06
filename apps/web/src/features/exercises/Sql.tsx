@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SqlExercise } from '@alicerce/content';
+import type { SqlExercise } from '../../content.ts';
 import { CodeView } from '../../lib/markdown.tsx';
 import { CodeEditor } from '../editor/CodeEditor.tsx';
 import { runSql } from '../runner/python.ts';

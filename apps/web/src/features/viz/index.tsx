@@ -3,7 +3,7 @@
  * baixado só quando uma visualização dele aparece na tela.
  */
 import { lazy, Suspense, type ComponentType } from 'react';
-import type { VizId } from '@alicerce/content';
+import type { VizId } from '../../content.ts';
 
 type VizComp = ComponentType<{ caption?: string | undefined }>;
 const group = (load: () => Promise<Record<string, unknown>>, name: string) => lazy(async () => ({ default: (await load())[name] as VizComp }));

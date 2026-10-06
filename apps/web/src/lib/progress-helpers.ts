@@ -1,4 +1,4 @@
-import { levels, modules, type Module } from '@alicerce/content';
+import { levels, modules, type Module } from '../content.ts';
 import { nodeStatus, topologicalOrder, type NodeStatus } from '@alicerce/engine';
 import type { Derived } from '../state/store.ts';
 

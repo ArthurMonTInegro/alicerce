@@ -4,3 +4,5 @@ export * from './graph.ts';
 export * from './diagnostic.ts';
 export * from './progress.ts';
 export * from './tutor.ts';
+export * from './achievements.ts';
+export * from './plans.ts';

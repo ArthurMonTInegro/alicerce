@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { CodeLang } from '@alicerce/content';
+import type { CodeLang } from '../content.ts';
 import { CodeView } from '../lib/markdown.tsx';
 import { navigate } from '../lib/router.tsx';
 import { runPython } from '../features/runner/python.ts';

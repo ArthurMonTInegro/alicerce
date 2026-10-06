@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { lessonById, levelById, moduleById, modules, referenceById, STAGE_LABEL, type Lesson, type Stage } from '@alicerce/content';
+import { lessonById, levelById, moduleById, modules, referenceById, STAGE_LABEL, useLesson, type LessonMeta, type Stage } from '../content.ts';
 import { topologicalOrder } from '@alicerce/engine';
 import { useHead } from '../lib/head.tsx';
 import { Link, setSearchParam, useSearchParam } from '../lib/router.tsx';
@@ -10,15 +10,16 @@ import { completeLesson, useDerived, useProgress, visitStage } from '../state/st
 import { resetTutorContext } from '../features/tutor/context.ts';
 import { NotFound } from './NotFound.tsx';
 
-const ORDERED_LESSONS: Lesson[] = topologicalOrder(modules).flatMap((m) => m.lessons);
+const ORDERED_LESSONS: LessonMeta[] = topologicalOrder(modules).flatMap((m) => m.lessons);
 
-function nextLesson(id: string): Lesson | undefined {
+function nextLesson(id: string): LessonMeta | undefined {
   const i = ORDERED_LESSONS.findIndex((l) => l.id === id);
   return i >= 0 ? ORDERED_LESSONS[i + 1] : undefined;
 }
 
 export function Licao({ id }: { id: string }) {
   const lesson = lessonById.get(id);
+  const { lesson: full, failed, retry } = useLesson(lesson?.id);
   const mod = lesson ? moduleById.get(lesson.moduleId) : undefined;
   const level = mod ? levelById.get(mod.levelId) : undefined;
   useHead(lesson ? `${lesson.title} (${lesson.titleEn})` : 'Lição não encontrada', lesson?.summary ?? '');
@@ -26,10 +27,10 @@ export function Licao({ id }: { id: string }) {
   const progress = useProgress();
   const d = useDerived();
 
-  const stages = useMemo(() => lesson?.sections.map((s) => s.stage) ?? [], [lesson]);
+  const stages = useMemo(() => lesson?.stages ?? [], [lesson]);
   const stage: Stage = stageParam && stages.includes(stageParam) ? stageParam : (stages[0] ?? 'conceito');
   const idx = stages.indexOf(stage);
-  const section = lesson?.sections[idx];
+  const section = full?.sections[idx];
 
   const firstStage = useRef(true);
   useEffect(() => {
@@ -49,11 +50,11 @@ export function Licao({ id }: { id: string }) {
     resetTutorContext({ lessonId: lesson.id });
   }, [lesson, stage]);
 
-  if (!lesson || !mod || !level || !section) return <NotFound />;
+  if (!lesson || !mod || !level || !stages.length) return <NotFound />;
 
   const visited = new Set(progress.lessons[lesson.id]?.visited ?? []);
   const done = d.completedLessons.has(lesson.id);
-  const practice = lesson.sections.filter((s) => s.stage === 'exercicio').flatMap((s) => s.blocks.flatMap((b) => (b.type === 'exercise' ? [b.exercise] : [])));
+  const practice = lesson.exercises.filter((e) => e.stage === 'exercicio');
   const attempted = new Set(progress.attempts.map((a) => a.exerciseId));
   const pending = practice.filter((e) => !attempted.has(e.id));
   const next = nextLesson(lesson.id);
@@ -86,7 +87,7 @@ export function Licao({ id }: { id: string }) {
       <div className="lesson-layout">
         <nav className="stage-nav" aria-label="Etapas da lição">
           <ol>
-            {lesson.sections.map((s) => (
+            {stages.map((st) => ({ stage: st })).map((s) => (
               <li key={s.stage}>
                 <a
                   href={`?etapa=${s.stage}`}
@@ -143,7 +144,20 @@ export function Licao({ id }: { id: string }) {
             </div>
           )}
 
-          <Blocks blocks={section.blocks} lessonId={lesson.id} />
+          {section ? (
+            <Blocks blocks={section.blocks} lessonId={lesson.id} />
+          ) : failed ? (
+            <div className="feedback err" role="alert">
+              <p>Não foi possível carregar esta lição. Verifique a conexão.</p>
+              <button type="button" className="btn" onClick={retry}>
+                Tentar de novo
+              </button>
+            </div>
+          ) : (
+            <p className="muted" role="status">
+              Carregando a lição…
+            </p>
+          )}
 
           {stage === 'revisao' && (
             <>

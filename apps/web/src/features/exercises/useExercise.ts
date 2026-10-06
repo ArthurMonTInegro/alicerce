@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import type { Exercise } from '@alicerce/content';
+import type { Exercise } from '../../content.ts';
 import { recordAttempt, useDerived } from '../../state/store.ts';
 
 /** Estado comum a todo exercício: dicas, tentativas, resolvido, revelado. */

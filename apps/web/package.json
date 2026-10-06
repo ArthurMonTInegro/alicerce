@@ -4,10 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "node scripts/copy-pyodide.ts && vite build && vite build --ssr src/entry-server.tsx --outDir dist-ssr && node scripts/prerender.ts",
+    "dev": "node scripts/gen-content.ts && vite",
+    "build": "node scripts/copy-pyodide.ts && node scripts/gen-content.ts && vite build && vite build --ssr src/entry-server.tsx --outDir dist-ssr && node scripts/prerender.ts",
     "preview": "vite preview",
-    "typecheck": "tsc -p ."
+    "typecheck": "node scripts/gen-content.ts && tsc -p .",
+    "gen": "node scripts/gen-content.ts"
   },
   "dependencies": {
     "@alicerce/content": "*",

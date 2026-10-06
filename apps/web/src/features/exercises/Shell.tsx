@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Exercise } from '@alicerce/content';
+import type { Exercise } from '../../content.ts';
 import { Markdown } from '../../lib/markdown.tsx';
 import { openTutor, setTutorContext } from '../tutor/context.ts';
 import { DIFF_LABEL, KIND_LABEL, type ExerciseState } from './useExercise.ts';

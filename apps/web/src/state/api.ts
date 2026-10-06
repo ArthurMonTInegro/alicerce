@@ -3,14 +3,19 @@
  * pelo servidor) e um cabeçalho fixo que a API exige em requisições que alteram
  * estado — junto com SameSite=Lax, isso bloqueia CSRF sem token extra.
  */
-import type { ProgressState } from '@alicerce/engine';
+import type { Entitlements, ProgressState } from '@alicerce/engine';
 import { BASE, STATIC_SITE } from '../lib/base.ts';
 
 export interface User {
   id: string;
   email: string;
   name: string;
+  /** o que o plano desta conta permite (ver packages/engine/src/plans.ts) */
+  entitlements?: Entitlements;
 }
+
+type AuthReply = { user: User | null; entitlements?: Entitlements | null };
+const withEnt = (r: AuthReply): User | null => (r.user ? { ...r.user, ...(r.entitlements ? { entitlements: r.entitlements } : {}) } : null);
 
 export interface TutorRequest {
   message: string;
@@ -55,14 +60,14 @@ export const api = {
   async me(): Promise<User | null> {
     if (STATIC_SITE) return null;
     try {
-      return (await call<{ user: User | null }>('GET', '/auth/me')).user;
+      return withEnt(await call<AuthReply>('GET', '/auth/me'));
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) return null;
       throw e;
     }
   },
-  login: async (email: string, password: string) => (await call<{ user: User }>('POST', '/auth/login', { email, password })).user,
-  register: async (email: string, password: string, name: string) => (await call<{ user: User }>('POST', '/auth/register', { email, password, name })).user,
+  login: async (email: string, password: string) => withEnt(await call<AuthReply>('POST', '/auth/login', { email, password }))!,
+  register: async (email: string, password: string, name: string) => withEnt(await call<AuthReply>('POST', '/auth/register', { email, password, name }))!,
   logout: () => call<void>('POST', '/auth/logout'),
   putProgress: async (p: ProgressState) => (await call<{ progress: ProgressState }>('PUT', '/progress', { progress: p })).progress,
   deleteAccount: () => call<void>('DELETE', '/auth/me'),
