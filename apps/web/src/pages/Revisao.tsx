@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { exerciseById, exercises, findExercise, lessons, lessonById, skillById, useLesson } from '../content.ts';
+import { cardsResource, exerciseById, exercises, findExercise, lessons, lessonById, skillById, useLesson, useResource, type LessonMeta } from '../content.ts';
 import { exercisesToRedo, isDue, previewIntervals, skillStatus, type Grade } from '@alicerce/engine';
 import { useHead } from '../lib/head.tsx';
 import { Markdown } from '../lib/markdown.tsx';
@@ -8,7 +8,6 @@ import { reviewCard, useDerived, useProgress } from '../state/store.ts';
 import { Exercise } from '../features/exercises/Exercise.tsx';
 import { formatDuration } from '../lib/progress-helpers.ts';
 
-const CARD_INDEX = new Map(lessons.flatMap((l) => l.cards.map((c) => [c.id, { ...c, lesson: l }] as const)));
 const GRADES: Array<{ g: Grade; label: string; en: string; key: string }> = [
   { g: 1, label: 'Errei', en: 'Again', key: '1' },
   { g: 2, label: 'Difícil', en: 'Hard', key: '2' },
@@ -24,6 +23,11 @@ export function Revisao() {
   const [shown, setShown] = useState(false);
   const [session, setSession] = useState(0);
   useEffect(() => setNow(Date.now()), [p.cards]);
+  const { value: cardsByLesson, failed: cardsFailed, retry: retryCards } = useResource(cardsResource);
+  const CARD_INDEX = useMemo(
+    () => new Map(lessons.flatMap((l: LessonMeta) => (cardsByLesson?.[l.id] ?? []).map((c) => [c.id, { ...c, lesson: l }] as const))),
+    [cardsByLesson],
+  );
 
   // fila: cartões vencidos, intercalando lições (interleaving)
   const queue = useMemo(() => {
@@ -32,7 +36,7 @@ export function Revisao() {
       .filter(([id, c]) => isDue(c, now) && CARD_INDEX.has(id))
       .sort(([a, x], [b, y]) => x.due - y.due || a.localeCompare(b))
       .map(([id]) => id);
-  }, [p.cards, now]);
+  }, [p.cards, now, CARD_INDEX]);
   const currentId = queue[0];
   const current = currentId ? CARD_INDEX.get(currentId) : undefined;
   const intervals = currentId && now ? previewIntervals(p.cards[currentId]!, now) : null;
@@ -106,7 +110,20 @@ export function Revisao() {
 
       <section aria-labelledby="h-cards" className="prose" style={{ maxWidth: '760px' }}>
         <h2 id="h-cards">Cartões</h2>
-        {!now ? null : current ? (
+        {!now ? null : totalCards > 0 && !cardsByLesson ? (
+          cardsFailed ? (
+            <div className="feedback err" role="alert">
+              <p>Não foi possível carregar os cartões. Verifique a conexão.</p>
+              <button type="button" className="btn" onClick={retryCards}>
+                Tentar de novo
+              </button>
+            </div>
+          ) : (
+            <p className="muted" role="status">
+              Carregando os cartões…
+            </p>
+          )
+        ) : current ? (
           <div>
             <div className="flashcard" aria-live="polite">
               <div>

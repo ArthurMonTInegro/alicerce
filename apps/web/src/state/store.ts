@@ -21,7 +21,7 @@ import {
   type ProgressState,
   type SkillState,
 } from '@alicerce/engine';
-import { lessonById, modules, type Exercise } from '../content.ts';
+import { cardIds, lessonById, modules, type Exercise } from '../content.ts';
 import { api, type User } from './api.ts';
 
 const KEY = 'alicerce:progresso:v1';
@@ -190,7 +190,7 @@ export function completeLesson(lessonId: string) {
   const now = Date.now();
   update((s) => {
     const cards = { ...s.cards };
-    for (const c of lesson?.cards ?? []) if (!cards[c.id]) cards[c.id] = newCard(now + 60 * 60_000); // primeira revisão em ~1h
+    for (const id of lesson ? cardIds(lesson) : []) if (!cards[id]) cards[id] = newCard(now + 60 * 60_000); // primeira revisão em ~1h
     const cur = s.lessons[lessonId] ?? { visited: [] };
     return { ...s, cards, lessons: { ...s.lessons, [lessonId]: { ...cur, completedAt: cur.completedAt ?? now } } };
   });

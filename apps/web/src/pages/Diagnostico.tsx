@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { diagnosticItems, moduleById, NAO_SEI_LABEL } from '../content.ts';
+import { diagnosticItems, moduleById, NAO_SEI_LABEL, cardIds } from '../content.ts';
 import { AREAS, ITEMS_PER_AREA, nextItem, scoreAreas, type DiagnosticAnswer } from '@alicerce/engine';
 import { useHead } from '../lib/head.tsx';
 import { CodeView, inline, Markdown } from '../lib/markdown.tsx';
@@ -42,7 +42,7 @@ export function Diagnostico() {
 
   const apply = () => {
     setTestedOut(rec.testedOut);
-    enrollCards(rec.testedOut.flatMap((id) => moduleById.get(id)?.lessons.flatMap((l) => l.cards.map((c) => c.id)) ?? []));
+    enrollCards(rec.testedOut.flatMap((id) => moduleById.get(id)?.lessons.flatMap(cardIds) ?? []));
     setApplied(true);
   };
 

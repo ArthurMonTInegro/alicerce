@@ -3,7 +3,7 @@ import { createRoot, hydrateRoot } from 'react-dom/client';
 import { App } from './App.tsx';
 import { RouterProvider } from './lib/router.tsx';
 import { stripBase } from './lib/base.ts';
-import { loadLesson } from './content.ts';
+import { preloadPath } from './routes.tsx';
 import './styles.css';
 
 const root = document.getElementById('root')!;
@@ -14,12 +14,11 @@ const tree = (
     </RouterProvider>
   </StrictMode>
 );
-// Numa página de lição, o HTML pré-renderizado já traz o texto. Baixamos a lição
-// antes de hidratar para que o React encontre exatamente o mesmo conteúdo.
-const lessonId = /^\/licao\/([^/]+)/.exec(stripBase(location.pathname))?.[1];
-
+// O HTML pré-renderizado já traz a página pronta. Baixamos o código e os dados dela
+// (texto da lição, cartões, glossário) antes de hidratar, para o React encontrar
+// exatamente o mesmo conteúdo.
 async function start() {
-  if (lessonId) await loadLesson(decodeURIComponent(lessonId)).catch(() => undefined);
+  await preloadPath(stripBase(location.pathname));
   // HTML pré-renderizado → hidrata; desenvolvimento (sem SSR) → renderiza do zero.
   if (root.firstElementChild) hydrateRoot(root, tree);
   else createRoot(root).render(tree);

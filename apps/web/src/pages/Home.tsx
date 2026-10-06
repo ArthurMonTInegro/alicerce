@@ -1,4 +1,4 @@
-import { exercises, glossary, lessons, levels, projects, STAGES, STAGE_LABEL } from '../content.ts';
+import { exercises, glossaryCount, lessons, levels, projects, STAGES, STAGE_LABEL } from '../content.ts';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
 import { useDerived } from '../state/store.ts';
@@ -96,7 +96,7 @@ export function Home() {
               [lessons.length, 'lições com as 8 etapas completas'],
               [exercises.length, 'exercícios com correção automática'],
               [Object.keys(VIZ).length, 'visualizações interativas'],
-              [glossary.length, 'termos técnicos português → inglês'],
+              [glossaryCount, 'termos técnicos português → inglês'],
               [projects.length, 'projetos para o portfólio'],
             ].map(([n, t]) => (
               <div className="card" key={String(t)}>

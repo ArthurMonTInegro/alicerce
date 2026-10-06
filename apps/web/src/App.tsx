@@ -1,59 +1,13 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { Layout } from './components/Layout.tsx';
-import { matchPath, useLocation, useRouteFocus } from './lib/router.tsx';
+import { setPreloader, useLocation, useRouteFocus } from './lib/router.tsx';
 import { initAuth } from './state/store.ts';
-import { Carreira } from './pages/Carreira.tsx';
-import { Conta } from './pages/Conta.tsx';
-import { Diagnostico } from './pages/Diagnostico.tsx';
-import { Glossario } from './pages/Glossario.tsx';
-import { Home } from './pages/Home.tsx';
-import { Laboratorio } from './pages/Laboratorio.tsx';
-import { Licao } from './pages/Licao.tsx';
-import { Metodologia } from './pages/Metodologia.tsx';
-import { Modulo } from './pages/Modulo.tsx';
-import { Nivel } from './pages/Nivel.tsx';
 import { NotFound } from './pages/NotFound.tsx';
-import { Privacidade } from './pages/Privacidade.tsx';
-import { Progresso } from './pages/Progresso.tsx';
-import { Projeto, Projetos } from './pages/Projetos.tsx';
-import { Referencias } from './pages/Referencias.tsx';
-import { Revisao } from './pages/Revisao.tsx';
-import { Sobre } from './pages/Sobre.tsx';
-import { Trilha } from './pages/Trilha.tsx';
-import { Visualizacoes } from './pages/Visualizacoes.tsx';
+import { findRoute, loadPage, loadedPage, preloadPath } from './routes.tsx';
 
-type Route = [pattern: string, render: (p: Record<string, string>) => ReactNode];
+setPreloader(preloadPath);
 
-/** Tabela de rotas. A pré-renderização usa os mesmos padrões (scripts/prerender.ts). */
-export const ROUTES: Route[] = [
-  ['/', () => <Home />],
-  ['/trilha', () => <Trilha />],
-  ['/nivel/:id', (p) => <Nivel key={p.id} id={p.id!} />],
-  ['/modulo/:id', (p) => <Modulo key={p.id} id={p.id!} />],
-  ['/licao/:id', (p) => <Licao key={p.id} id={p.id!} />],
-  ['/revisao', () => <Revisao />],
-  ['/diagnostico', () => <Diagnostico />],
-  ['/laboratorio', () => <Laboratorio />],
-  ['/projetos', () => <Projetos />],
-  ['/projetos/:id', (p) => <Projeto key={p.id} id={p.id!} />],
-  ['/carreira', () => <Carreira />],
-  ['/glossario', () => <Glossario />],
-  ['/visualizacoes', () => <Visualizacoes />],
-  ['/progresso', () => <Progresso />],
-  ['/conta', () => <Conta />],
-  ['/metodologia', () => <Metodologia />],
-  ['/referencias', () => <Referencias />],
-  ['/sobre', () => <Sobre />],
-  ['/privacidade', () => <Privacidade />],
-];
-
-function resolve(path: string): ReactNode {
-  for (const [pattern, render] of ROUTES) {
-    const params = matchPath(pattern, path);
-    if (params) return render(params);
-  }
-  return <NotFound />;
-}
+export { ROUTES } from './routes.tsx';
 
 export function App() {
   const { path } = useLocation();
@@ -61,5 +15,42 @@ export function App() {
   useEffect(() => {
     void initAuth();
   }, []);
-  return <Layout>{resolve(path)}</Layout>;
+  const found = findRoute(path);
+  const mod = found ? loadedPage(found.route.page) : undefined;
+  // Normalmente a página já veio baixada (pré-carregada antes da navegação). Se não veio
+  // (voltar do navegador, rede lenta), baixa aqui e mostra um aviso enquanto isso.
+  const [failed, setFailed] = useState<string | null>(null);
+  const [, setTick] = useState(0);
+  const key = found?.route.page;
+  useEffect(() => {
+    if (!key || mod) return;
+    let alive = true;
+    loadPage(key).then(
+      () => alive && setTick((n) => n + 1),
+      () => alive && setFailed(key),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [key, mod]);
+
+  let content;
+  if (!found) content = <NotFound />;
+  else if (mod) content = found.route.render(mod as never, found.params);
+  else if (failed === key)
+    content = (
+      <div className="container" role="alert">
+        <p>Não foi possível carregar esta página. Verifique a conexão.</p>
+        <button type="button" className="btn" onClick={() => location.reload()}>
+          Tentar de novo
+        </button>
+      </div>
+    );
+  else
+    content = (
+      <p className="container muted" role="status">
+        Carregando…
+      </p>
+    );
+  return <Layout>{content}</Layout>;
 }

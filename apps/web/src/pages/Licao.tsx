@@ -109,9 +109,9 @@ export function Licao({ id }: { id: string }) {
             ))}
           </ol>
           <details className="disclosure" style={{ marginTop: '1rem' }}>
-            <summary>Termos desta lição ({lesson.terms.length})</summary>
+            <summary>Termos desta lição ({full?.terms.length ?? '…'})</summary>
             <ul style={{ paddingLeft: '1rem', fontSize: '0.88rem' }}>
-              {lesson.terms.map((t) => (
+              {(full?.terms ?? []).map((t) => (
                 <li key={t.en}>
                   {t.pt} → <span lang="en" style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{t.en}</span>
                 </li>
@@ -137,7 +137,7 @@ export function Licao({ id }: { id: string }) {
                 <strong>Ao final desta lição você vai conseguir:</strong>
               </p>
               <ul>
-                {lesson.objectives.map((o, i) => (
+                {(full?.objectives ?? []).map((o, i) => (
                   <li key={i}>
                     <Markdown text={o} />
                   </li>
@@ -161,13 +161,13 @@ export function Licao({ id }: { id: string }) {
             </p>
           )}
 
-          {stage === 'revisao' && (
+          {stage === 'revisao' && full && (
             <>
               <h3>Vocabulário da lição</h3>
-              <TermList terms={lesson.terms} />
+              <TermList terms={full.terms} />
               <h3>Teste sua memória</h3>
               <p className="small muted">Tente responder antes de abrir. Ao concluir a lição, estes cartões entram na sua revisão espaçada.</p>
-              {lesson.cards.map((c) => (
+              {full.cards.map((c) => (
                 <RecallCard key={c.id} front={c.front} back={c.back} />
               ))}
               {lesson.references.length > 0 && (

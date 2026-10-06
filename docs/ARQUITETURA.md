@@ -122,14 +122,17 @@ O mesmo `harness.py` roda no CPython local em `scripts/verify-solutions.ts`, ent
 - `OfflineTutor`: usa `offlineTutor()` do motor (pistas guiadas pelo tipo de erro e pelas dicas do exercício).
 - `ClaudeTutor`: monta um prompt de sistema com o enunciado, a lição e as regras pedagógicas (nunca dar a solução, responder com pergunta ou pista, um passo por vez). O código e o erro do estudante entram na mensagem do usuário, delimitados por tags e tratados como dados. A solução oficial nunca é enviada ao modelo. Em qualquer erro ou recusa, o servidor responde com o tutor offline.
 
-## Conteúdo sob demanda
+## Conteúdo e páginas sob demanda
 
 `apps/web/scripts/gen-content.ts` roda antes do build, do `dev` e do typecheck e gera em `apps/web/src/generated/` (fora do git):
 
-- `catalog.json`: níveis, módulos, metadados de cada lição (sem o texto das etapas, mas com a lista de etapas e de exercícios), habilidades e glossário;
-- `lessons/<id>.json`: o texto completo de cada lição.
+- `catalog.json`: níveis, módulos, metadados de cada lição (sem texto, termos, objetivos nem cartões, mas com a lista de etapas, de exercícios e o número de cartões), habilidades e o total do glossário;
+- `lessons/<id>.json`: o texto completo de cada lição;
+- `cards.json` e `glossary.json`: cartões de revisão e glossário, usados só pelas páginas Revisão e Glossário.
 
-O front-end importa conteúdo só por `apps/web/src/content.ts`, que expõe o catálogo e carrega cada lição com `import.meta.glob` na primeira vez que ela é aberta (`useLesson`, `loadLesson`). A pré-renderização chama `seedLessons` com o conteúdo inteiro, e `main.tsx` baixa a lição da URL antes de hidratar, para o HTML e o React baterem. Resultado: o JavaScript inicial caiu de 1,09 MB (344 KB com gzip) para 739 KB (229 KB com gzip).
+O front-end importa conteúdo só por `apps/web/src/content.ts`. Cada página também é um pedaço de JavaScript separado: `apps/web/src/routes.tsx` diz qual página e quais dados cada rota precisa, e o roteador espera `preloadPath` antes de trocar de página, então a página nova aparece pronta. Na primeira visita, `main.tsx` faz o mesmo antes de hidratar o HTML pré-renderizado; a pré-renderização (`entry-server.tsx`) entrega tudo carregado com `seedPages`, `seedLessons` e `seed` dos recursos.
+
+Resultado: o JavaScript inicial caiu de 1,09 MB (344 KB com gzip) para 427 KB (132 KB com gzip), e não cresce mais junto com o número de lições.
 
 ## Gamificação
 
@@ -143,4 +146,12 @@ No servidor, `apps/api/src/plans.ts` lê e muda o plano (`setPlan` grava também
 
 ## Métricas
 
-`apps/api/src/metrics.ts` calcula, a partir do progresso já sincronizado (sem rastreamento extra), usuários ativos por dia, semana e mês, retenção D1/D7/D30, funil (cadastro → diagnóstico → primeira lição → primeiro nível), exercícios mais difíceis e lições onde as pessoas param. Grupos com menos de 5 pessoas não são mostrados. Relatório: `node apps/api/scripts/metricas.ts [--json]`.
+`apps/api/src/metrics.ts` calcula, a partir do progresso já sincronizado (sem rastreamento extra), a métrica principal (aprendizado que dura: entre quem começou há 30 dias ou mais, quantos resolveram de novo uma habilidade sem ver a solução ou lembraram um cartão 30 dias depois; regra em `packages/engine/src/retention.ts`), usuários ativos por dia, semana e mês, retenção D1/D7/D30, funil (cadastro → diagnóstico → primeira lição → primeiro nível), exercícios mais difíceis e lições onde as pessoas param. Grupos com menos de 5 pessoas não são mostrados. Relatório: `node apps/api/scripts/metricas.ts [--json]`.
+
+## Exercícios para refazer
+
+Ver a solução de um exercício é a saída para quem travou: a lição pode ser concluída, mas o exercício entra em Revisão → Para refazer até ser resolvido sem ajuda (`exercisesToRedo` em `packages/engine/src/retention.ts`). O plano do dia e a própria lição avisam.
+
+## Lições extras dos níveis 3 e 4
+
+Cada módulo dos níveis 3 e 4 tem um arquivo `packages/content/src/levels/modulos/<módulo>.ts` com as lições além da primeira. Um arquivo novo é conferido antes de entrar no currículo com `node scripts/check-lessons.ts <arquivo> <módulo>`: tipos, etapas, ids, termos, cartões, referências e execução de cada exercício (a solução passa, o código inicial falha, "prever a saída" bate).

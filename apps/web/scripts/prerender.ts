@@ -19,7 +19,7 @@ const PARAMS: Record<string, string[]> = {
   '/licao/:id': lessons.map((l) => l.id),
   '/projetos/:id': projects.map((p) => p.id),
 };
-const urls = ROUTES.flatMap(([pattern]) => {
+const urls = ROUTES.flatMap(({ pattern }) => {
   if (!pattern.includes(':')) return [pattern];
   const ids = PARAMS[pattern];
   if (!ids) throw new Error(`prerender: sem ids para ${pattern}`);

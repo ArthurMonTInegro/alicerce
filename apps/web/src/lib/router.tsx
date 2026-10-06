@@ -34,11 +34,26 @@ function subscribe(cb: () => void) {
   };
 }
 
+let preload: ((path: string) => Promise<unknown>) | null = null;
+let navToken = 0;
+
+/** Registra o que baixar antes de trocar de página (código e dados da página de destino). */
+export function setPreloader(fn: (path: string) => Promise<unknown>) {
+  preload = fn;
+}
+
 export function navigate(to: string, opts: { replace?: boolean } = {}) {
-  const url = withBase(to);
-  if (opts.replace) window.history.replaceState(null, '', url);
-  else window.history.pushState(null, '', url);
-  for (const l of listeners) l();
+  const commit = () => {
+    const url = withBase(to);
+    if (opts.replace) window.history.replaceState(null, '', url);
+    else window.history.pushState(null, '', url);
+    for (const l of listeners) l();
+  };
+  const path = to.split(/[?#]/)[0]!;
+  if (!preload || path === stripBase(window.location.pathname)) return commit();
+  // a última navegação pedida vence, mesmo que uma anterior termine de baixar depois
+  const token = ++navToken;
+  void preload(path).finally(() => token === navToken && commit());
 }
 
 const ServerLocation = createContext<Loc | null>(null);

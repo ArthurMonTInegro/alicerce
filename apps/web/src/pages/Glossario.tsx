@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { glossary, lessonById } from '../content.ts';
+import { glossaryCount, glossaryResource, lessonById, useResource, type GlossaryEntry } from '../content.ts';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
 import { SpeakButton, speak } from '../components/Speak.tsx';
@@ -11,13 +11,15 @@ const norm = (s: string) =>
     .replace(/[̀-ͯ]/g, '');
 
 export function Glossario() {
-  useHead('Glossário português → inglês', `Os ${glossary.length} termos técnicos da trilha em português e inglês, com definição, exemplo de uso real e pronúncia.`);
+  const { value: loaded, failed, retry } = useResource(glossaryResource);
+  const glossary = useMemo(() => loaded ?? [], [loaded]);
+  useHead('Glossário português → inglês', `Os ${glossaryCount} termos técnicos da trilha em português e inglês, com definição, exemplo de uso real e pronúncia.`);
   const [q, setQ] = useState('');
   const [practice, setPractice] = useState(false);
   const list = useMemo(() => {
     const t = norm(q.trim());
     return t ? glossary.filter((g) => norm(`${g.pt} ${g.en} ${g.def}`).includes(t)) : glossary;
-  }, [q]);
+  }, [q, glossary]);
   return (
     <div className="container">
       <p className="eyebrow">Glossário · glossary</p>
@@ -32,10 +34,19 @@ export function Glossario() {
           {practice ? 'Fechar treino' : '🎯 Treinar vocabulário'}
         </button>
       </div>
-      {practice && <VocabPractice />}
-      <p className="small muted" role="status">
-        {list.length} termo(s)
-      </p>
+      {practice && loaded && <VocabPractice glossary={loaded} />}
+      {failed ? (
+        <div className="feedback err" role="alert">
+          <p>Não foi possível carregar o glossário. Verifique a conexão.</p>
+          <button type="button" className="btn" onClick={retry}>
+            Tentar de novo
+          </button>
+        </div>
+      ) : (
+        <p className="small muted" role="status">
+          {loaded ? `${list.length} termo(s)` : 'Carregando o glossário…'}
+        </p>
+      )}
       <dl className="terms-list" style={{ margin: 0 }}>
         {list.map((g) => (
           <div key={g.en} className="card" style={{ padding: '0.7rem 0.85rem' }}>
@@ -75,7 +86,7 @@ export function Glossario() {
   );
 }
 
-function VocabPractice() {
+function VocabPractice({ glossary }: { glossary: GlossaryEntry[] }) {
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * glossary.length));
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<'ok' | 'err' | null>(null);
