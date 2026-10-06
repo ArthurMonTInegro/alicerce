@@ -1,3 +1,4 @@
+import type { PlacementRule } from '@alicerce/engine';
 import type { DiagnosticItem } from './types.ts';
 
 /**
@@ -150,7 +151,7 @@ export const diagnosticItems: DiagnosticItem[] = [
  * quando a evidência é forte. O estudante sempre pode desfazer a dispensa e,
  * em qualquer caso, os cards de revisão desses módulos entram na fila.
  */
-export const placementRules = [
+export const placementRules: PlacementRule[] = [
   { moduleId: 'm0-1', requires: { computacao: 0.85 } },
   { moduleId: 'm0-2', requires: { computacao: 0.85 } },
   { moduleId: 'm0-3', requires: { computacao: 0.85 } },
@@ -161,6 +162,6 @@ export const placementRules = [
   { moduleId: 'm1-4', requires: { programacao: 0.85, logica: 0.6 } },
   { moduleId: 'm1-5', requires: { programacao: 0.85, logica: 0.85 } },
   { moduleId: 'm14-1', requires: { logica: 0.85, matematica: 0.85 } },
-] as const;
+];
 
 export const NAO_SEI_LABEL = NAO_SEI;

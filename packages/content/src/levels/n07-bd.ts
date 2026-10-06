@@ -1,7 +1,7 @@
 import type { Level } from '../types.ts';
 import { code, dedent, deep, english, info, lesson, md, py, t, warn } from '../helpers.ts';
 
-const SETUP_ESCOLA = dedent(`
+export const SETUP_ESCOLA = dedent(`
   CREATE TABLE alunos (id INTEGER PRIMARY KEY, nome TEXT NOT NULL, curso TEXT, ano INTEGER);
   CREATE TABLE disciplinas (id INTEGER PRIMARY KEY, nome TEXT NOT NULL, creditos INTEGER);
   CREATE TABLE matriculas (aluno_id INTEGER REFERENCES alunos(id), disciplina_id INTEGER REFERENCES disciplinas(id), nota REAL);

@@ -1,3 +1,4 @@
+import { countryCurricula, universityPrograms, learningEvidence, usUniversityRefs } from './research.ts';
 /**
  * Testes de integridade do conteúdo. O currículo é dado tipado, então dá para
  * verificar automaticamente o que num CMS só se descobre quando o aluno tropeça:
@@ -205,5 +206,16 @@ describe('entrevistas e glossário', () => {
   it('glossário não tem termo em inglês duplicado', () => {
     expect(dupes(glossary.map((g) => g.en.toLowerCase()))).toEqual([]);
     expect(glossary.length).toBeGreaterThan(200);
+  });
+});
+
+describe('pesquisa', () => {
+  it('fontes têm https e ids únicos', () => {
+    const all = [...countryCurricula, ...universityPrograms, ...learningEvidence];
+    expect(new Set(all.map((x) => x.id)).size).toBe(all.length);
+    for (const x of all) expect(x.url.startsWith('https://')).toBe(true);
+  });
+  it('referências de universidades dos EUA existem', () => {
+    for (const id of usUniversityRefs) expect(referenceById.has(id), id).toBe(true);
   });
 });

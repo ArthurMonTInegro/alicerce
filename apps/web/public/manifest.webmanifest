@@ -1,0 +1,10 @@
+{
+  "name": "Alicerce — formação em computação",
+  "short_name": "Alicerce",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f1e7",
+  "theme_color": "#1d2a44",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
