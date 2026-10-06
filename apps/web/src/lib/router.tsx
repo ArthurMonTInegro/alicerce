@@ -5,6 +5,7 @@
  * No servidor (pré-renderização) a URL vem por props.
  */
 import { createContext, useContext, useEffect, useSyncExternalStore, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } from 'react';
+import { stripBase, withBase } from './base.ts';
 
 interface Loc {
   path: string;
@@ -16,7 +17,7 @@ const listeners = new Set<() => void>();
 let current: Loc | null = null;
 
 function readLocation(): Loc {
-  return { path: window.location.pathname, search: window.location.search, hash: window.location.hash };
+  return { path: stripBase(window.location.pathname), search: window.location.search, hash: window.location.hash };
 }
 function snapshot(): Loc {
   const l = readLocation();
@@ -34,8 +35,9 @@ function subscribe(cb: () => void) {
 }
 
 export function navigate(to: string, opts: { replace?: boolean } = {}) {
-  if (opts.replace) window.history.replaceState(null, '', to);
-  else window.history.pushState(null, '', to);
+  const url = withBase(to);
+  if (opts.replace) window.history.replaceState(null, '', url);
+  else window.history.pushState(null, '', url);
   for (const l of listeners) l();
 }
 
@@ -67,7 +69,7 @@ export function setSearchParam(name: string, value: string | null, replace = tru
   const u = new URL(window.location.href);
   if (value === null) u.searchParams.delete(name);
   else u.searchParams.set(name, value);
-  navigate(u.pathname + u.search + u.hash, { replace });
+  navigate(stripBase(u.pathname) + u.search + u.hash, { replace });
 }
 
 /** Casa "/licao/:id" com "/licao/m1-1-l1" → { id: 'm1-1-l1' } */
@@ -97,7 +99,7 @@ export function Link({ to, activeExact, onClick, children, ...rest }: LinkProps)
     navigate(to);
   };
   return (
-    <a href={to} onClick={handle} aria-current={active ? 'page' : undefined} {...rest}>
+    <a href={withBase(to)} onClick={handle} aria-current={active ? 'page' : undefined} {...rest}>
       {children}
     </a>
   );

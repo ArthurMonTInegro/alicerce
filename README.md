@@ -33,6 +33,10 @@ Todas são opcionais; veja `.env.example`.
 | `COOKIE_SECURE` | ligado em produção | Cookie de sessão com atributo `Secure` (exige HTTPS) |
 | `SITE_URL` | vazio | Usado no build para canonical, sitemap e robots.txt |
 
+### Versão de demonstração (GitHub Pages)
+
+O workflow `.github/workflows/pages.yml` gera, a cada push na main, uma versão só com o site estático (`BASE_PATH=/alicerce/`, `VITE_STATIC=1`) e a publica no branch `gh-pages`. Nela tudo roda no navegador; contas, sincronização e o tutor com IA ficam desligados, e o tutor usa o modo offline.
+
 ### Docker
 
 ```bash

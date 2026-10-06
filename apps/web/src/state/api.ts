@@ -4,6 +4,7 @@
  * estado — junto com SameSite=Lax, isso bloqueia CSRF sem token extra.
  */
 import type { ProgressState } from '@alicerce/engine';
+import { BASE, STATIC_SITE } from '../lib/base.ts';
 
 export interface User {
   id: string;
@@ -37,7 +38,8 @@ export class ApiError extends Error {
 }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  if (STATIC_SITE) throw new ApiError(503, 'Esta é a versão de demonstração, sem servidor: contas e sincronização não estão disponíveis.');
+  const res = await fetch(`${BASE}/api${path}`, {
     method,
     credentials: 'same-origin',
     headers: body === undefined ? { 'x-alicerce': '1' } : { 'content-type': 'application/json', 'x-alicerce': '1' },
@@ -51,6 +53,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export const api = {
   async me(): Promise<User | null> {
+    if (STATIC_SITE) return null;
     try {
       return (await call<{ user: User | null }>('GET', '/auth/me')).user;
     } catch (e) {

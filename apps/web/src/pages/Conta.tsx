@@ -3,6 +3,7 @@ import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
 import { api, ApiError } from '../state/api.ts';
 import { signIn, signOut, syncNow, useAuth } from '../state/store.ts';
+import { STATIC_SITE } from '../lib/base.ts';
 
 const SYNC_LABEL = { offline: 'Sem conta: progresso só neste navegador', idle: 'Sincronizado', syncing: 'Sincronizando…', error: 'Falha ao sincronizar; tentaremos de novo' } as const;
 
@@ -46,6 +47,19 @@ export function Conta() {
       setError('Não consegui excluir a conta agora. Tente de novo.');
     }
   };
+
+  if (STATIC_SITE) {
+    return (
+      <div className="container prose" style={{ maxWidth: '60ch' }}>
+        <p className="eyebrow">Conta · account</p>
+        <h1>Conta</h1>
+        <p>Esta é a versão de demonstração, publicada sem servidor. Tudo funciona, mas o progresso fica só neste navegador: criar conta, sincronizar entre aparelhos e o tutor com IA ficam disponíveis quando a plataforma roda com o servidor dela.</p>
+        <p>
+          Seu progresso pode ser exportado e importado em <Link to="/progresso">Progresso</Link>.
+        </p>
+      </div>
+    );
+  }
 
   if (user) {
     return (

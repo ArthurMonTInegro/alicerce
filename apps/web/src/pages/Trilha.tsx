@@ -3,6 +3,7 @@ import { levels, moduleById, modules, type Module } from '@alicerce/content';
 import { ancestors } from '@alicerce/engine';
 import { useHead } from '../lib/head.tsx';
 import { Link, navigate } from '../lib/router.tsx';
+import { withBase } from '../lib/base.ts';
 import { useDerived } from '../state/store.ts';
 import { levelNumber, moduleProgress, moduleStatus, nextModules, STATUS_BADGE, STATUS_LABEL } from '../lib/progress-helpers.ts';
 
@@ -141,7 +142,7 @@ export function Trilha() {
               return (
                 <a
                   key={m.id}
-                  href={`/modulo/${m.id}`}
+                  href={withBase(`/modulo/${m.id}`)}
                   onClick={(e) => {
                     e.preventDefault();
                     navigate(`/modulo/${m.id}`);

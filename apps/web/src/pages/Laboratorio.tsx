@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { SETUP_ESCOLA } from '@alicerce/content';
 import { useHead } from '../lib/head.tsx';
+import { BASE } from '../lib/base.ts';
 import { CodeView } from '../lib/markdown.tsx';
 import { CodeEditor } from '../features/editor/CodeEditor.tsx';
 import { runPython, runSql } from '../features/runner/python.ts';
@@ -120,7 +121,7 @@ export function Laboratorio() {
     }
   };
   const share = async () => {
-    const url = `${window.location.origin}/laboratorio#codigo=${encodeShare(lang, code)}`;
+    const url = `${window.location.origin}${BASE}/laboratorio#codigo=${encodeShare(lang, code)}`;
     try {
       await navigator.clipboard.writeText(url);
       setShareMsg('Link copiado! O código vai dentro do link: nada é enviado a servidores.');

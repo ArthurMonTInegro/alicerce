@@ -6,6 +6,7 @@
  * e termos bilíngues {{termo|term}}.
  */
 import { Fragment, type ReactNode } from 'react';
+import { withBase } from './base.ts';
 import { highlight } from './highlight.tsx';
 
 const INLINE = /(\{\{([^|}]+)\|([^}]+)\}\})|(`([^`]+)`)|(\*\*([^*]+)\*\*)|(\*([^*\s][^*]*)\*)|(\[([^\]]+)\]\(([^)\s]+)\))/g;
@@ -27,7 +28,7 @@ export function inline(text: string, keyPrefix = 'i'): ReactNode[] {
       const safe = /^(https:\/\/|\/|#)/.test(href);
       out.push(
         safe ? (
-          <a key={key} href={href} {...(href.startsWith('https://') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+          <a key={key} href={withBase(href)} {...(href.startsWith('https://') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
             {inline(m[11]!, key)}
           </a>
         ) : (

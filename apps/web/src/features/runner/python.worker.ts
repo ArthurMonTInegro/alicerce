@@ -16,7 +16,7 @@ let py: Promise<PyodideLike> | null = null;
 
 function boot(): Promise<PyodideLike> {
   py ??= (async () => {
-    const base = new URL('/pyodide/', self.location.origin).href;
+    const base = new URL(`${import.meta.env.BASE_URL}pyodide/`, self.location.origin).href;
     const mod = (await import(/* @vite-ignore */ `${base}pyodide.mjs`)) as { loadPyodide(o: object): Promise<PyodideLike> };
     const instance = await mod.loadPyodide({ indexURL: base });
     instance.runPython(harness);
