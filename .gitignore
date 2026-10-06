@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-ssr
+*.db
+*.db-*
+.env
+playwright-report
+test-results
+apps/web/public/pyodide
+coverage

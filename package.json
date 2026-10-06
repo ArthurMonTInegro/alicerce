@@ -1,0 +1,33 @@
+{
+  "name": "alicerce",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Alicerce — plataforma de formação em computação, do zero ao avançado.",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace @alicerce/web",
+    "dev:api": "npm run dev --workspace @alicerce/api",
+    "build": "npm run build --workspace @alicerce/web",
+    "start": "npm run start --workspace @alicerce/api",
+    "typecheck": "tsc -p packages/engine && tsc -p packages/content && tsc -p apps/api && tsc -p apps/web",
+    "test": "vitest run",
+    "test:content": "vitest run packages/content",
+    "test:solutions": "node scripts/verify-solutions.ts",
+    "test:e2e": "playwright test",
+    "check": "npm run typecheck && npm test && npm run test:solutions"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}
