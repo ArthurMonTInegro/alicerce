@@ -60,7 +60,7 @@ export function Conta() {
           <button type="button" className="btn" onClick={() => void syncNow()} disabled={syncStatus === 'syncing'}>
             Sincronizar agora
           </button>
-          <button type="button" className="btn" onClick={() => void signOut()}>
+          <button type="button" className="btn" onClick={() => void signOut().then(() => setMode('login'))}>
             Sair
           </button>
           <button type="button" className="btn danger" onClick={deleteAccount}>

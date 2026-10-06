@@ -1,0 +1,11 @@
+node_modules
+**/node_modules
+**/dist
+**/dist-ssr
+apps/web/public/pyodide
+test-results
+playwright-report
+*.db
+*.db-*
+.env
+.git

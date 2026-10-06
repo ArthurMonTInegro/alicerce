@@ -22,7 +22,7 @@ export function Projetos() {
           const ready = pr.requires.every((m) => d.completedModules.has(m) || d.testedOut.has(m));
           return (
             <li key={pr.id} style={{ margin: 0 }}>
-              <Link to={`/projetos/${pr.id}`} className="card" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.25rem 1rem' }}>
+              <Link to={`/projetos/${pr.id}`} className="card" style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', gap: '0.25rem 1rem' }}>
                 <span className="level-num" aria-hidden="true">
                   {pr.order}
                 </span>
@@ -34,7 +34,7 @@ export function Projetos() {
                         {done}/{pr.milestones.length} etapas
                       </span>
                     )}
-                    {!ready && <span className="badge">requer {pr.requires.map((m) => moduleById.get(m)?.title).join(', ')}</span>}
+                    {!ready && <span className="badge" style={{ whiteSpace: 'normal' }}>requer {pr.requires.map((m) => moduleById.get(m)?.title).join(', ')}</span>}
                   </div>
                   <h2 style={{ fontSize: '1.2rem', margin: '0.4rem 0 0.2rem' }}>
                     {pr.title}{' '}

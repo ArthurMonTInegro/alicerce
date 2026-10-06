@@ -28,11 +28,11 @@ export function Carreira() {
       <p className="eyebrow">Carreira · career</p>
       <h1>Carreira e entrevistas</h1>
       <p className="lead">Saber é metade do caminho; a outra metade é mostrar. Treine entrevistas (em português e em inglês) e monte currículo, GitHub e portfólio que provam o que você construiu.</p>
-      <div className="segmented" role="tablist" aria-label="Seções" style={{ marginBottom: '1.5rem' }}>
-        <button type="button" role="tab" aria-selected={tab === 'entrevistas'} aria-pressed={tab === 'entrevistas'} onClick={() => setSearchParam('aba', null)}>
+      <div className="segmented" role="group" aria-label="Seções" style={{ marginBottom: '1.5rem' }}>
+        <button type="button" aria-pressed={tab === 'entrevistas'} onClick={() => setSearchParam('aba', null)}>
           Treino de entrevistas
         </button>
-        <button type="button" role="tab" aria-selected={tab === 'guia'} aria-pressed={tab === 'guia'} onClick={() => setSearchParam('aba', 'guia')}>
+        <button type="button" aria-pressed={tab === 'guia'} onClick={() => setSearchParam('aba', 'guia')}>
           Currículo, GitHub e portfólio
         </button>
       </div>

@@ -52,7 +52,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 export const api = {
   async me(): Promise<User | null> {
     try {
-      return (await call<{ user: User }>('GET', '/auth/me')).user;
+      return (await call<{ user: User | null }>('GET', '/auth/me')).user;
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) return null;
       throw e;

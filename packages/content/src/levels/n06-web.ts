@@ -1,5 +1,6 @@
 import type { Level } from '../types.ts';
 import { code, dedent, deep, english, info, lesson, md, py, t, tip, warn } from '../helpers.ts';
+import { backend } from './aprofundamento-a.ts';
 
 const htmlCss = lesson({
   id: 'l6-html-css',
@@ -564,7 +565,7 @@ export const level6: Level = {
       prerequisites: ['m6-3', 'm7-1', 'm5-1'],
       skills: [{ id: 'web-backend', pt: 'Back-end e autenticação', en: 'Back-end and authentication' }],
       outline: ['Arquitetura de um servidor web', 'Frameworks (FastAPI, Express, Fastify)', 'Camadas: rotas, serviços, repositórios', 'Sessões com cookies × tokens (JWT)', 'Hash de senhas', 'Validação e tratamento de erros', 'Front-end com componentes (React)'],
-      lessons: [],
+      lessons: [backend],
       references: ['owasp-cheatsheets', 'mdn-http'],
     },
   ],

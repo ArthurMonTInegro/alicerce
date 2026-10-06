@@ -1,5 +1,6 @@
 import type { Level } from '../types.ts';
 import { code, dedent, deep, english, info, lesson, md, py, t, warn } from '../helpers.ts';
+import { memoria, sockets, arquitetura } from './aprofundamento-a.ts';
 
 /* ========================= Nível 8 — Sistemas Operacionais ========================= */
 
@@ -1130,7 +1131,7 @@ export const level8: Level = {
       prerequisites: ['m8-1'],
       skills: [{ id: 'so-memoria', pt: 'Memória virtual e arquivos', en: 'Virtual memory and file systems' }],
       outline: ['Espaço de endereçamento', 'Paginação e TLB', 'Stack × heap', 'Ponteiros e gerenciamento de memória em C', 'Inodes, diretórios, journaling'],
-      lessons: [],
+      lessons: [memoria],
       references: ['ostep', 'cmu-15213'],
     },
     {
@@ -1174,7 +1175,7 @@ export const level9: Level = {
       prerequisites: ['m9-2', 'm2-5'],
       skills: [{ id: 'redes-sockets', pt: 'Programação com sockets', en: 'Socket programming' }],
       outline: ['API de sockets', 'Servidor TCP de eco', 'Concorrência no servidor', 'WebSockets', 'Balanceamento de carga e proxies'],
-      lessons: [],
+      lessons: [sockets],
       references: ['kurose-ross', 'python-docs'],
     },
   ],
@@ -1218,7 +1219,7 @@ export const level10: Level = {
       prerequisites: ['m10-3', 'm5-3'],
       skills: [{ id: 'eng-arquitetura', pt: 'Arquitetura de software', en: 'Software architecture' }],
       outline: ['Camadas e arquitetura limpa', 'Monólito × microsserviços', 'Documentação (README, ADRs)', 'Requisitos e histórias de usuário', 'Scrum, Kanban e métodos ágeis'],
-      lessons: [],
+      lessons: [arquitetura],
       references: ['ddia', 'swe-at-google', 'pragmatic-programmer'],
     },
   ],

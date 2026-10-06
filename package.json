@@ -21,6 +21,7 @@
     "test:content": "vitest run packages/content",
     "test:solutions": "node scripts/verify-solutions.ts",
     "test:e2e": "playwright test",
+    "docs": "node scripts/gen-docs.ts",
     "check": "npm run typecheck && npm test && npm run test:solutions"
   },
   "devDependencies": {

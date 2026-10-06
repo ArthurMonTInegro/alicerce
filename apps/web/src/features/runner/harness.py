@@ -131,6 +131,7 @@ def run(user_code, tests_json="[]", stdin_text="", trace=False):
             result["phase"] = "tests"
             for t in tests:
                 ns["_output"] = out.getvalue()
+                ns["_source"] = user_code
                 entry = {"name": t["name"], "passed": True, "message": ""}
                 saved = out.tell()
                 try:

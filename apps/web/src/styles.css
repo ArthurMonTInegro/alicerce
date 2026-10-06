@@ -208,7 +208,8 @@ main { padding-block: 1.5rem 4rem; min-height: 70vh; }
 .btn.primary { --btn-bg: var(--brand); --btn-ink: var(--brand-ink); --btn-line: var(--brand); }
 .btn.primary:hover { filter: brightness(1.15); background: var(--brand); }
 .btn.accent { --btn-bg: var(--accent); --btn-ink: #fff; --btn-line: var(--accent); }
-:root[data-theme='dark'] .btn.accent, :root:not([data-theme='light']) .btn.accent { --btn-ink: #1b1208; }
+:root[data-theme='dark'] .btn.accent { --btn-ink: #1b1208; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .btn.accent { --btn-ink: #1b1208; } }
 .btn.accent:hover { filter: brightness(1.08); background: var(--accent); }
 .btn.ghost { --btn-bg: transparent; --btn-line: transparent; }
 .btn.small { padding: 0.3rem 0.65rem; min-height: 2rem; font-size: 0.85rem; }
@@ -347,7 +348,12 @@ a.card:hover { border-color: var(--accent); transform: translateY(-2px); }
 .stage-nav { position: sticky; top: 4.5rem; }
 @media (max-width: 960px) { .stage-nav { position: static; } }
 .stage-nav ol { list-style: none; margin: 0; padding: 0; counter-reset: st; display: grid; gap: 0.2rem; }
-@media (max-width: 960px) { .stage-nav ol { display: flex; overflow-x: auto; gap: 0.35rem; padding-bottom: 0.4rem; } }
+@media (max-width: 960px) {
+  .stage-nav ol { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .stage-nav a { padding: 0.35rem 0.5rem; font-size: 0.85rem; }
+  .stage-nav .en { display: none; }
+}
+.lesson-layout > * { min-width: 0; }
 .stage-nav li { margin: 0; counter-increment: st; }
 .stage-nav a { display: flex; gap: 0.55rem; align-items: center; padding: 0.45rem 0.6rem; border-radius: var(--radius-sm); color: var(--ink-2); text-decoration: none; font-size: 0.92rem; white-space: nowrap; }
 .stage-nav a::before { content: counter(st); display: inline-grid; place-items: center; flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 1.5px solid var(--line-strong); font: 700 0.75rem/1 var(--font-sans); }
@@ -497,7 +503,7 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 .frame .changed { background: var(--highlight); }
 
 /* ---------- utilidades ---------- */
-.kbd { font: 0.8rem var(--font-mono); border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 0.3rem; background: var(--surface); }
+.kbd { color: var(--ink); font: 0.8rem var(--font-mono); border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 0.3rem; background: var(--surface); }
 .pill-list { display: flex; flex-wrap: wrap; gap: 0.35rem; padding: 0; margin: 0 0 1rem; list-style: none; }
 .pill-list li { margin: 0; }
 .toc { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.25rem; }

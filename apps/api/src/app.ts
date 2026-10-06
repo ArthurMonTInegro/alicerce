@@ -94,10 +94,8 @@ export async function buildApp({ config, db, tutor, logger = false }: AppDeps) {
   });
 
   /* ---------- autenticação ---------- */
-  app.get('/api/auth/me', async (req, reply) => {
-    const u = requireUser(req, reply);
-    return u ? { user: u } : reply;
-  });
+  // Sem sessão devolve user: null (200), e não 401: visitante anônimo é o caso normal.
+  app.get('/api/auth/me', async (req) => ({ user: currentUser(req) }));
 
   app.post('/api/auth/register', async (req, reply) => {
     const retry = limits.auth.take(`reg:${req.ip}`);

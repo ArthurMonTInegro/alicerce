@@ -59,7 +59,7 @@ describe('API', () => {
     const out = await app.inject({ method: 'POST', url: '/api/auth/logout', headers: { ...H, cookie: cookieOf(ok) } });
     expect(out.statusCode).toBe(204);
     const after = await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie: cookieOf(ok) } });
-    expect(after.statusCode).toBe(401);
+    expect(after.json().user).toBeNull();
   });
 
   it('valida senha curta e e-mail inválido', async () => {
@@ -91,7 +91,7 @@ describe('API', () => {
     const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'c@c.co', password: 'uma frase longa' } });
     const cookie = cookieOf(reg);
     expect((await app.inject({ method: 'DELETE', url: '/api/auth/me', headers: { ...H, cookie } })).statusCode).toBe(204);
-    expect((await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie } })).statusCode).toBe(401);
+    expect((await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie } })).json().user).toBeNull();
   });
 
   it('tutor offline responde sem IA e recusa dar a resposta', async () => {

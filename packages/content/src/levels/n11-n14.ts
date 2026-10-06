@@ -1,5 +1,6 @@
 import type { Level } from '../types.ts';
 import { code, dedent, deep, info, lesson, md, py, t, warn } from '../helpers.ts';
+import { cripto, deploy, discreta, algebra } from './aprofundamento-b.ts';
 
 /* ========================= Nível 11 — Segurança ========================= */
 
@@ -1326,7 +1327,7 @@ export const level11: Level = {
       prerequisites: ['m11-1', 'm14-1'],
       skills: [{ id: 'seg-cripto', pt: 'Criptografia aplicada', en: 'Applied cryptography' }],
       outline: ['Criptografia simétrica (AES)', 'Assimétrica (RSA, curvas elípticas)', 'Assinaturas digitais e HMAC', 'Troca de chaves', 'Nunca crie sua própria cripto'],
-      lessons: [],
+      lessons: [cripto],
       references: ['stanford-cs255', 'owasp-cheatsheets'],
     },
   ],
@@ -1361,7 +1362,7 @@ export const level12: Level = {
       prerequisites: ['m12-2', 'm10-3'],
       skills: [{ id: 'devops-deploy', pt: 'Deploy e observabilidade', en: 'Deployment and observability' }],
       outline: ['Modelos de nuvem: IaaS, PaaS, serverless', 'Pipelines de entrega contínua', 'Infraestrutura como código', 'Logs, métricas e traces', 'Escalabilidade horizontal e vertical', 'Twelve-Factor App', 'SRE: SLIs, SLOs e incidentes'],
-      lessons: [],
+      lessons: [deploy],
       references: ['twelve-factor', 'google-sre', 'aws-well-architected'],
     },
   ],
@@ -1431,7 +1432,7 @@ export const level14: Level = {
       prerequisites: ['m14-1', 'm4-4'],
       skills: [{ id: 'mat-discreta', pt: 'Matemática discreta', en: 'Discrete mathematics' }],
       outline: ['Indução matemática', 'Invariantes de laço e corretude', 'Recorrências e Teorema Mestre', 'Teoria dos grafos', 'Aritmética modular (base da criptografia)'],
-      lessons: [],
+      lessons: [discreta],
       references: ['mit-6042', 'rosen-discrete', 'clrs'],
     },
     {
@@ -1440,7 +1441,7 @@ export const level14: Level = {
       prerequisites: ['m14-2', 'm2-2'],
       skills: [{ id: 'mat-algebra', pt: 'Álgebra linear e cálculo', en: 'Linear algebra and calculus' }],
       outline: ['Vetores e produto escalar', 'Matrizes e multiplicação', 'Transformações lineares', 'Derivadas e regra da cadeia', 'Gradiente', 'Aplicações: gráficos, recomendação, redes neurais'],
-      lessons: [],
+      lessons: [algebra],
       references: ['mit-1806', 'mml-book'],
     },
   ],

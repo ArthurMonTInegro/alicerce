@@ -1,5 +1,6 @@
 import type { Level } from '../types.ts';
 import { code, dedent, deep, english, info, lesson, md, py, t, warn } from '../helpers.ts';
+import { nosql } from './aprofundamento-a.ts';
 
 export const SETUP_ESCOLA = dedent(`
   CREATE TABLE alunos (id INTEGER PRIMARY KEY, nome TEXT NOT NULL, curso TEXT, ano INTEGER);
@@ -476,7 +477,7 @@ export const level7: Level = {
       prerequisites: ['m7-3'],
       skills: [{ id: 'bd-nosql', pt: 'NoSQL', en: 'NoSQL' }],
       outline: ['Documentos (MongoDB)', 'Chave-valor (Redis)', 'Colunares e grafos', 'Teorema CAP', 'Replicação e particionamento', 'Escolhendo o banco certo'],
-      lessons: [],
+      lessons: [nosql],
       references: ['ddia', 'cmu-15445'],
     },
   ],

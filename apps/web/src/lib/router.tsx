@@ -53,7 +53,9 @@ function parseUrl(url: string): Loc {
 
 export function useLocation(): Loc {
   const server = useContext(ServerLocation);
-  return useSyncExternalStore(subscribe, snapshot, () => server ?? { path: '/', search: '', hash: '' });
+  // Na hidratação o React usa o "snapshot do servidor": no navegador ele precisa ser a URL real,
+  // senão a página pré-renderizada de /trilha seria hidratada como se fosse a página inicial.
+  return useSyncExternalStore(subscribe, snapshot, () => server ?? (typeof window === 'undefined' ? { path: '/', search: '', hash: '' } : snapshot()));
 }
 
 export function useSearchParam(name: string): string | null {

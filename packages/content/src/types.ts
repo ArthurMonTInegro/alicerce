@@ -108,7 +108,7 @@ export interface PredictExercise extends ExerciseBase {
 
 export interface PythonTest {
   name: string;
-  /** código Python executado após o código do estudante; use assert. `_output` contém o que foi impresso. */
+  /** código Python executado após o código do estudante; use assert. `_output` contém o que foi impresso e `_source`, o código do estudante. */
   code: string;
 }
 

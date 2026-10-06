@@ -93,7 +93,7 @@ export function Diagnostico() {
           <ul className="options">
             {current.options.map((o, i) => (
               <li key={i}>
-                <label className="option" aria-checked={choice === i} style={{ cursor: 'pointer' }}>
+                <label className="option" style={{ cursor: 'pointer' }}>
                   <input type="radio" name="diag" checked={choice === i} onChange={() => setChoice(i)} style={{ marginTop: '0.3rem' }} />
                   <span>{inline(o)}</span>
                 </label>
