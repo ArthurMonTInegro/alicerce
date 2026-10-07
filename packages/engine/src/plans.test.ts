@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { can, effectivePlan, entitlements, FEATURES, formatBRL, PLANS, PREMIUM_FOR_SALE, yearlyDeal } from './plans.ts';
+import { can, effectivePlan, entitlements, FEATURES, FOREVER_FREE, formatBRL, PLANS, PREMIUM_FOR_SALE, yearlyDeal } from './plans.ts';
 
 describe('planos', () => {
   it('plano vencido ou desconhecido vira gratuito', () => {
@@ -44,5 +44,13 @@ describe('planos', () => {
     const paidOnly = PLANS.premium.features.filter((f) => !PLANS.free.features.includes(f));
     const paidReady = paidOnly.some((f) => FEATURES[f].status === 'disponivel');
     expect(PREMIUM_FOR_SALE && !paidReady).toBe(false);
+  });
+
+  it('o que é gratuito para sempre está em todos os planos e já existe', () => {
+    for (const f of FOREVER_FREE) {
+      expect(FEATURES[f].status).toBe('disponivel');
+      for (const plan of Object.values(PLANS)) expect(plan.features).toContain(f);
+      expect(can(entitlements('free', null, 60), f)).toBe(true);
+    }
   });
 });

@@ -112,6 +112,13 @@ export function yearlyDeal(price: PlanPrice) {
   };
 }
 
+/**
+ * Gratuitos para sempre, decisão do Arthur em 07/10/2026 e compromisso público em
+ * /planos. Nenhum plano pode deixar de ter estes recursos (um teste cobra isso).
+ * O tutor com IA e a sincronização têm custo por pessoa e ficaram de fora.
+ */
+export const FOREVER_FREE: readonly Feature[] = ['trilha-completa', 'exercicios-e-revisao', 'laboratorio', 'tutor-offline'];
+
 export const isPlanId = (x: unknown): x is PlanId => x === 'free' || x === 'premium';
 
 /** Plano em vigor: um plano pago vencido volta a ser o gratuito, sem perder progresso. */

@@ -124,6 +124,8 @@ test('planos: mostra o preço decidido, sem botão de compra, e o rodapé leva a
   await expect(premium).toContainText(/R\$\s149,00 por ano/);
   await expect(premium).toContainText(/R\$\s12,42 por mês/);
   await expect(premium).toContainText('ainda não está à venda');
+  await expect(main.getByRole('region', { name: 'Gratuito' }).getByText('grátis para sempre')).toHaveCount(4);
+  await expect(main).toContainText('ficam gratuitos para sempre, em qualquer plano');
   await expect(main.getByRole('button')).toHaveCount(0);
   await expect(main.getByRole('link', { name: /assin|compr|pagar|checkout/i })).toHaveCount(0);
   expect(errors).toEqual([]);
