@@ -1,5 +1,6 @@
 /** Configuração por variáveis de ambiente, lida uma vez e validada. */
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_TUTOR_DAILY_LIMIT } from '@alicerce/engine';
 
 export interface Config {
   port: number;
@@ -34,6 +35,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     trustProxy: bool(env.TRUST_PROXY, false),
     anthropicApiKey: env.ANTHROPIC_API_KEY || undefined,
     tutorModel: env.TUTOR_MODEL || 'claude-sonnet-5-5',
-    tutorDailyLimit: int(env.TUTOR_DAILY_LIMIT, 60),
+    tutorDailyLimit: int(env.TUTOR_DAILY_LIMIT, DEFAULT_TUTOR_DAILY_LIMIT),
   };
 }

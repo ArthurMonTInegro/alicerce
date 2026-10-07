@@ -10,7 +10,7 @@ Requisitos: Node.js 22.18 ou mais novo (o projeto usa TypeScript executado diret
 
 ```bash
 npm ci
-npm run build      # gera apps/web/dist com as 190 páginas pré-renderizadas
+npm run build      # gera apps/web/dist com as 191 páginas pré-renderizadas
 npm start          # API + site em http://localhost:3001
 ```
 

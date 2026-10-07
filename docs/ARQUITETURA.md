@@ -101,9 +101,9 @@ Toda mutação exige o cabeçalho `x-alicerce: 1` (defesa contra CSRF somada ao 
 
 ## Navegação
 
-`/` início · `/trilha` mapa dos 15 níveis · `/nivel/:id` · `/modulo/:id` · `/licao/:id?etapa=` as 8 etapas · `/revisao` cartões para hoje · `/diagnostico` · `/laboratorio` editor livre (com link compartilhável) · `/projetos` e `/projetos/:id` · `/carreira` · `/glossario` · `/visualizacoes?v=` · `/progresso` · `/conta` · `/metodologia` · `/referencias` · `/sobre` · `/privacidade`.
+`/` início · `/trilha` mapa dos 15 níveis · `/nivel/:id` · `/modulo/:id` · `/licao/:id?etapa=` as 8 etapas · `/revisao` cartões para hoje · `/diagnostico` · `/laboratorio` editor livre (com link compartilhável) · `/projetos` e `/projetos/:id` · `/carreira` · `/glossario` · `/visualizacoes?v=` · `/progresso` · `/conta` · `/metodologia` · `/referencias` · `/sobre` · `/privacidade` · `/planos` preço do premium, só informativo.
 
-Cada rota é pré-renderizada no build (190 páginas), com título, descrição, canonical e Open Graph próprios, e o React hidrata por cima. Sem JavaScript, o conteúdo das lições continua legível.
+Cada rota é pré-renderizada no build (191 páginas), com título, descrição, canonical e Open Graph próprios, e o React hidrata por cima. Sem JavaScript, o conteúdo das lições continua legível.
 
 ## Fluxo de um exercício de código
 
@@ -140,7 +140,7 @@ Resultado: o JavaScript inicial caiu de 1,09 MB (344 KB com gzip) para 427 KB (1
 
 ## Planos e direitos de uso
 
-`packages/engine/src/plans.ts` é a única tabela do que cada plano pode fazer. O código pergunta `can(entitlements, 'tutor-ia')`, nunca "é premium?". Recursos com status `planejado` aparecem na página de planos mas não são concedidos. Um plano vencido volta a `free` sem perder progresso.
+`packages/engine/src/plans.ts` é a única tabela do que cada plano pode fazer. O código pergunta `can(entitlements, 'tutor-ia')`, nunca "é premium?". Recursos com status `planejado` aparecem na página de planos (`/planos`) marcados como em construção e não são concedidos. Um plano vencido volta a `free` sem perder progresso. O preço também mora lá (`price`, em centavos, para não somar dinheiro com ponto flutuante), junto com `formatBRL` e `yearlyDeal`; `PREMIUM_FOR_SALE` só vira `true` quando houver provedor de pagamento e algum recurso pago pronto, e um teste impede ligá-lo enquanto nenhum recurso pago estiver pronto.
 
 No servidor, `apps/api/src/plans.ts` lê e muda o plano (`setPlan` grava também em `plan_changes`). Não há provedor de pagamento: quando houver, o webhook dele chama `setPlan`, e nenhum dado de cartão passa pelo Alicerce. Para testes e cortesias: `node apps/api/scripts/plano.ts <email> <free|premium> [dias]`.
 

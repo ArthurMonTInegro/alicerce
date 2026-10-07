@@ -98,6 +98,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <Link to="/visualizacoes">Visualizações</Link>
             <Link to="/referencias">Referências</Link>
             <Link to="/sobre">Por que a Alicerce</Link>
+            <Link to="/planos">Planos</Link>
             <Link to="/privacidade">Privacidade</Link>
           </nav>
           <p>Alicerce — formação em computação, do zero ao avançado. Conteúdo original, com referências públicas citadas em cada módulo. Seu progresso fica no seu navegador; a conta é opcional.</p>

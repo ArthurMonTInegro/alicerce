@@ -24,12 +24,13 @@ import * as metodologia from './pages/Metodologia.tsx';
 import * as referencias from './pages/Referencias.tsx';
 import * as sobre from './pages/Sobre.tsx';
 import * as privacidade from './pages/Privacidade.tsx';
+import * as planos from './pages/Planos.tsx';
 
 // No build, tudo já está em memória: cada página sai completa, sem "Carregando".
 seedLessons(lessons);
 cardsResource.seed(Object.fromEntries(lessons.map((l) => [l.id, l.cards])));
 glossaryResource.seed(glossary);
-seedPages({ home, trilha, nivel, modulo, licao, revisao, diagnostico, laboratorio, projetos, carreira, glossario, visualizacoes, progresso, conta, metodologia, referencias, sobre, privacidade });
+seedPages({ home, trilha, nivel, modulo, licao, revisao, diagnostico, laboratorio, projetos, carreira, glossario, visualizacoes, progresso, conta, metodologia, referencias, sobre, privacidade, planos });
 
 export function render(url: string): { html: string; head: HeadData } {
   const head: HeadData = { title: 'Alicerce', description: '' };

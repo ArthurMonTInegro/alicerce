@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { can, effectivePlan, entitlements, FEATURES, PLANS } from './plans.ts';
+import { can, effectivePlan, entitlements, FEATURES, formatBRL, PLANS, PREMIUM_FOR_SALE, yearlyDeal } from './plans.ts';
 
 describe('planos', () => {
   it('plano vencido ou desconhecido vira gratuito', () => {
@@ -25,5 +25,24 @@ describe('planos', () => {
 
   it('o pago inclui tudo do gratuito', () => {
     for (const f of PLANS.free.features) expect(PLANS.premium.features).toContain(f);
+  });
+
+  it('preço do premium: R$ 19,90 por mês ou R$ 149 por ano', () => {
+    expect(PLANS.free.price).toBeNull();
+    expect(PLANS.premium.price).toEqual({ monthly: 1990, yearly: 14900 });
+    const nbsp = (x: string) => x.replace(/\s/g, ' ');
+    expect(nbsp(formatBRL(1990))).toBe('R$ 19,90');
+    expect(nbsp(formatBRL(14900))).toBe('R$ 149,00');
+  });
+
+  it('o anual sai a R$ 12,42 por mês e economiza 37%, sem arredondar o desconto para cima', () => {
+    expect(yearlyDeal({ monthly: 1990, yearly: 14900 })).toEqual({ perMonth: 1242, savings: 8980, savingsPercent: 37 });
+    expect(yearlyDeal({ monthly: 1000, yearly: 12000 })).toEqual({ perMonth: 1000, savings: 0, savingsPercent: 0 });
+  });
+
+  it('o premium só entra à venda quando algum recurso pago existir', () => {
+    const paidOnly = PLANS.premium.features.filter((f) => !PLANS.free.features.includes(f));
+    const paidReady = paidOnly.some((f) => FEATURES[f].status === 'disponivel');
+    expect(PREMIUM_FOR_SALE && !paidReady).toBe(false);
   });
 });

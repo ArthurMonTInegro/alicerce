@@ -31,6 +31,7 @@ const PAGES = {
   referencias: () => import('./pages/Referencias.tsx'),
   sobre: () => import('./pages/Sobre.tsx'),
   privacidade: () => import('./pages/Privacidade.tsx'),
+  planos: () => import('./pages/Planos.tsx'),
 };
 export type PageKey = keyof typeof PAGES;
 type PageModule<K extends PageKey> = Awaited<ReturnType<(typeof PAGES)[K]>>;
@@ -72,6 +73,7 @@ export const ROUTES: Route[] = [
   route('/referencias', 'referencias', (m) => <m.Referencias />),
   route('/sobre', 'sobre', (m) => <m.Sobre />),
   route('/privacidade', 'privacidade', (m) => <m.Privacidade />),
+  route('/planos', 'planos', (m) => <m.Planos />),
 ];
 
 const loaded = new Map<PageKey, unknown>();

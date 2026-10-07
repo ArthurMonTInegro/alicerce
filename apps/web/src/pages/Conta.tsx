@@ -4,7 +4,7 @@ import { Link } from '../lib/router.tsx';
 import { api, ApiError } from '../state/api.ts';
 import { signIn, signOut, syncNow, useAuth } from '../state/store.ts';
 import { STATIC_SITE } from '../lib/base.ts';
-import { FEATURES, PLANS } from '@alicerce/engine';
+import { FEATURES, PLANS, PREMIUM_FOR_SALE } from '@alicerce/engine';
 
 const SYNC_LABEL = { offline: 'Sem conta: progresso só neste navegador', idle: 'Sincronizado', syncing: 'Sincronizando…', error: 'Falha ao sincronizar; tentaremos de novo' } as const;
 
@@ -83,7 +83,9 @@ export function Conta() {
               ))}
               <li>Tutor com IA: até {user.entitlements.tutorDailyLimit} perguntas por dia</li>
             </ul>
-            <p className="small muted">Hoje, a trilha inteira é gratuita. Se recursos pagos vierem a existir, a ideia é que somem ao que você já tem, sem tirar nada.</p>
+            <p className="small muted">
+              {PREMIUM_FOR_SALE ? 'A trilha inteira é gratuita.' : 'Hoje, tudo é gratuito. O premium ainda não está à venda.'} Veja <Link to="/planos">Planos</Link>.
+            </p>
           </section>
         )}
         <div className="row">
@@ -110,7 +112,7 @@ export function Conta() {
     <div className="container prose" style={{ maxWidth: '52ch' }}>
       <p className="eyebrow">Conta · account</p>
       <h1>{mode === 'login' ? 'Entrar' : 'Criar conta'}</h1>
-      <p>A conta é opcional: serve só para sincronizar o progresso entre aparelhos. Tudo funciona sem ela. Veja a <Link to="/privacidade">política de privacidade</Link>.</p>
+      <p>A conta é opcional: serve para sincronizar o progresso entre aparelhos e, quando o tutor com IA está ativado, para usá-lo. Todo o resto funciona sem ela. Veja a <Link to="/privacidade">política de privacidade</Link>.</p>
       <div className="segmented" role="group" aria-label="Escolha">
         <button type="button" aria-pressed={mode === 'login'} onClick={() => (setMode('login'), setError(''))}>
           Já tenho conta

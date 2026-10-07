@@ -19,7 +19,7 @@ Revisão feita ao fim da construção, em 06/10/2026, contra o pedido original. 
 | Tutor que não dá a resposta | Feito | IA (Claude) para contas, offline para todos; solução nunca enviada |
 | Carreira e referências | Feito | 28 perguntas de entrevista, currículo, GitHub, portfólio; 77 referências verificadas |
 | Pesquisa internacional sem inventar fontes | Feito, com ressalvas abaixo | [PESQUISA.md](PESQUISA.md) |
-| Desempenho, acessibilidade, segurança, SEO, celular | Feito, com ressalvas abaixo | axe WCAG 2.2 AA em 15 páginas e nas etapas Explicação, Exercícios e Desafio de todas as lições, 190 páginas pré-renderizadas, CSP estrita |
+| Desempenho, acessibilidade, segurança, SEO, celular | Feito, com ressalvas abaixo | axe WCAG 2.2 AA em 16 páginas e nas etapas Explicação, Exercícios e Desafio de todas as lições, 191 páginas pré-renderizadas, CSP estrita |
 
 ## Fraquezas reais
 

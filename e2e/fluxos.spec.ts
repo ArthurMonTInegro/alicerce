@@ -110,6 +110,25 @@ test('tutor responde sem entregar a solução', async ({ page }) => {
   await expect(page.getByText(/não vou te dar a solução/i)).toBeVisible();
 });
 
+test('planos: mostra o preço decidido, sem botão de compra, e o rodapé leva até lá', async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto('/');
+  await page.getByRole('contentinfo').getByRole('link', { name: 'Planos' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Planos' })).toBeVisible();
+  // carga direta: hidrata o HTML pré-renderizado de /planos com o console vigiado
+  await page.goto('/planos');
+  await page.waitForLoadState('networkidle');
+  const main = page.locator('main');
+  const premium = main.getByRole('region', { name: /^Premium/ });
+  await expect(premium).toContainText(/R\$\s19,90 por mês/);
+  await expect(premium).toContainText(/R\$\s149,00 por ano/);
+  await expect(premium).toContainText(/R\$\s12,42 por mês/);
+  await expect(premium).toContainText('ainda não está à venda');
+  await expect(main.getByRole('button')).toHaveCount(0);
+  await expect(main.getByRole('link', { name: /assin|compr|pagar|checkout/i })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('página inexistente devolve 404 com página amigável', async ({ page }) => {
   const res = await page.goto('/nao-existe');
   expect(res?.status()).toBe(404);
