@@ -1,6 +1,12 @@
 import type { Level } from '../types.ts';
 import { code, dedent, deep, english, info, lesson, md, py, t, warn } from '../helpers.ts';
 import { memoria, sockets, arquitetura } from './aprofundamento-a.ts';
+import { lessons as m8_1 } from './modulos/m8-1.ts';
+import { lessons as m8_2 } from './modulos/m8-2.ts';
+import { lessons as m8_3 } from './modulos/m8-3.ts';
+import { lessons as m9_1 } from './modulos/m9-1.ts';
+import { lessons as m9_2 } from './modulos/m9-2.ts';
+import { lessons as m9_3 } from './modulos/m9-3.ts';
 
 /* ========================= Nível 8 — Sistemas Operacionais ========================= */
 
@@ -1122,7 +1128,7 @@ export const level8: Level = {
       prerequisites: ['m0-2', 'm2-5'],
       skills: [{ id: 'so-processos', pt: 'Processos e escalonamento', en: 'Processes and scheduling' }],
       outline: ['Processos e estados', 'fork/exec', 'Threads', 'Escalonamento: FCFS, SJF, RR, prioridades', 'Troca de contexto'],
-      lessons: [processos],
+      lessons: [processos, ...m8_1],
       references: ['ostep'],
     },
     {
@@ -1131,7 +1137,7 @@ export const level8: Level = {
       prerequisites: ['m8-1'],
       skills: [{ id: 'so-memoria', pt: 'Memória virtual e arquivos', en: 'Virtual memory and file systems' }],
       outline: ['Espaço de endereçamento', 'Paginação e TLB', 'Stack × heap', 'Ponteiros e gerenciamento de memória em C', 'Inodes, diretórios, journaling'],
-      lessons: [memoria],
+      lessons: [memoria, ...m8_2],
       references: ['ostep', 'cmu-15213'],
     },
     {
@@ -1140,7 +1146,7 @@ export const level8: Level = {
       prerequisites: ['m8-1'],
       skills: [{ id: 'so-concorrencia', pt: 'Concorrência e sincronização', en: 'Concurrency and synchronization' }],
       outline: ['Condições de corrida', 'Locks e mutex', 'Semáforos e variáveis de condição', 'Deadlock', 'async/await × threads × processos'],
-      lessons: [concorrencia],
+      lessons: [concorrencia, ...m8_3],
       references: ['ostep'],
     },
   ],
@@ -1157,7 +1163,7 @@ export const level9: Level = {
       prerequisites: ['m0-3'],
       skills: [{ id: 'redes-tcpip', pt: 'TCP/IP', en: 'TCP/IP' }],
       outline: ['Modelo em camadas', 'IP, máscaras, roteamento, NAT', 'TCP: handshake, confiabilidade, congestionamento', 'UDP e QUIC'],
-      lessons: [tcpip],
+      lessons: [tcpip, ...m9_1],
       references: ['kurose-ross', 'stanford-cs144'],
     },
     {
@@ -1166,7 +1172,7 @@ export const level9: Level = {
       prerequisites: ['m9-1'],
       skills: [{ id: 'redes-dns-tls', pt: 'DNS, HTTP e TLS', en: 'DNS, HTTP and TLS' }],
       outline: ['Resolução DNS e cache', 'Tipos de registro', 'HTTP/1.1, 2 e 3', 'TLS e certificados'],
-      lessons: [dnsHttps],
+      lessons: [dnsHttps, ...m9_2],
       references: ['kurose-ross', 'rfc9110'],
     },
     {
@@ -1175,7 +1181,7 @@ export const level9: Level = {
       prerequisites: ['m9-2', 'm2-5'],
       skills: [{ id: 'redes-sockets', pt: 'Programação com sockets', en: 'Socket programming' }],
       outline: ['API de sockets', 'Servidor TCP de eco', 'Concorrência no servidor', 'WebSockets', 'Balanceamento de carga e proxies'],
-      lessons: [sockets],
+      lessons: [sockets, ...m9_3],
       references: ['kurose-ross', 'python-docs'],
     },
   ],

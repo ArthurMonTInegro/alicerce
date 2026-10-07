@@ -35,9 +35,14 @@ test('acessibilidade das lições: explicação, exercícios e desafio de todas'
 
 test('tema escuro também passa no contraste', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
-  await page.goto('/');
-  const result = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
-  expect(result.violations.map((v) => v.nodes.map((n) => n.target.join(' '))).flat()).toEqual([]);
+  const problems: string[] = [];
+  for (const path of [...PAGES, '/licao/l0-bits-bytes?etapa=codigo', '/licao/l0-bits-bytes?etapa=exercicio', '/modulo/m0-1', '/nivel/n7']) {
+    await page.goto(path);
+    await page.waitForLoadState('networkidle');
+    const result = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
+    for (const v of result.violations) for (const n of v.nodes) problems.push(`${path}: ${n.target.join(' ')}`);
+  }
+  expect(problems).toEqual([]);
 });
 
 test('nenhuma página rola na horizontal no celular', async ({ page }, info) => {

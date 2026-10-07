@@ -17,6 +17,31 @@ const DIFFERENTIATORS = [
   { icon: '🛠️', title: 'Projetos de portfólio', text: '10 projetos de dificuldade crescente, com requisitos e critérios de aceite, do terminal até um sistema em produção.' },
 ];
 
+/** Os 15 níveis empilhados como uma obra: a fundação embaixo, o topo em latão. Decorativa: a lista de níveis vem logo abaixo. */
+const FILEIRAS = [[0, 1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11], [12, 13], [14]];
+
+function Fundacao() {
+  return (
+    <svg className="fundacao" viewBox="0 0 340 262" aria-hidden="true" focusable="false">
+      <rect className="laje" x="0" y="242" width="340" height="18" rx="3" />
+      {FILEIRAS.map((fileira, r) =>
+        fileira.map((n, c) => {
+          const x = 8 + r * 33 + c * 66;
+          const y = 196 - r * 46;
+          return (
+            <g key={n} className={`bloco f${r}`}>
+              <rect x={x} y={y} width="60" height="40" rx="3" />
+              <text x={x + 30} y={y + 26} textAnchor="middle">
+                {n}
+              </text>
+            </g>
+          );
+        }),
+      )}
+    </svg>
+  );
+}
+
 export function Home() {
   useHead('', 'Aprenda computação do zero ao avançado: lógica, Python, estruturas de dados, algoritmos, web, bancos de dados, redes, segurança, cloud e IA. Prática interativa, revisão espaçada e inglês técnico integrado.');
   const d = useDerived();
@@ -25,31 +50,34 @@ export function Home() {
   return (
     <>
       <section className="hero">
-        <div className="container">
-          <p className="eyebrow">Formação em computação · do zero ao avançado</p>
-          <h1>
-            Construa uma base <em>sólida</em> em computação.
-          </h1>
-          <p className="lead">
-            Uma trilha completa em 15 níveis, inspirada nos currículos das melhores universidades e escrita em português, com o inglês técnico que o mercado exige. Você aprende fazendo: código rodando no navegador, visualizações e um tutor que guia sem entregar a resposta.
-          </p>
-          <div className="row">
-            {started ? (
-              <Link to={next[0] ? `/modulo/${next[0].id}` : '/trilha'} className="btn accent">
-                Continuar de onde parei →
+        <div className="container hero-grid">
+          <div>
+            <p className="eyebrow">Formação em computação · do zero ao avançado</p>
+            <h1>
+              Construa uma base <em>sólida</em> em computação.
+            </h1>
+            <p className="lead">
+              Uma trilha completa em 15 níveis, inspirada nos currículos das melhores universidades e escrita em português, com o inglês técnico que o mercado exige. Você aprende fazendo: código rodando no navegador, visualizações e um tutor que guia sem entregar a resposta.
+            </p>
+            <div className="row">
+              {started ? (
+                <Link to={next[0] ? `/modulo/${next[0].id}` : '/trilha'} className="btn accent">
+                  Continuar de onde parei →
+                </Link>
+              ) : (
+                <Link to="/diagnostico" className="btn accent">
+                  Fazer o diagnóstico (10 min)
+                </Link>
+              )}
+              <Link to={started ? '/trilha' : `/licao/${lessons[0]!.id}`} className="btn">
+                {started ? 'Ver a trilha' : 'Começar do zero'}
               </Link>
-            ) : (
-              <Link to="/diagnostico" className="btn accent">
-                Fazer o diagnóstico (10 min)
-              </Link>
-            )}
-            <Link to={started ? '/trilha' : `/licao/${lessons[0]!.id}`} className="btn">
-              {started ? 'Ver a trilha' : 'Começar do zero'}
-            </Link>
+            </div>
+            <p className="small muted" style={{ marginTop: '1rem' }}>
+              Grátis, sem cadastro obrigatório. Seu progresso fica salvo neste navegador; crie uma conta para sincronizar entre dispositivos.
+            </p>
           </div>
-          <p className="small muted" style={{ marginTop: '1rem' }}>
-            Grátis, sem cadastro obrigatório. Seu progresso fica salvo neste navegador; crie uma conta para sincronizar entre dispositivos.
-          </p>
+          <Fundacao />
         </div>
       </section>
 
@@ -90,7 +118,7 @@ export function Home() {
           <h2 id="h-num" className="sr-only">
             A trilha em números
           </h2>
-          <div className="grid" style={{ marginTop: '2rem' }}>
+          <ul className="stats-band">
             {[
               [levels.length, 'níveis, do computador por dentro à IA'],
               [lessons.length, 'lições com as 8 etapas completas'],
@@ -99,14 +127,12 @@ export function Home() {
               [glossaryCount, 'termos técnicos português → inglês'],
               [projects.length, 'projetos para o portfólio'],
             ].map(([n, t]) => (
-              <div className="card" key={String(t)}>
-                <div className="stat">{n}</div>
-                <p className="small" style={{ margin: '0.3rem 0 0' }}>
-                  {t}
-                </p>
-              </div>
+              <li key={String(t)}>
+                <span className="stat">{n}</span>
+                <span className="small">{t}</span>
+              </li>
             ))}
-          </div>
+          </ul>
         </section>
 
         <section aria-labelledby="h-niveis">

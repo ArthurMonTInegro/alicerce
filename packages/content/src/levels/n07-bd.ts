@@ -2,6 +2,10 @@ import type { Level } from '../types.ts';
 import { code, dedent, deep, english, info, lesson, md, py, t, warn } from '../helpers.ts';
 import { nosql } from './aprofundamento-a.ts';
 import { SETUP_ESCOLA } from '../sql-setup.ts';
+import { lessons as m7_1 } from './modulos/m7-1.ts';
+import { lessons as m7_2 } from './modulos/m7-2.ts';
+import { lessons as m7_3 } from './modulos/m7-3.ts';
+import { lessons as m7_4 } from './modulos/m7-4.ts';
 
 export { SETUP_ESCOLA };
 
@@ -444,7 +448,7 @@ export const level7: Level = {
       prerequisites: ['m2-2'],
       skills: [{ id: 'bd-sql', pt: 'SQL', en: 'SQL' }],
       outline: ['Tabelas e chaves', 'SELECT, WHERE, ORDER BY, LIMIT', 'Agregações e GROUP BY', 'INSERT, UPDATE, DELETE', 'Consultas parametrizadas'],
-      lessons: [sql],
+      lessons: [sql, ...m7_1],
       references: ['postgres-docs', 'sqlite-docs'],
     },
     {
@@ -453,7 +457,7 @@ export const level7: Level = {
       prerequisites: ['m7-1'],
       skills: [{ id: 'bd-joins', pt: 'Relacionamentos e JOINs', en: 'Relationships and JOINs' }],
       outline: ['1:N e N:N', 'INNER JOIN', 'LEFT JOIN e anti-join', 'NULL', 'Subconsultas'],
-      lessons: [joins],
+      lessons: [joins, ...m7_2],
       references: ['postgres-docs'],
     },
     {
@@ -462,7 +466,7 @@ export const level7: Level = {
       prerequisites: ['m7-2'],
       skills: [{ id: 'bd-modelagem', pt: 'Modelagem, índices e transações', en: 'Modeling, indexes and transactions' }],
       outline: ['Formas normais', 'Índices B-tree e EXPLAIN', 'ACID', 'Níveis de isolamento', 'Otimização de consultas'],
-      lessons: [transacoes],
+      lessons: [transacoes, ...m7_3],
       references: ['cmu-15445', 'ddia'],
     },
     {
@@ -471,7 +475,7 @@ export const level7: Level = {
       prerequisites: ['m7-3'],
       skills: [{ id: 'bd-nosql', pt: 'NoSQL', en: 'NoSQL' }],
       outline: ['Documentos (MongoDB)', 'Chave-valor (Redis)', 'Colunares e grafos', 'Teorema CAP', 'Replicação e particionamento', 'Escolhendo o banco certo'],
-      lessons: [nosql],
+      lessons: [nosql, ...m7_4],
       references: ['ddia', 'cmu-15445'],
     },
   ],

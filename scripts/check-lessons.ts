@@ -49,6 +49,8 @@ try {
 
 const module = moduleById.get(moduleId);
 if (!module) bad(moduleId, 'módulo inexistente');
+// m7-2 → 7: ids de lição l7-... e de exercício e7-...
+const levelNum = /^m(\d+)-/.exec(moduleId)?.[1] ?? '?';
 
 // O currículo carregado já inclui a versão instalada deste arquivo (lições depois da primeira do módulo): ignora-a na comparação.
 const installed = new Set(module ? module.lessons.slice(1).map((l) => l.id) : []);
@@ -76,7 +78,7 @@ for (const l of draft) {
   const w = l.id ?? '(sem id)';
   dup('lessons', l.id, w);
   if (l.moduleId !== moduleId) bad(w, `moduleId ${l.moduleId} ≠ ${moduleId}`);
-  if (!/^l[34]-[a-z0-9-]+$/.test(l.id)) bad(w, 'id da lição deve seguir o padrão l3-... ou l4-...');
+  if (!new RegExp(`^l${levelNum}-[a-z0-9-]+$`).test(l.id)) bad(w, `id da lição deve seguir o padrão l${levelNum}-...`);
   for (const k of ['title', 'titleEn', 'summary'] as const) if (!l[k] || l[k].length < 5) bad(w, `${k} vazio ou curto`);
   if (!(l.minutes >= 10 && l.minutes <= 90)) bad(w, 'minutes fora de 10..90');
 
@@ -111,7 +113,7 @@ for (const l of draft) {
   for (const { ex } of exs) {
     const we = `${w} › ${ex.id}`;
     dup('exercises', ex.id, we);
-    if (!/^e[34]-[a-z0-9-]+$/.test(ex.id)) bad(we, 'id do exercício deve seguir o padrão e3-... ou e4-...');
+    if (!new RegExp(`^e${levelNum}-[a-z0-9-]+$`).test(ex.id)) bad(we, `id do exercício deve seguir o padrão e${levelNum}-...`);
     if (!ex.hints.length) bad(we, 'sem dicas');
     if (ex.explanation.length <= 10) bad(we, 'explicação curta');
     if (!ex.skills.length) bad(we, 'sem habilidade');

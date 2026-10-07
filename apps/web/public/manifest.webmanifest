@@ -4,7 +4,7 @@
   "lang": "pt-BR",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f6f1e7",
-  "theme_color": "#1d2a44",
+  "background_color": "#efeeea",
+  "theme_color": "#3b4a2a",
   "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
 }
