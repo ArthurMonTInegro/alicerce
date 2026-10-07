@@ -10,3 +10,4 @@ apps/web/public/pyodide
 coverage
 apps/web/src/generated
 packages/content/src/levels/modulos/_rascunho-*
+__pycache__/

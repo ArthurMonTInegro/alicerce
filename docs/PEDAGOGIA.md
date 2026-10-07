@@ -17,7 +17,7 @@ A plataforma foi desenhada para quem nunca programou e precisa chegar a um níve
 
 ## Tipos de exercício
 
-Múltipla escolha com explicação por alternativa, prever a saída, completar lacunas, escrever código com testes, problemas de Parsons (ordenar linhas), corrigir código com bug, SQL comparado com a consulta de referência, além dos simuladores de terminal. Hoje são 237 exercícios: 93 de código, 89 de múltipla escolha, 22 de previsão, 14 de correção, 10 de Parsons, 6 de SQL e 3 de lacunas.
+Múltipla escolha com explicação por alternativa, prever a saída, completar lacunas, escrever código com testes, problemas de Parsons (ordenar linhas), corrigir código com bug, SQL comparado com a consulta de referência, além dos simuladores de terminal. Hoje são 364 exercícios: 139 de código, 127 de múltipla escolha, 45 de previsão, 24 de correção, 15 de Parsons, 8 de lacunas e 6 de SQL.
 
 Cada exercício tem dificuldade (fácil, intermediário, avançado, desafio), dicas progressivas, explicação da solução e as habilidades que exercita. Revelar a solução é permitido, mas conta como evidência fraca de domínio.
 
@@ -56,7 +56,7 @@ Ao concluir uma lição, seus cartões (198 no total) entram na fila. O agendame
 
 ## Inglês técnico
 
-Todo termo novo aparece como **termo PT → EN**, com pronúncia por síntese de voz do navegador, e entra no glossário (413 termos). As mensagens de erro são mostradas no original em inglês e traduzidas, porque é assim que elas aparecem no mundo real.
+Todo termo novo aparece como **termo PT → EN**, com pronúncia por síntese de voz do navegador, e entra no glossário (584 termos). As mensagens de erro são mostradas no original em inglês e traduzidas, porque é assim que elas aparecem no mundo real.
 
 ## Tutor
 

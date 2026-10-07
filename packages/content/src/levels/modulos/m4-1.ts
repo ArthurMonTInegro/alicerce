@@ -22,8 +22,8 @@ const omegaTeta = lesson({
   skills: ['alg-complexidade'],
   terms: [
     t('análise assintótica', 'asymptotic analysis', 'Estudo de como o custo se comporta quando n cresce sem limite, ignorando constantes e entradas pequenas.', 'Asymptotic analysis lets us compare algorithms independently of the machine.'),
-    t('limite superior', 'upper bound', 'f(n) = O(g(n)): a partir de algum n₀, f(n) fica abaixo de c·g(n).', 'O(n²) is an upper bound on the running time, but not a tight one.'),
-    t('limite inferior', 'lower bound', 'f(n) = Ω(g(n)): a partir de algum n₀, f(n) fica acima de c·g(n).', 'Any comparison sort has a lower bound of Ω(n log n) comparisons in the worst case.'),
+    t('limite superior', 'upper bound', 'f(n) = O(g(n)): existe uma constante c > 0 tal que, a partir de algum n₀, f(n) ≤ c·g(n).', 'O(n²) is an upper bound on the running time, but not a tight one.'),
+    t('limite inferior', 'lower bound', 'f(n) = Ω(g(n)): existe uma constante c > 0 tal que, a partir de algum n₀, f(n) ≥ c·g(n).', 'Any comparison sort has a lower bound of Ω(n log n) comparisons in the worst case.'),
     t('limite justo', 'tight bound', 'f(n) = Θ(g(n)): f é O(g) e Ω(g) ao mesmo tempo; cresce exatamente como g, a menos de constantes.', 'The worst-case running time of linear search is Θ(n).'),
     t('limite frouxo', 'loose bound', 'Limite verdadeiro, mas com folga, como dizer que n é O(n²).'),
     t('melhor caso', 'best case', 'A entrada de tamanho n que faz o algoritmo trabalhar menos.'),
@@ -129,7 +129,7 @@ const omegaTeta = lesson({
           ['100', '6,6', '10', '664', '10 000', '10⁶', '≈ 1,3 × 10³⁰', '≈ 9,3 × 10¹⁵⁷'],
           ['1 000', '10', '31,6', '9 966', '10⁶', '10⁹', '≈ 1,1 × 10³⁰¹', '2 568 algarismos'],
         ],
-        caption: 'Repare em n = 10: log₂ n ainda é maior que √n, e 2ⁿ quase empata com n³. A escada vale "para n grande" (o n₀ das definições): √n e log₂ n empatam em n = 16 e daí em diante √n fica sempre na frente; 2ⁿ e n² empatam em n = 4 e, de n = 5 em diante, 2ⁿ fica na frente.',
+        caption: 'Repare em n = 10: log₂ n ainda é maior que √n, e 2ⁿ quase empata com n³. A escada vale "para n grande" (o n₀ das definições): √n e log₂ n empatam em n = 4 e de novo em n = 16, e daí em diante √n fica sempre na frente; 2ⁿ e n² empatam em n = 2 e em n = 4 e, de n = 5 em diante, 2ⁿ fica na frente.',
       },
       md(`
         Três regras evitam os erros mais comuns:
@@ -143,7 +143,7 @@ const omegaTeta = lesson({
       `, 'Uma conta que volta na ordenação'),
       md(`
         ### Somando laços: quando "aninhamento multiplica" erra
-        A regra da lição anterior supõe que o laço de dentro dá sempre o mesmo número de voltas. Quando ele depende do de fora, **some as voltas de dentro**, uma parcela por volta do de fora. Quatro somas resolvem quase tudo:
+        A regra da lição anterior supõe que o laço de dentro dá sempre o mesmo número de voltas. Quando ele depende do de fora, **some as voltas de dentro**, uma parcela por volta do de fora. Estas cinco formas resolvem quase tudo:
       `),
       {
         type: 'table',
@@ -415,6 +415,10 @@ const omegaTeta = lesson({
                             nomes.add(no.func.attr)
                 proibidas = nomes & {"range", "sum", "map", "combinations", "permutations", "product", "contar_trios"}
                 assert not proibidas, "use uma fórmula: sem " + ", ".join(sorted(proibidas))
+                for funcao in ast.walk(arvore):
+                    if isinstance(funcao, ast.FunctionDef):
+                        chama = {getattr(no.func, "id", None) for no in ast.walk(funcao) if isinstance(no, ast.Call)}
+                        assert funcao.name not in chama, f"use uma fórmula: a função {funcao.name} chama a si mesma (recursão)"
               `),
             },
             {
@@ -423,14 +427,19 @@ const omegaTeta = lesson({
                 import ast
                 laco = (ast.For, ast.While, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
                 gera = {"range", "sum", "map", "combinations", "permutations", "product", "contar_trios"}
-                for no in ast.walk(ast.parse(_source)):
+                arvore = ast.parse(_source)
+                for no in ast.walk(arvore):
                     chamada = isinstance(no, ast.Call) and getattr(no.func, "id", getattr(no.func, "attr", None)) in gera
                     if isinstance(no, laco) or chamada:
                         raise AssertionError("contando um por um, n = 1 000 000 levaria horas: este teste só roda com uma fórmula")
+                    if isinstance(no, ast.FunctionDef) and any(isinstance(c, ast.Call) and getattr(c.func, "id", None) == no.name for c in ast.walk(no)):
+                        raise AssertionError("com recursão, n = 1 000 000 estoura a pilha de chamadas: este teste só roda com uma fórmula")
                 for n, esperado in [(10 ** 6, 166666166667000000), (1234567, 313611288304333155)]:
                     r = contar_trios(n)
                     assert isinstance(r, int), f"o resultado deve ser int, veio {type(r).__name__}: use // em vez de /"
-                    assert r == esperado, f"para n = {n} esperava {esperado}; veio {r}. Se você usou / e depois int() ou round(), o float perdeu precisão (ele guarda só uns 16 algarismos): faça a conta toda com inteiros e divida com // no fim."
+                    if abs(r - esperado) <= esperado // 10 ** 9:
+                        assert r == esperado, f"para n = {n} esperava {esperado}; veio {r}, quase igual. Se você usou / e depois int() ou round(), o float perdeu precisão (ele guarda só uns 16 algarismos): faça a conta toda com inteiros e divida com // no fim."
+                    assert r == esperado, f"para n = {n} esperava {esperado}; veio {r}. Confira a fórmula com os casos pequenos (n = 3, 4 e 5)."
               `),
             },
           ],
@@ -586,7 +595,7 @@ const amortizada = lesson({
     t('método agregado', 'aggregate method', 'Somar diretamente o custo real de toda a sequência e dividir pelo número de operações.'),
     t('método contábil', 'accounting method', 'Cobrar um preço fixo de cada operação e guardar o troco como crédito, que paga as operações caras.'),
     t('método do potencial', 'potential method', 'Medir o "trabalho acumulado" do estado com uma função Φ ≥ 0; custo amortizado = custo real + variação de Φ.', 'We define a potential function Φ that maps each state of the data structure to a nonnegative number.'),
-    t('contador binário', 'binary counter', 'Lista de bits que representa um número e só sabe somar 1; um incremento zera os bits 1 menos significativos (os da direita) e liga o primeiro 0 depois deles.'),
+    t('contador binário', 'binary counter', 'Lista de bits que representa um número e só sabe somar 1; um incremento zera a sequência de bits 1 do fim (os menos significativos, à direita) e liga o primeiro 0 depois dela.'),
     t('fila com duas pilhas', 'queue with two stacks', 'Fila FIFO feita com uma pilha de entrada e uma de saída; a entrada só é despejada na saída quando a saída está vazia.', 'Implement a queue using two stacks with amortized O(1) operations.'),
     t('pilha monotônica', 'monotonic stack', 'Pilha cujos valores ficam sempre em ordem (por exemplo, nunca aumentam de baixo para cima); quem quebraria a ordem desempilha os outros antes de entrar.', 'Use a monotonic stack to find the next greater element for every index in O(n).'),
     t('janela deslizante', 'sliding window', 'Trecho contíguo [ini, fim] que percorre a sequência com os dois índices só andando para a frente, nunca para trás.'),
@@ -599,7 +608,7 @@ const amortizada = lesson({
 
         Pense na louça de casa. Tem dia em que a pia está lotada e você lava 30 pratos de uma vez; tem dia em que lava um só. Mas cada prato sujo é lavado **uma vez**. No fim do mês, as lavagens somam exatamente o número de pratos usados, por mais desiguais que tenham sido os dias.
 
-        A mesma conta derruba uma intuição perigosa: **um \`while\` dentro de um \`for\` não é automaticamente O(n²)**. Se o laço de dentro só consome coisas que o de fora produziu, e cada coisa só pode ser consumida uma vez, o total do laço de dentro fica limitado pelo total produzido.
+        A mesma conta derruba uma intuição perigosa: **um \`while\` dentro de um \`for\` não custa automaticamente Θ(n²)**. Se o laço de dentro só consome coisas que o de fora produziu, e cada coisa só pode ser consumida uma vez, o total do laço de dentro fica limitado pelo total produzido.
       `),
     ],
     explicacao: [
@@ -614,7 +623,7 @@ const amortizada = lesson({
           ['Contábil', 'Cobre um preço fixo de cada operação; o troco vira crédito guardado na estrutura e paga as operações caras. O crédito nunca pode ficar negativo.', 'Quando dá para "pendurar" o crédito em cada elemento.'],
           ['Potencial', 'Escolha uma função Φ do estado (Φ ≥ 0, começando em 0). Custo amortizado = custo real + variação de Φ.', 'Quando o crédito depende do estado inteiro, não de um elemento só.'],
         ],
-        caption: 'Os três chegam ao mesmo resultado; use o que deixar a conta mais curta. Os nomes são os do CLRS.',
+        caption: 'Os três chegam ao mesmo resultado; use o que deixar a conta mais curta. São os três métodos do capítulo de análise amortizada do CLRS (lá, o agregado se chama *aggregate analysis*).',
       },
       md(`
         ### 1. Método agregado: o contador binário
@@ -1035,7 +1044,9 @@ const amortizada = lesson({
                     if isinstance(no, ast.Delete):
                         problemas.add("del")
                     if isinstance(no, ast.AugAssign):
-                        problemas.add("+= ou *= (mexem na lista inteira de uma vez)")
+                        contador = isinstance(no.op, (ast.Add, ast.Sub)) and isinstance(no.value, ast.Constant) and isinstance(no.value.value, int)
+                        if not contador:
+                            problemas.add("+= ou *= numa lista (mexem em vários elementos de uma vez)")
                     if isinstance(no, ast.Subscript) and isinstance(no.slice, ast.Slice):
                         problemas.add("fatias")
                     if isinstance(no, (ast.Import, ast.ImportFrom)):
@@ -1236,7 +1247,7 @@ const amortizada = lesson({
     ['Qual a fórmula do custo amortizado no método do potencial, e que condições Φ precisa cumprir?', 'Amortizado = real + (Φ depois − Φ antes), com Φ começando em 0 e nunca negativa; assim a soma dos amortizados limita a soma dos reais.'],
     ['Por que a pilha monotônica é Θ(n) mesmo com um while dentro do for?', 'Cada índice é empilhado uma vez e desempilhado no máximo uma vez: o total de pops é menor que n, por mais que uma volta desempilhe muito.'],
     ['Dê um exemplo de operação que quebra uma garantia amortizada, e por quê.', 'Decrementar no contador binário: alternando incremento e decremento entre 0111…1 e 1000…0, cada operação troca k bits, Θ(n·k). O decremento recria a situação cara sem ninguém ter pago por ela.'],
-    ['No máximo de janela deslizante com deque, por que guardar índices e não valores?', 'Para saber quando o candidato da frente ficou para trás da janela (índice ≤ i − k) e retirá-lo.'],
+    ['No máximo de janela deslizante com deque, por que é mais simples guardar índices do que valores?', 'Com o índice, dá para ver direto se o candidato da frente ficou para trás da janela (índice ≤ i − k) e retirá-lo. Guardando só valores, seria preciso comparar com o valor que saiu e manter os repetidos no deque.'],
   ],
   references: ['clrs', 'mit-6006', 'stanford-cs161', 'sedgewick-algs'],
 });

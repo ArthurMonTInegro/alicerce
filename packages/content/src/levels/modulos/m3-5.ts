@@ -30,14 +30,27 @@ const REF_ILHAS = dedent(`
       return total
 `);
 
-/** Confere se uma lista é um ciclo de verdade em g e decide, por outro método (Kahn), se g tem ciclo. */
+/** Diz o que há de errado com uma resposta (ou "" se ela é um ciclo de g) e decide, por outro método (Kahn), se g tem ciclo. */
 const REF_CICLO = dedent(`
-  def _valido(g, c):
+  def _problema(g, c):
+      if c is None:
+          return "veio None, mas o grafo tem ciclo"
       if not isinstance(c, list) or not c:
-          return False
-      if len(set(c)) != len(c):
-          return False
-      return all(c[(i + 1) % len(c)] in g.get(c[i], []) for i in range(len(c)))
+          return f"veio {c!r}; esperado uma lista não vazia de vértices"
+      try:
+          repetidos = len(set(c)) != len(c)
+      except TypeError:
+          return f"veio {c!r}; a lista deve conter os próprios vértices"
+      if repetidos:
+          return f"{c} repete vértices: cada um aparece uma vez só (não repita o primeiro no fim)"
+      for i in range(len(c)):
+          a, b = c[i], c[(i + 1) % len(c)]
+          if b not in g.get(a, []):
+              return f"{c} não é um ciclo deste grafo: {a} -> {b} não é aresta"
+      return ""
+
+  def _valido(g, c):
+      return _problema(g, c) == ""
 
   def _tem_ciclo_ref(g):
       vs = set(g) | {w for ws in g.values() for w in ws}
@@ -205,7 +218,7 @@ const dfsAFundo = lesson({
         A recursão usa a pilha de chamadas no lugar da pilha explícita da lição anterior. As duas versões são DFS e custam O(V + E), mas a recursiva entrega de graça um momento que a outra esconde: o instante em que um vértice **sai**, depois de todos os que foram descobertos a partir dele. São as mesmas ideias de pré-ordem e pós-ordem dos percursos de árvore, e é a saída que permite detectar ciclos (e, no Nível 4, fazer a ordenação topológica).
       `),
       warn(`
-        Python limita a profundidade da recursão: o padrão é 1000 chamadas (veja \`sys.getrecursionlimit()\`). Uma DFS recursiva num caminho com 5 000 vértices cai com \`RecursionError\`, e num mapa 100 × 100 todo de terra ela pode cair também. Aumentar o limite com \`sys.setrecursionlimit\` é remendo: cada chamada pendente ocupa memória e, conforme a versão do Python e o ambiente (no navegador, por exemplo), passar do que a máquina aguenta derruba o programa inteiro, sem nem um \`RecursionError\` para tratar. Em grafos de tamanho desconhecido, use a pilha explícita (ou uma BFS).
+        Python limita a profundidade da recursão: o padrão é 1000 chamadas (veja \`sys.getrecursionlimit()\`). Uma DFS recursiva num caminho com 5 000 vértices cai com \`RecursionError\`, e num mapa 100 × 100 todo de terra ela pode cair também. Aumentar o limite com \`sys.setrecursionlimit\` é remendo: você precisa adivinhar um número que sirva para qualquer entrada, cada chamada pendente ocupa memória e, em versões antigas do Python (até a 3.10), passar do que a pilha da máquina aguenta derruba o programa inteiro, sem nem um \`RecursionError\` para tratar. Em grafos de tamanho desconhecido, use a pilha explícita (ou uma BFS).
       `, 'O limite de recursão do Python'),
       md(`
         ### Componentes conexos
@@ -406,7 +419,7 @@ const dfsAFundo = lesson({
           id: 'e3-dfs-3',
           kind: 'code',
           lang: 'python',
-          prompt: 'Uma imagem de satélite virou uma grade: `"#"` é terra e `"."` é água. Escreva `contar_ilhas(mapa)`, que recebe uma lista de strings (todas do mesmo tamanho) e devolve quantas ilhas existem. Uma ilha é um grupo de células de terra ligadas por cima, por baixo, pela esquerda ou pela direita (diagonal **não** liga). O mapa pode ser vazio (`[]`) ou grande (70 × 70), e não deve ser modificado.',
+          prompt: 'Uma imagem de satélite virou uma grade: `"#"` é terra e `"."` é água. Escreva `contar_ilhas(mapa)`, que recebe uma lista de strings (todas do mesmo tamanho) e devolve quantas ilhas existem. Uma ilha é um grupo de células de terra ligadas por cima, por baixo, pela esquerda ou pela direita (diagonal **não** liga). O mapa pode ser vazio (`[]`) ou grande (70 × 70) e não deve ser modificado. Não mexa no limite de recursão do Python (`sys.setrecursionlimit`).',
           difficulty: 'intermediario',
           skills: ['ed-grafos'],
           hints: [
@@ -470,6 +483,8 @@ const dfsAFundo = lesson({
                 assert _r == 2, f'["#..#"] tem 2 ilhas, veio {_r}. Em Python, a coluna -1 é a última coluna: confira os limites antes de olhar o vizinho'
                 _r = contar_ilhas(["#", ".", "#"])
                 assert _r == 2, f'["#", ".", "#"] tem 2 ilhas, veio {_r}. Em Python, a linha -1 é a última linha: confira 0 <= linha < número de linhas'
+                _r = contar_ilhas(["#.#", "...", "###"])
+                assert _r == 3, f'["#.#", "...", "###"] tem 3 ilhas, veio {_r}. Um try/except IndexError não protege dos índices negativos: confira 0 <= linha e 0 <= coluna antes de olhar o vizinho'
               `),
             },
             {
@@ -502,6 +517,7 @@ const dfsAFundo = lesson({
             {
               name: 'mapa grande (70 × 70) todo de terra',
               code: dedent(`
+                assert "setrecursionlimit" not in _source, "não aumente o limite de recursão: troque a recursão por uma pilha explícita, que funciona para mapas de qualquer tamanho"
                 _r = contar_ilhas(["#" * 70 for _ in range(70)])
                 assert _r == 1, f"o mapa 70 x 70 todo de terra é uma ilha só; veio {_r}"
               `),
@@ -597,6 +613,11 @@ const dfsAFundo = lesson({
                       [0, 0, 0, 1, 0]]
                 _r = contar_grupos(_m)
                 assert _r == 2, f"0-1-2 e 3-4 são 2 grupos; veio {_r}"
+                _m = [[0, 0, 1],
+                      [0, 0, 1],
+                      [1, 1, 0]]
+                _r = contar_grupos(_m)
+                assert _r == 1, f"0 e 1 se ligam com baldeação no 2 (ligações 0-2 e 1-2): 1 grupo; veio {_r}. Percorra a linha inteira de cada bairro, não só as colunas depois dele"
               `),
             },
             {
@@ -684,7 +705,7 @@ const dfsAFundo = lesson({
           id: 'e3-dfs-desafio',
           kind: 'code',
           lang: 'python',
-          prompt: 'Antes de publicar a grade de um curso, a coordenação quer um verificador que, além de avisar que existe um pré-requisito circular, **mostre** qual é. Escreva `encontrar_ciclo(g)`: `g` é um dict "disciplina → lista do que ela exige" (grafo direcionado). Devolva uma lista `[v1, v2, ..., vk]` de vértices distintos em que v1 → v2 → ... → vk → v1 são arestas do grafo (um laço A → A vira `["A"]`), ou `None` se não houver ciclo. Atenção: uma disciplina pode aparecer só como pré-requisito, sem ser chave do dict (ela não exige nada).',
+          prompt: 'Antes de publicar a grade de um curso, a coordenação quer um verificador que, além de avisar que existe um pré-requisito circular, **mostre** qual é. Escreva `encontrar_ciclo(g)`: `g` é um dict "disciplina → lista do que ela exige" (grafo direcionado). Devolva uma lista `[v1, v2, ..., vk]` de vértices distintos em que v1 → v2 → ... → vk → v1 são arestas do grafo (um laço A → A vira `["A"]`), ou `None` se não houver ciclo. Atenção: uma disciplina pode aparecer só como pré-requisito, sem ser chave do dict (ela não exige nada). A busca deve custar O(V + E): os testes incluem grafos com muitos caminhos diferentes até os mesmos vértices.',
           difficulty: 'desafio',
           skills: ['ed-grafos', 'alg-recursao'],
           hints: [
@@ -735,7 +756,7 @@ const dfsAFundo = lesson({
               code: REF_CICLO + '\n' + dedent(`
                 _g = {"FIS2": ["FIS1", "CAL2"], "FIS1": ["CAL1"], "CAL2": ["CAL1"], "CAL1": ["FIS2"]}
                 _c = encontrar_ciclo(_g)
-                assert _valido(_g, _c), f"{_c} não é um ciclo deste grafo; esperado algo como ['FIS2', 'FIS1', 'CAL1']"
+                assert _valido(_g, _c), f"{_problema(_g, _c)}. Esperado algo como ['FIS2', 'FIS1', 'CAL1']"
               `),
             },
             {
@@ -763,7 +784,7 @@ const dfsAFundo = lesson({
               code: REF_CICLO + '\n' + dedent(`
                 _g = {"A": ["B"], "B": ["C"], "C": ["D"], "D": ["B"]}
                 _c = encontrar_ciclo(_g)
-                assert _valido(_g, _c), f"{_c} não é um ciclo: D -> A não é aresta. O ciclo é B -> C -> D -> B; A só leva até ele"
+                assert _valido(_g, _c), f"{_problema(_g, _c)}. O ciclo é B -> C -> D -> B; o A só leva até ele e não faz parte do ciclo"
               `),
             },
             {
@@ -771,10 +792,10 @@ const dfsAFundo = lesson({
               code: REF_CICLO + '\n' + dedent(`
                 _g = {"A": ["B"], "B": [], "X": ["Y"], "Y": ["Z"], "Z": ["X"]}
                 _c = encontrar_ciclo(_g)
-                assert _valido(_g, _c), f"o ciclo X -> Y -> Z -> X não é alcançável a partir de A; comece uma DFS em todo vértice branco (veio {_c})"
+                assert _valido(_g, _c), f"{_problema(_g, _c)}. O ciclo X -> Y -> Z -> X não é alcançável a partir de A: comece uma DFS em todo vértice branco"
                 _g = {"A": ["B"], "B": ["C", "A"]}
                 _c = encontrar_ciclo(_g)
-                assert _valido(_g, _c), f"A -> B -> A é um ciclo, e C não é chave do dict; veio {_c}"
+                assert _valido(_g, _c), f"{_problema(_g, _c)}. A -> B -> A é um ciclo, e C não é chave do dict"
               `),
             },
             {
@@ -793,9 +814,36 @@ const dfsAFundo = lesson({
                     _tem = _tem_ciclo_ref(_g)
                     _c = encontrar_ciclo(_g)
                     if _tem:
-                        assert _valido(_g, _c), f"encontrar_ciclo({_g}) devolveu {_c}, que não é um ciclo do grafo"
+                        assert _valido(_g, _c), f"encontrar_ciclo({_g}): {_problema(_g, _c)}"
                     else:
                         assert _c is None, f"{_g} não tem ciclo, mas encontrar_ciclo devolveu {_c}"
+              `),
+            },
+            {
+              name: '20 losangos em sequência: cada vértice é explorado uma vez só',
+              code: dedent(`
+                class _Contador(dict):
+                    def __init__(self, dados, limite):
+                        super().__init__(dados)
+                        self.limite, self.consultas = limite, 0
+                    def _conta(self):
+                        self.consultas += 1
+                        if self.consultas > self.limite:
+                            raise AssertionError(f"o grafo tem {len(self)} vértices, mas sua função já consultou listas de vizinhos mais de {self.limite} vezes: algum vértice está sendo explorado de novo a cada caminho que chega nele. Um vértice preto (que já saiu) não precisa ser visitado outra vez")
+                    def __getitem__(self, k):
+                        self._conta()
+                        return super().__getitem__(k)
+                    def get(self, k, padrao=None):
+                        self._conta()
+                        return super().get(k, padrao)
+                _d = {}
+                for _i in range(20):
+                    _d[f"a{_i}"] = [f"b{_i}", f"c{_i}"]
+                    _d[f"b{_i}"] = [f"a{_i + 1}"]
+                    _d[f"c{_i}"] = [f"a{_i + 1}"]
+                _d["a20"] = []
+                _r = encontrar_ciclo(_Contador(_d, 10 * (61 + 80)))
+                assert _r is None, f"20 losangos em sequência não têm ciclo; veio {_r}"
               `),
             },
           ],
@@ -893,7 +941,7 @@ const unionFind = lesson({
            2       5
         \`\`\`
 
-        Atenção: essas árvores **não** são o grafo das ligações. Elas só registram quem está no mesmo grupo, e as arestas delas não precisam corresponder a ligações reais. Com a regra de união que você vai ver a seguir, as evidências 0–2 e 2–1 deixam o 1 pendurado direto no 0, e não existe evidência 0–1. Por isso o Union-Find não sabe dizer **por qual caminho** dois elementos se ligam.
+        Atenção: essas árvores **não** são o grafo das ligações. Elas só registram quem está no mesmo grupo, e as arestas delas não precisam corresponder a ligações reais. Com a união por tamanho que você vai ver a seguir (e a regra de desempate do código desta lição), as evidências 0–2 e 2–1 deixam o 1 pendurado direto no 0, e não existe evidência 0–1. Por isso o Union-Find não sabe dizer **por qual caminho** dois elementos se ligam.
 
         ### O problema: árvores que viram cadeias
         Na versão ingênua, \`union\` pendura sempre a raiz do primeiro na raiz do segundo. Faça union(0, 1), union(0, 2), union(0, 3), ...: a cada vez, a raiz do grupo do 0 vai para baixo do elemento novo, e a árvore vira uma fila indiana 0 → 1 → 2 → 3 → ... Depois de n − 1 uniões, find(0) dá n − 1 saltos, e a sequência inteira custou O(n²). É o mesmo pesadelo da BST que degenera em lista.
@@ -937,7 +985,7 @@ const unionFind = lesson({
       deep(`
         - A estrutura é de Galler e Fischer (1964). O limite O(m · α(n)) foi provado por Robert Tarjan (1975), e Fredman e Saks mostraram em 1989 que esse α(n) não pode ser eliminado: nenhuma estrutura para o problema faz melhor, em custo amortizado.
         - A união por *rank* guarda em cada raiz um limite superior para a altura (em vez do tamanho) e pendura a de rank menor na de rank maior. Dá a mesma garantia; a versão por tamanho tem o bônus de deixar o tamanho de cada grupo disponível de graça.
-        - Variante de uma passada só, a **divisão do caminho pela metade** (*path halving*): \`while pai[x] != x: pai[x] = pai[pai[x]]; x = pai[x]\`. Cada elemento visitado passa a apontar para o avô. Tem a mesma garantia de custo e dispensa a segunda passada.
+        - Variante de uma passada só, a **divisão do caminho pela metade** (*path halving*): \`while pai[x] != x: pai[x] = pai[pai[x]]; x = pai[x]\`. A cada passo, x passa a apontar para o avô e pula direto para ele: um elemento sim, outro não, do caminho ganha um atalho, e o caminho fica com cerca de metade do comprimento (daí o nome). Junto com a união por tamanho, tem a mesma garantia de custo e dispensa a segunda passada.
       `),
       md(`
         ### O que o Union-Find não faz
@@ -954,7 +1002,7 @@ const unionFind = lesson({
           ['Alcance em grafo direcionado (A segue B)', 'sim', 'não: "estar no mesmo grupo" precisa ser simétrico e transitivo'],
         ],
       },
-      tip('Se todas as remoções forem conhecidas de antemão, há um truque clássico: processe a sequência **de trás para frente**. Lida ao contrário, cada remoção de ligação vira uma união.'),
+      tip('Se as ligações só são removidas (nunca acrescentadas) e a sequência inteira é conhecida de antemão, há um truque clássico: comece pelo grafo que sobra no fim e processe a sequência **de trás para frente**. Lida ao contrário, cada remoção de ligação vira uma união.'),
       md(`
         ### Duas receitas que você vai usar muito
         - **Contar grupos enquanto as ligações chegam**: comece com n grupos e desconte 1 a cada union que juntar grupos diferentes.
@@ -980,7 +1028,7 @@ const unionFind = lesson({
         caption: 'No fim, 4 é pai de 0, 3, 5, 6 e 7, e 0 é pai de 1 e 2: um grupo só, com altura 2.',
       },
       md(`
-        Com 8 elementos, a união por tamanho garante altura de no máximo ⌊log₂ 8⌋ = 3; aqui ela nunca passou de 2. Repare também no limite da compressão: depois do passo 7, os elementos 1 e 2 ainda estão a dois saltos da raiz, porque ninguém fez find neles. A compressão só achata os caminhos que alguém percorreu.
+        Com 8 elementos, a união por tamanho garante altura de no máximo ⌊log₂ 8⌋ = 3; aqui ela nunca passou de 2. Repare também no limite da compressão: depois do passo 7, os elementos 1 e 2 ainda estão a dois saltos da raiz, porque nenhum find passou por eles depois que o 0 foi pendurado no 4. A compressão só achata os caminhos que alguém percorreu.
       `),
     ],
     codigo: [
@@ -1222,13 +1270,20 @@ const unionFind = lesson({
               code: dedent(`
                 _r = ligacao_redundante(4, [(0, 1), (2, 3), (1, 2), (3, 0)])
                 assert _r == (3, 0), f"(1, 2) junta os grupos 0-1 e 2-3, que eram diferentes; o redundante é (3, 0). Veio {_r}"
+                _r = ligacao_redundante(3, [(0, 1), (0, 2), (1, 2)])
+                assert _r == (1, 2), f"1 e 2 já estavam ligados por 1-0-2, então (1, 2) é redundante; veio {_r}. Ao unir, mude o pai das RAÍZES, e não o de um dos prédios do cabo"
+                _r = ligacao_redundante(3, [(0, 1), (2, 1), (0, 2)])
+                assert _r == (0, 2), f"0 e 2 já estavam ligados por 0-1-2, então (0, 2) é redundante; veio {_r}. Ao unir, mude o pai das RAÍZES, e não o de um dos prédios do cabo"
               `),
             },
             {
               name: 'cadeia longa',
               code: dedent(`
                 _cabos = [(i, i + 1) for i in range(999)] + [(999, 0), (5, 6)]
-                _r = ligacao_redundante(1000, _cabos)
+                try:
+                    _r = ligacao_redundante(1000, _cabos)
+                except RecursionError:
+                    raise AssertionError("RecursionError numa cadeia de 1000 prédios: sem a união por tamanho, a árvore vira uma cadeia e um find recursivo estoura o limite do Python. Una pelo tamanho ou escreva o find com while")
                 assert _r == (999, 0), f"o cabo (999, 0) fecha a volta da cadeia 0-1-...-999; veio {_r}"
               `),
             },
@@ -1461,6 +1516,15 @@ const unionFind = lesson({
                 assert hora_da_rota(1, 1, []) == -1, "sem liberações, nunca há rota: -1"
                 assert hora_da_rota(1, 5, [(0, 3)]) == 1, "com uma linha só, qualquer quarteirão liberado já liga a linha 0 à última"
                 assert hora_da_rota(3, 1, [(0, 0), (2, 0), (1, 0)]) == 3, "numa coluna de 3, a rota só existe quando o meio é liberado, na hora 3"
+              `),
+            },
+            {
+              name: 'grades retangulares',
+              code: dedent(`
+                _r = hora_da_rota(2, 3, [(0, 2), (1, 0), (1, 2)])
+                assert _r == 3, f"numa grade 2 x 3, (0, 2) e (1, 0) não são vizinhos; a rota surge na hora 3, com (1, 2). Veio {_r}: confira quem são os vizinhos de cada quarteirão e a conta que transforma (linha, coluna) num número"
+                _r = hora_da_rota(3, 2, [(0, 1), (2, 0), (1, 1), (1, 0)])
+                assert _r == 4, f"numa grade 3 x 2, a rota (0, 1) -> (1, 1) -> (1, 0) -> (2, 0) surge na hora 4; veio {_r}"
               `),
             },
             {

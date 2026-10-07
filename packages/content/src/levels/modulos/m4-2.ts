@@ -3,20 +3,20 @@ import type { Lesson } from '../../types.ts';
 import { code, dedent, deep, english, lesson, md, py, t, tip, trace, warn } from '../../helpers.ts';
 
 /**
- * Prefixo de testes: `_sem_laco_infinito(f, *args)` chama f(*args) contando as linhas executadas no
- * código do estudante (main.py). Numa entrada pequena, passar de 50 000 linhas só acontece com laço
- * infinito; assim o erro clássico (lo = meio com o meio arredondado para baixo) vira uma mensagem de
- * teste, em vez de estourar o tempo e derrubar a execução inteira.
+ * Prefixo de testes com dois vigias, que acompanham cada linha executada no código do estudante (main.py):
+ * - `_sem_laco_infinito(f, *args)` chama f(*args) e reprova se passar de 50 000 linhas. Numa entrada
+ *   pequena isso só acontece com laço infinito (o erro clássico: lo = meio com o meio arredondado para
+ *   baixo) ou com uma busca que testa candidato por candidato.
+ * - `_no_prazo(segundos, msg, f, *args)` chama f(*args) e reprova com `msg` se passar do prazo.
+ * Os testes rodam todos na mesma execução: sem os vigias, uma solução lenta estouraria o tempo do
+ * executor e o estudante perderia as mensagens de todos os testes.
  */
 const GUARDA_LACO = dedent(`
-  import sys as _sys
-  def _sem_laco_infinito(f, *args):
-      passos = [0]
+  import sys as _sys, time as _time
+  def _vigiar(f, args, conferir):
       def _linha(frame, evento, arg):
           if evento == "line":
-              passos[0] += 1
-              if passos[0] > 50_000:
-                  raise AssertionError(f"{f.__name__} rodou mais de 50 000 linhas numa entrada pequena: o laço não está terminando. Simule à mão o caso em que hi = lo + 1 e confira se as duas saídas do if encolhem o intervalo.")
+              conferir()
           return _linha
       def _chamada(frame, evento, arg):
           return _linha if frame.f_code.co_filename == "main.py" else None
@@ -25,6 +25,19 @@ const GUARDA_LACO = dedent(`
           return f(*args)
       finally:
           _sys.settrace(None)
+  def _sem_laco_infinito(f, *args):
+      passos = [0]
+      def conferir():
+          passos[0] += 1
+          if passos[0] > 50_000:
+              raise AssertionError(f"{f.__name__} executou mais de 50 000 linhas numa entrada pequena: o laço não termina, ou não descarta metade do intervalo a cada volta. Simule à mão o caso em que hi = lo + 1 e confira se as duas saídas do if encolhem o intervalo.")
+      return _vigiar(f, args, conferir)
+  def _no_prazo(segundos, msg, f, *args):
+      fim = _time.perf_counter() + segundos
+      def conferir():
+          if _time.perf_counter() > fim:
+              raise AssertionError(msg)
+      return _vigiar(f, args, conferir)
 `);
 
 /* ------------------------------------------------------------------ */
@@ -170,7 +183,7 @@ const fronteiras = lesson({
         caption: 'Com n = 1 000 000 e q = 1 000: cerca de 10⁹ passos na busca linear contra cerca de 2 × 10⁷ com sorted + bisect (quase todos gastos no sorted).',
       },
       md(`
-        Para **uma** consulta, a busca linear vence: o preparo de O(n log n) já custa mais que o O(n) dela. Se a pergunta é só "x está lá?" ou "quantas vezes x aparece?", um \`set\` ou um \`Counter\` responde em O(1) médio. A lista ordenada com \`bisect\` brilha quando a **ordem** importa: faixas, piso e teto, posição de inserção, os k vizinhos mais próximos.
+        Para **uma** consulta numa lista ainda fora de ordem, a busca linear vence: o preparo de O(n log n) já custa mais que o O(n) dela. Se a pergunta é só "x está lá?" ou "quantas vezes x aparece?", um \`set\` ou um \`Counter\` responde em O(1) médio. A lista ordenada com \`bisect\` brilha quando a **ordem** importa: faixas, piso e teto, posição de inserção, os k vizinhos mais próximos.
       `),
       deep(`
         Desde o Python 3.10, todas as funções do \`bisect\` aceitam \`key=\`, para buscar numa lista de registros ordenada por um campo. Por exemplo, com \`saidas\` ordenada pelo horário, \`bisect_left(saidas, 450, key=horario)\` acha a primeira saída com \`horario(s) >= 450\`.
@@ -349,6 +362,7 @@ const fronteiras = lesson({
             { name: 'notas no meio das faixas', code: 'for nota, esperado in [(0, "D"), (4.9, "D"), (6.0, "C"), (8.5, "B"), (9.7, "A")]:\n    r = conceito(nota)\n    assert r == esperado, f"conceito({nota}) deu {r!r}, esperado {esperado!r}"' },
             { name: 'notas em cima dos cortes', code: 'for nota, esperado in [(5.0, "C"), (7.0, "B"), (9.0, "A"), (10.0, "A")]:\n    r = conceito(nota)\n    assert r == esperado, f"conceito({nota}) deu {r!r}, esperado {esperado!r}: \\"a partir de\\" inclui o próprio corte"' },
             { name: 'notas logo abaixo dos cortes', code: 'for nota, esperado in [(4.99, "D"), (6.999, "C"), (8.9999, "B"), (5.001, "C")]:\n    r = conceito(nota)\n    assert r == esperado, f"conceito({nota}) deu {r!r}, esperado {esperado!r}: abaixo do corte ainda é a faixa de baixo. Em vez de somar uma folga à nota ou mudar os cortes, troque a função de busca"' },
+            { name: 'notas a um fio do corte', code: 'import math\nfor corte, esperado in [(5.0, "D"), (7.0, "C"), (9.0, "B")]:\n    nota = math.nextafter(corte, 0)\n    r = conceito(nota)\n    assert r == esperado, f"conceito({nota!r}) deu {r!r}, esperado {esperado!r}: essa nota é o maior float abaixo de {corte}. Uma folga somada à nota, ou cortes deslocados, sempre erram em algum caso assim; o certo é a função de busca que já trata o empate do jeito da tabela"' },
             { name: 'continua usando bisect', code: dedent(`
               import ast
               chamadas = set()
@@ -430,12 +444,26 @@ const fronteiras = lesson({
                   b = ultima_ocorrencia(xs, 5)
                   c = limite_superior(xs, 4)
                   d = ultima_ocorrencia(xs, 6)
+                  e = ultima_ocorrencia(xs, 4)
                   if time.perf_counter() - t0 > 0.5:
                       break
-              assert (a, b, c, d) == (2_000_000, 1_999_999, 0, -1), f"resultados errados numa lista de 2 milhões de cincos: {(a, b, c, d)}"
-              assert time.perf_counter() - t0 < 0.5, "muito lento: não percorra a lista (nem com in, index ou fatias), descarte metade a cada passo"
+              assert (a, b, c, d, e) == (2_000_000, 1_999_999, 0, -1, -1), f"resultados errados numa lista de 2 milhões de cincos: {(a, b, c, d, e)}"
+              assert time.perf_counter() - t0 < 0.5, "muito lento: não percorra a lista (nem com in, index, fatias ou um laço de trás para frente). Descarte metade a cada passo em limite_superior, e use-a em ultima_ocorrencia"
             `) },
-            { name: 'sem bisect', code: 'assert "bisect" not in _source, "implemente a busca você mesmo, sem o módulo bisect"' },
+            { name: 'sem bisect', code: dedent(`
+              import ast
+              nomes = set()
+              for no in ast.walk(ast.parse(_source)):
+                  if isinstance(no, ast.Import):
+                      nomes.update(a.name for a in no.names)
+                  elif isinstance(no, ast.ImportFrom):
+                      nomes.add(no.module or "")
+                  elif isinstance(no, ast.Name):
+                      nomes.add(no.id)
+                  elif isinstance(no, ast.Attribute):
+                      nomes.add(no.attr)
+              assert not any(n.startswith(("bisect", "insort")) for n in nomes), "implemente a busca você mesmo, sem o módulo bisect"
+            `) },
           ],
         },
       },
@@ -445,46 +473,60 @@ const fronteiras = lesson({
           id: 'e4-fronteira-5',
           kind: 'code',
           lang: 'python',
-          prompt: '`valores` é a lista **ordenada** dos Pix (em reais) que uma loja recebeu no mês; estornos aparecem como valores negativos. Escreva `contar_no_intervalo(valores, a, b)`, que devolve quantos valores v satisfazem `a <= v <= b`, em O(log n) por chamada, usando `bisect`. Se `a > b`, a resposta é 0.',
+          prompt: '`extrato` traz os Pix (em reais) que uma loja recebeu no mês, **na ordem em que chegaram**, ou seja, fora de ordem de valor; estornos aparecem como valores negativos. O gerente quer fazer muitas perguntas do tipo "quantos Pix ficaram entre `a` e `b` reais, com os dois extremos incluídos?". Escreva `contar_faixas(extrato, consultas)`, que recebe uma lista de pares `(a, b)` e devolve a lista com a resposta de cada consulta, na mesma ordem. Se `a > b`, a resposta daquela consulta é 0. Não altere a lista `extrato`. Meta: O((n + q) log n) no total, para n Pix e q consultas.',
           difficulty: 'intermediario',
           skills: ['alg-busca'],
           hints: [
-            'Pense em fronteiras: em que posição começa o trecho da lista com valores >= a? E em que posição termina o trecho com valores <= b?',
+            'Se o extrato estivesse ordenado por valor, como você contaria uma faixa sem olhar os valores do meio?',
+            'Quantas vezes você precisa ordenar: uma vez por consulta ou uma vez no total? Compare O(q · n log n) com O(n log n + q log n). E como ordenar sem mexer na lista de quem chamou?',
             'Os dois extremos contam. Qual função do bisect deixa os iguais a b do lado de dentro, e qual deixa os iguais a a do lado de dentro?',
-            'O que a sua conta devolve com valores = [1, 2, 3], a = 3 e b = 1?',
+            'O que a sua conta devolve para a consulta (3, 1)?',
           ],
-          explanation: '`bisect_left(valores, a)` é quantos valores são menores que a, e `bisect_right(valores, b)` é quantos são menores ou iguais a b. A diferença é exatamente quantos estão em `[a, b]`: duas buscas, O(log n), sem olhar os valores do meio. Trocar uma das funções exclui um dos extremos, e com `a > b` a diferença pode ficar negativa, por isso o caso especial.',
+          explanation: 'Ordenar uma cópia (`sorted`) uma única vez custa O(n log n). Depois, cada consulta são duas buscas binárias: `bisect_left(valores, a)` é quantos valores são menores que a, e `bisect_right(valores, b)` é quantos são menores ou iguais a b; a diferença é quantos estão em `[a, b]`. Total: O((n + q) log n). Ordenar dentro de cada consulta custaria O(q · n log n), pior até que a busca linear, O(q · n). `extrato.sort()` também ordena, mas bagunça a lista de quem chamou a função. Com `a > b`, a diferença pode ficar negativa, por isso o caso especial; e como Pix têm centavos, truques como `b + 1` não funcionam.',
           starter: dedent(`
             from bisect import bisect_left, bisect_right
 
-            def contar_no_intervalo(valores, a, b):
-                # quantos v com a <= v <= b, em O(log n)
+            def contar_faixas(extrato, consultas):
+                # extrato: valores fora de ordem; consultas: lista de pares (a, b)
+                # devolva [quantos v com a <= v <= b, para cada (a, b)], em O((n + q) log n)
                 pass
           `),
           solution: dedent(`
             from bisect import bisect_left, bisect_right
 
-            def contar_no_intervalo(valores, a, b):
-                if a > b:
-                    return 0
-                return bisect_right(valores, b) - bisect_left(valores, a)
+            def contar_faixas(extrato, consultas):
+                valores = sorted(extrato)    # uma vez só, e numa cópia
+                respostas = []
+                for a, b in consultas:
+                    if a > b:
+                        respostas.append(0)
+                    else:
+                        respostas.append(bisect_right(valores, b) - bisect_left(valores, a))
+                return respostas
           `),
           tests: [
-            { name: 'exemplo', code: 'v = [5, 12, 20, 20, 20, 35, 50, 50, 120]\nfor a, b, esperado in [(20, 50, 6), (13, 19, 0), (0, 1000, 9), (6, 34, 4)]:\n    r = contar_no_intervalo(v, a, b)\n    assert r == esperado, f"contar_no_intervalo(v, {a}, {b}) deu {r}, esperado {esperado}"' },
-            { name: 'extremos inclusos', code: 'v = [5, 12, 20, 20, 20, 35, 50, 50, 120]\nassert contar_no_intervalo(v, 20, 20) == 3, "os três Pix de R$ 20 estão em [20, 20]"\nassert contar_no_intervalo(v, 50, 120) == 3, "os dois extremos contam: a <= v <= b"\nassert contar_no_intervalo(v, 5, 12) == 2, "os dois extremos contam: a <= v <= b"' },
-            { name: 'vazia e a > b', code: 'assert contar_no_intervalo([], 1, 5) == 0, "lista vazia: 0"\nr = contar_no_intervalo([1, 2, 3], 3, 1)\nassert r == 0, f"com a > b não há valor possível: devolva 0 (veio {r})"\nr = contar_no_intervalo([5, 12, 20, 20, 20, 35, 50, 50, 120], 50, 20)\nassert r == 0, f"com a > b não há valor possível: devolva 0 (veio {r})"' },
-            { name: 'estornos negativos', code: 'v = [-30, -10, -10, 0, 15]\nassert contar_no_intervalo(v, -10, 0) == 3, "em [-10, 0] há -10, -10 e 0"\nassert contar_no_intervalo(v, -100, -20) == 1, "em [-100, -20] só há o -30"\nassert contar_no_intervalo(v, 16, 99) == 0' },
-            { name: 'valores com centavos', code: 'v = [9.9, 10.0, 10.5, 10.99, 11.0, 20.5]\nfor a, b, esperado in [(10, 10.5, 2), (10.5, 11, 3), (10.01, 10.98, 1), (10, 11, 4)]:\n    r = contar_no_intervalo(v, a, b)\n    assert r == esperado, f"contar_no_intervalo({v}, {a}, {b}) deu {r}, esperado {esperado}. Pix têm centavos: truques como b + 1 só funcionam com inteiros"' },
-            { name: 'O(log n) por consulta', code: dedent(`
-              import time
-              valores = list(range(2_000_000))
-              t0 = time.perf_counter()
-              for q in range(2000):
-                  r = contar_no_intervalo(valores, q * 500, q * 500 + 999_999)
-                  assert r == 1_000_000, f"a faixa [{q * 500}, {q * 500 + 999_999}] deveria ter 1000000 valores, veio {r}"
-                  if time.perf_counter() - t0 > 0.5:
-                      break
-              assert time.perf_counter() - t0 < 0.5, "muito lento: cada consulta deve custar O(log n), sem percorrer a lista nem a faixa encontrada"
+            { name: 'exemplo', code: 'ext = [20, 5, 50, 120, 20, 12, 35, 50, 20]\nconsultas = [(20, 50), (13, 19), (0, 1000), (6, 34)]\nr = contar_faixas(ext, consultas)\nassert r == [6, 0, 9, 4], f"contar_faixas({ext}, {consultas}) deu {r}, esperado [6, 0, 9, 4]"' },
+            { name: 'extremos inclusos', code: 'ext = [20, 5, 50, 120, 20, 12, 35, 50, 20]\nr = contar_faixas(ext, [(20, 20), (50, 120), (5, 12)])\nassert r == [3, 3, 2], f"deu {r}, esperado [3, 3, 2]: os dois extremos contam (a <= v <= b), e os três Pix de R$ 20 estão em [20, 20]"' },
+            { name: 'vazios e a > b', code: 'r = contar_faixas([], [(1, 5)])\nassert r == [0], f"extrato vazio: esperado [0], veio {r}"\nr = contar_faixas([1, 2, 3], [])\nassert r == [], f"sem consultas: esperado [], veio {r}"\nr = contar_faixas([1, 2, 3], [(3, 1)])\nassert r == [0], f"com a > b não há valor possível: esperado [0], veio {r}"\nr = contar_faixas([20, 5, 50, 120, 20, 12, 35, 50, 20], [(50, 20), (20, 50)])\nassert r == [0, 6], f"esperado [0, 6] (a primeira consulta tem a > b), veio {r}"' },
+            { name: 'estornos negativos', code: 'ext = [0, -10, 15, -30, -10]\nr = contar_faixas(ext, [(-10, 0), (-100, -20), (16, 99)])\nassert r == [3, 1, 0], f"deu {r}, esperado [3, 1, 0]: em [-10, 0] há -10, -10 e 0, e em [-100, -20] só o -30"' },
+            { name: 'valores com centavos', code: 'ext = [10.99, 9.9, 20.5, 10.0, 11.0, 10.5]\nconsultas = [(10, 10.5), (10.5, 11), (10.01, 10.98), (10, 11)]\nr = contar_faixas(ext, consultas)\nassert r == [2, 3, 1, 4], f"contar_faixas({ext}, {consultas}) deu {r}, esperado [2, 3, 1, 4]. Pix têm centavos: truques como b + 1 só funcionam com inteiros"' },
+            { name: 'não altera o extrato', code: 'ext = [30, -5, 12, 12, 7]\ncontar_faixas(ext, [(0, 20)])\nassert ext == [30, -5, 12, 12, 7], f"o extrato mudou para {ext}: ordene uma cópia"' },
+            { name: 'muitas consultas', code: `${GUARDA_LACO}\n` + dedent(`
+              import random
+              from bisect import bisect_left as _bl, bisect_right as _br
+              random.seed(8)
+              ext = [random.randint(-1_000, 100_000) for _ in range(200_000)]
+              consultas = []
+              for i in range(10_000):
+                  if i % 10:
+                      a, b = random.randint(-2_000, 30_000), random.randint(70_000, 101_000)
+                  else:
+                      a, b = random.randint(-2_000, 101_000), random.randint(-2_000, 101_000)
+                  consultas.append((a, b))
+              _ord = sorted(ext)
+              esperado = [max(0, _br(_ord, b) - _bl(_ord, a)) for a, b in consultas]
+              r = _no_prazo(1.5, "com 200 000 Pix e 10 000 consultas, a sua função passou de 1,5 s: ordene uma vez só e responda cada consulta com duas buscas binárias, sem percorrer a lista, sem fatiar a faixa encontrada e sem reordenar a cada consulta", contar_faixas, ext, consultas)
+              assert r == esperado, "com 200 000 Pix e 10 000 consultas, algumas contagens vieram erradas"
             `) },
           ],
         },
@@ -551,18 +593,19 @@ const fronteiras = lesson({
                   r = postos_mais_proximos(kms, x, k)
                   assert r == esperado, f"postos_mais_proximos({kms}, {x}, {k}) deu {r}, esperado {esperado}"
             `) },
-            { name: 'O(log n + k) por consulta', code: dedent(`
-              import time
+            { name: 'O(log n + k) por consulta', code: `${GUARDA_LACO}\n` + dedent(`
+              from bisect import bisect_left as _bl
               kms = list(range(0, 2_000_000, 2))
-              t0 = time.perf_counter()
-              for q in range(1000):
-                  postos_mais_proximos(kms, q * 1999, 3)
-                  if time.perf_counter() - t0 > 1.0:
-                      break
-              dt = time.perf_counter() - t0
-              r = postos_mais_proximos(kms, 1001, 3)
-              assert r == [998, 1000, 1002], f"esperado [998, 1000, 1002] (998 e 1004 empatam), veio {r}"
-              assert dt < 1.0, f"as consultas numa lista de 1 milhão de postos passaram de {dt:.2f} s: cada consulta deve custar O(log n + k), sem percorrer nem ordenar a lista"
+              xs = [1001] + [q * 1999 for q in range(1000)]
+              def _consultas():
+                  return [postos_mais_proximos(kms, x, 3) for x in xs]
+              rs = _no_prazo(1.0, "1 001 consultas numa lista de 1 milhão de postos passaram de 1 s: cada consulta deve custar O(log n + k), sem percorrer nem ordenar a lista", _consultas)
+              assert rs[0] == [998, 1000, 1002], f"postos_mais_proximos(kms, 1001, 3): esperado [998, 1000, 1002] (998 e 1004 empatam, fica o 998), veio {rs[0]}"
+              for x, r in zip(xs, rs):
+                  i = _bl(kms, x)
+                  perto = kms[max(0, i - 4):i + 4]
+                  e = sorted(sorted(perto, key=lambda v: (abs(v - x), v))[:3])
+                  assert r == e, f"postos_mais_proximos(kms, {x}, 3) deu {r}, esperado {e}"
             `) },
           ],
         },
@@ -609,8 +652,11 @@ const fronteiras = lesson({
 /* Busca binária na resposta                                           */
 /* ------------------------------------------------------------------ */
 
-/** Envolve `pedacos` para acusar laço infinito com uma mensagem, em vez de estourar o tempo. */
-const GUARDA_PEDACOS = dedent(`
+/**
+ * Envolve `pedacos` para acusar laço infinito com uma mensagem, em vez de estourar o tempo. Se o estudante
+ * contar os pedaços sem chamar `pedacos`, o vigia de linhas de GUARDA_LACO faz o mesmo papel.
+ */
+const GUARDA_PEDACOS = `${GUARDA_LACO}\n` + dedent(`
   if "_pedacos_original" not in globals() and "pedacos" in globals():
       _pedacos_original = pedacos
   _contador = [0]
@@ -621,7 +667,7 @@ const GUARDA_PEDACOS = dedent(`
           return _pedacos_original(rolos, L)
   def _chama(rolos, k):
       _contador[0] = 0
-      return maior_pedaco(rolos, k)
+      return _sem_laco_infinito(maior_pedaco, rolos, k)
 `);
 
 const naResposta = lesson({
@@ -655,7 +701,7 @@ const naResposta = lesson({
 
         Uma transportadora precisa despachar pacotes de 3, 2, 2, 4, 1 e 4 kg, **na ordem da esteira**, em até 3 dias, com um caminhão que faz uma viagem por dia. Qual a **menor capacidade** de caminhão que dá conta? Não há fórmula direta. Mas, para um chute, a pergunta é fácil: **"com capacidade C, dá para despachar tudo em até 3 dias?"**. E ela tem uma propriedade preciosa: se dá com C, dá com qualquer capacidade maior. Ao longo de C = 1, 2, 3, … as respostas formam F…F V…V, e a menor capacidade que serve é a **fronteira**, exatamente o que você aprendeu a achar.
 
-        Essa técnica se chama **{{busca binária na resposta|binary search on the answer}}**: em vez de testar C = 1, 2, 3, … até dar certo, você testa o meio do intervalo de respostas possíveis e descarta metade dele a cada teste. Um uso famoso fora das provas: o \`git bisect\` (Nível 10) acha qual entre milhares de commits introduziu um bug testando cerca de log₂ n deles. Se o bug, uma vez introduzido, continua lá, "este commit já tem o bug?" é F…F V…V ao longo da história.
+        Essa técnica se chama **{{busca binária na resposta|binary search on the answer}}**: em vez de testar C = 1, 2, 3, … até dar certo, você testa o meio do intervalo de respostas possíveis e descarta metade dele a cada teste. Um uso famoso fora das provas: o \`git bisect\` (o Git é assunto do Nível 10) acha qual entre milhares de commits introduziu um bug testando cerca de log₂ n deles. Se o bug, uma vez introduzido, continua lá, "este commit já tem o bug?" é F…F V…V ao longo da história.
       `),
     ],
     explicacao: [
@@ -706,6 +752,8 @@ const naResposta = lesson({
         ### Escolhendo lo e hi
         - \`lo\`: um valor abaixo do qual com certeza nada funciona, ou o menor valor permitido. Para o caminhão: \`max(pesos)\`, porque com menos que isso o pacote mais pesado nunca embarca.
         - \`hi\`: um valor que **com certeza** funciona. Para o caminhão: \`sum(pesos)\`, que leva tudo num dia só.
+
+        No molde do máximo os papéis se invertem: \`lo\` é o valor que com certeza funciona, e \`hi\`, um valor acima do qual com certeza nada funciona.
 
         Se a resposta estiver fora de \`[lo, hi]\`, a busca nunca a encontra, e o erro é silencioso: com \`lo\` alto demais, o molde do mínimo devolve um valor que serve, mas não é o menor; com \`hi\` baixo demais, devolve \`hi\` mesmo que ele não sirva. Na dúvida, teste \`pode(hi)\` antes e trate o caso "impossível".
 
@@ -820,8 +868,9 @@ const naResposta = lesson({
           difficulty: 'facil',
           skills: ['alg-busca'],
           hints: [
-            'Para cada opção, imagine a resposta para v = 50, 60, 70, 80, 90… Ela muda de F para V uma única vez?',
+            'Para cada opção, imagine a resposta para v = 50, 60, 70, 80, 90… Ela muda de resposta uma única vez?',
             'Se uma velocidade serve, uma velocidade maior pode deixar de servir?',
+            'Um predicado monotônico que não usa os 600 km nem as 8 horas consegue encontrar a velocidade que o problema pede?',
           ],
           explanation: 'Busca binária na resposta exige um verificador que vire de falso para verdadeiro uma única vez ao longo das respostas em ordem. "Termina em até 8 h" tem isso: o tempo 600 / v diminui quando v aumenta, e a fronteira é 75 km/h. "Exatamente" e "inteiro" são verdadeiros em pontos isolados. Por isso verificadores quase sempre usam ≤ ou ≥, nunca ==.',
           options: [
@@ -951,7 +1000,7 @@ const naResposta = lesson({
           `),
           tests: [
             { name: 'exemplo', code: `${GUARDA_PEDACOS}\nr = _chama([8, 5, 3], 4)\nassert r == 3, f"maior_pedaco([8, 5, 3], 4) deu {r}, esperado 3 (2 + 1 + 1 pedaços de 3 m)"` },
-            { name: 'pedaço maior que o menor rolo', code: `${GUARDA_PEDACOS}\nr = _chama([1, 100], 2)\nassert r == 50, f"maior_pedaco([1, 100], 2) deu {r}, esperado 50: o rolo de 1 m pode simplesmente sobrar. Reveja o hi."` },
+            { name: 'pedaço maior que o menor rolo', code: `${GUARDA_PEDACOS}\nr = _chama([1, 100], 2)\nassert r == 50, f"maior_pedaco([1, 100], 2) deu {r}, esperado 50: o rolo de 1 m pode simplesmente sobrar, e a resposta passa do menor rolo. O seu intervalo [lo, hi] contém o 50?"` },
             { name: 'impossível e bordas', code: `${GUARDA_PEDACOS}\nassert _chama([3, 2], 6) == 0, "só há 5 m de cabo: 6 pedaços é impossível, devolva 0"\nr = _chama([7], 1)\nassert r == 7, f"um rolo de 7 m e 1 pedaço: esperado 7, veio {r}"\nr = _chama([5, 5, 5], 3)\nassert r == 5, f"três rolos de 5 m e 3 pedaços: esperado 5, veio {r}"\nr = _chama([10], 10)\nassert r == 1, f"um rolo de 10 m e 10 pedaços: esperado 1, veio {r}"` },
             { name: 'rolos enormes', code: `${GUARDA_PEDACOS}\nr = _chama([10**9, 10**9 - 1], 3)\nassert r == 500_000_000, f"esperado 500000000 (2 pedaços do primeiro rolo e 1 do segundo), veio {r}"` },
             { name: 'comparação com força bruta', code: `${GUARDA_PEDACOS}\n` + dedent(`
@@ -1012,9 +1061,17 @@ const naResposta = lesson({
             { name: 'exemplos', code: 'for pilhas, h, esperado in [([3, 6, 7, 11], 8, 4), ([30, 11, 23, 4, 20], 5, 30), ([30, 11, 23, 4, 20], 6, 23)]:\n    r = ritmo_minimo(pilhas, h)\n    assert r == esperado, f"ritmo_minimo({pilhas}, {h}) deu {r}, esperado {esperado}"' },
             { name: 'uma pilha', code: 'for h, esperado in [(1, 10), (3, 4), (10, 1)]:\n    r = ritmo_minimo([10], h)\n    assert r == esperado, f"ritmo_minimo([10], {h}) deu {r}, esperado {esperado}"\nr = ritmo_minimo([10], 100)\nassert r == 1, f"com folga de sobra, o ritmo mínimo é 1 (nunca 0); veio {r}"' },
             { name: 'h igual ao número de pilhas', code: 'r = ritmo_minimo([5, 9, 2], 3)\nassert r == 9, f"com uma hora por pilha, o ritmo é a maior pilha: esperado 9, veio {r}"' },
-            { name: 'números enormes, só inteiros', code: 'r = ritmo_minimo([10**18], 3)\nassert r == 333333333333333334, f"esperado 333333333333333334, veio {r}. Se você usou p / v, o float perde precisão com números desse tamanho: calcule o teto só com inteiros"\nr = ritmo_minimo([10**18, 1], 2)\nassert r == 10**18, f"esperado 10**18, veio {r}"' },
-            { name: 'muitas pilhas: confere a fronteira', code: dedent(`
+            { name: 'números enormes, só inteiros', code: `${GUARDA_LACO}\n` + dedent(`
+              _lento = "com pilhas de até 10**18 redações, a sua função passou de 1 s: testar v = 1, 2, 3, … não termina. Use busca binária entre o menor e o maior ritmo possível"
+              r = _no_prazo(1.0, _lento, ritmo_minimo, [10**18], 3)
+              assert r == 333333333333333334, f"esperado 333333333333333334, veio {r}. Se você usou p / v, o float perde precisão com números desse tamanho: calcule o teto só com inteiros"
+              r = _no_prazo(1.0, _lento, ritmo_minimo, [10**18, 1], 2)
+              assert r == 10**18, f"esperado 10**18, veio {r}"
+            `) },
+            { name: 'muitas pilhas: confere a fronteira', code: `${GUARDA_LACO}\n` + dedent(`
               import random
+              r = _no_prazo(1.0, "com uma pilha de 10**9 redações, a sua função passou de 1 s: testar os ritmos um a um não termina. Use busca binária", ritmo_minimo, [10**9, 1], 2)
+              assert r == 10**9, f"ritmo_minimo([10**9, 1], 2) deu {r}, esperado 10**9"
               random.seed(11)
               def _horas(pilhas, v):
                   return sum((p + v - 1) // v for p in pilhas)
@@ -1105,14 +1162,19 @@ const naResposta = lesson({
             { name: '20 000 tomadas', code: `${GUARDA_LACO}\n` + dedent(`
               import random, time
               _sem_laco_infinito(maior_distancia_minima, [1, 2, 8, 4, 9], 3)
-              random.seed(5)
-              pontos = random.sample(range(10**9), 20_000)
               def _cabe(ps, c, d):
                   n, ultima = 1, ps[0]
                   for p in ps[1:]:
                       if p - ultima >= d:
                           n, ultima = n + 1, p
                   return n >= c
+              random.seed(6)
+              medio = random.sample(range(10**9), 500)
+              r = _no_prazo(1.5, "com 500 tomadas a sua função já passou de 1,5 s: tentar as escolhas, ou as distâncias uma a uma, não termina com 20 000. Busque a distância por busca binária, com um verificador O(n)", maior_distancia_minima, list(medio), 20)
+              ps = sorted(medio)
+              assert _cabe(ps, 20, r) and not _cabe(ps, 20, r + 1), f"com 500 tomadas e 20 caixas, a resposta {r} está errada"
+              random.seed(5)
+              pontos = random.sample(range(10**9), 20_000)
               t0 = time.perf_counter()
               r = maior_distancia_minima(pontos, 50)
               dt = time.perf_counter() - t0

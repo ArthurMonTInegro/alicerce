@@ -220,12 +220,12 @@ const balanceadas = lesson({
         rows: [
           ['BST comum', 'n − 1', '0', '0', 'ensino; dados que chegam em ordem aleatória'],
           ['AVL', 'cerca de 1,44 · log₂ n', 'no máximo 2', 'até O(log n)', 'quando há muito mais buscas que alterações (no pior caso, é a mais baixa das três)'],
-          ['Rubro-negra', '2 · log₂(n + 1)', 'no máximo 2', 'no máximo 3', '`TreeMap` e `TreeSet` do Java, `std::map` e `std::set` nas implementações comuns de C++, o escalonador de processos do kernel Linux'],
+          ['Rubro-negra', 'no máximo 2 · log₂(n + 1)', 'no máximo 2', 'no máximo 3', '`TreeMap` e `TreeSet` do Java, `std::map` e `std::set` nas implementações comuns de C++, o escalonador de processos do kernel Linux'],
         ],
-        caption: 'As três buscam, inserem e removem em O(h). Nas balanceadas, h = O(log n) no pior caso; com 1 milhão de chaves: AVL até 27, rubro-negra até 39, contra 19 da árvore mais baixa possível.',
+        caption: 'As três buscam, inserem e removem em O(h). Nas balanceadas, h = O(log n) no pior caso. Com 1 milhão de chaves, a AVL chega no máximo à altura 27 e a rubro-negra, à 36 (a fórmula 2 · log₂(n + 1) é um teto um pouco folgado: dá 39). A árvore mais baixa possível tem altura 19.',
       },
       warn('O Python **não** tem árvore balanceada na biblioteca padrão. Para busca exata, use `dict` e `set` (hash, O(1) em média). Quando a **ordem** importa (o próximo maior, todos os valores de um intervalo), as opções comuns são uma lista ordenada com o módulo `bisect` (busca O(log n), mas inserir no meio é O(n), porque desloca elementos) ou o pacote externo `sortedcontainers`. Bancos de dados usam **B-trees**, árvores balanceadas com muitos filhos por nó (Nível 7).', 'E no Python?'),
-      deep('Uma BST **completa** (todos os níveis cheios, menos talvez o último, preenchido da esquerda para a direita) tem a menor altura possível, mas mantê-la assim custa caro. Numa árvore perfeita com os valores 2 a 8, inserir o 9 obriga o novo nó a nascer no canto esquerdo do último nível, posição que precisa guardar o menor valor: todos os valores mudam de lugar, O(n) por inserção. A AVL aceita até ~44% a mais de altura em troca de consertos O(1) por nível; a rubro-negra aceita até 100% a mais em troca de ainda menos rotações. É um padrão de projeto que você vai rever muitas vezes: relaxar um pouco a garantia para tornar a manutenção barata.', 'Por que não exigir balanceamento perfeito?'),
+      deep('Uma BST **completa** (todos os níveis cheios, menos talvez o último, preenchido da esquerda para a direita) tem a menor altura possível, mas mantê-la assim custa caro. Numa árvore perfeita com os valores 2 a 8, inserir o 9 obriga o novo nó a nascer no canto esquerdo do último nível, posição que precisa guardar o menor valor: todos os valores mudam de lugar, um trabalho proporcional a n numa única inserção. A AVL aceita até ~44% a mais de altura em troca de consertos O(1) por nível; a rubro-negra aceita até 100% a mais em troca de ainda menos rotações. É um padrão de projeto que você vai rever muitas vezes: relaxar um pouco a garantia para tornar a manutenção barata.', 'Por que não exigir balanceamento perfeito?'),
     ],
     exemplo: [
       md('Vamos inserir 10, 20, 30, 40, 50 e 25 numa AVL vazia. Para caber numa tabela, a árvore está escrita como `x(E, D)`: o nó x com a subárvore esquerda E e a direita D; `—` é vazio, e uma folha aparece só como o número.'),
@@ -560,7 +560,7 @@ const balanceadas = lesson({
           id: 'e3-avl-desafio',
           kind: 'code',
           lang: 'python',
-          prompt: 'O código inicial traz uma AVL completa com inserção (a mesma da etapa Código). Escreva `remover(no, v)`, que remove `v` da subárvore e devolve a nova raiz dela, mantendo a regra da BST, o balanceamento AVL e corretas as alturas guardadas nos nós. Se `v` não estiver na árvore, nada muda. No caso de dois filhos, use o {{sucessor|in-order successor}} (o menor valor da subárvore direita).',
+          prompt: 'O código inicial traz a AVL com inserção da etapa Código. Escreva `remover(no, v)`, que remove `v` da subárvore e devolve a nova raiz dela, mantendo a regra da BST, o balanceamento AVL e corretas as alturas guardadas nos nós. Se `v` não estiver na árvore, nada muda. No caso de dois filhos, use o {{sucessor|in-order successor}} (o menor valor da subárvore direita). A remoção deve custar O(log n): visite só os nós do caminho da busca (e, no caso de dois filhos, os do caminho até o sucessor).',
           difficulty: 'desafio',
           skills: ['ed-arvores', 'alg-recursao'],
           hints: [
@@ -568,7 +568,7 @@ const balanceadas = lesson({
             'No caso de dois filhos, o valor do sucessor vem para o nó atual. Como tirar o sucessor da subárvore direita sem escrever código novo?',
             'A estrutura é a mesma de `inserir`: desça recursivamente, troque o filho pelo resultado da chamada e, na volta, devolva o nó já rebalanceado. Que funções do código inicial você pode reaproveitar?',
           ],
-          explanation: 'A remoção tem a mesma forma da inserção: recursão até o nó, os três casos da BST (no de dois filhos, o valor do sucessor sobe e o sucessor é removido da subárvore direita) e `rebalancear` em cada nó do caminho, na volta. Note que `rebalancear` trata fb(filho) = 0 com rotação simples, caso que só aparece na remoção. E, ao contrário da inserção, um conserto pode encurtar a subárvore e desequilibrar um ancestral: um dos testes provoca rotações em dois níveis com uma única remoção. Custo: O(log n).',
+          explanation: 'A remoção tem a mesma forma da inserção: recursão até o nó, os três casos da BST (no de dois filhos, o valor do sucessor sobe e o sucessor é removido da subárvore direita) e `rebalancear` em cada nó do caminho, na volta. Note que `rebalancear` trata fb(filho) = 0 com rotação simples, caso que só aparece na remoção. E, ao contrário da inserção, um conserto pode encurtar a subárvore e desequilibrar um ancestral: um dos testes provoca rotações em dois níveis com uma única remoção. Custo: O(log n), porque só os nós do caminho são visitados e rebalanceados; remover como numa BST comum e depois "consertar" a árvore inteira daria uma AVL válida, mas custaria O(n) por remoção.',
           starter:
             AVL_BASE +
             '\n\n' +
@@ -698,6 +698,32 @@ const balanceadas = lesson({
                 assert criados[0] <= 100, f"{criados[0]} nós criados em 100 remoções: remova ajustando os ponteiros, sem reconstruir a árvore"
               `),
             },
+            {
+              name: 'O(log n) por remoção',
+              code: CONFERIR_AVL + '\n' + dedent(`
+                r = _montar(range(2000))
+                _leituras = [0]
+                def _contar(campo):
+                    # conta cada leitura de no.esq e no.dir feita durante as remoções
+                    def ler(self):
+                        _leituras[0] += 1
+                        return self.__dict__[campo]
+                    def escrever(self, valor):
+                        self.__dict__[campo] = valor
+                    return property(ler, escrever)
+                No.esq, No.dir = _contar("esq"), _contar("dir")
+                pior = 0
+                try:
+                    for v in list(range(0, 2000, 97)) + [5000]:
+                        antes = _leituras[0]
+                        r = remover(r, v)
+                        pior = max(pior, _leituras[0] - antes)
+                finally:
+                    del No.esq, No.dir
+                _conferir(r)
+                assert pior <= 1000, f"uma única remoção leu {pior} ligações esq/dir numa AVL de 2 000 nós: isso é O(n), como percorrer a árvore inteira. Visite só o caminho da busca (e, com dois filhos, o do sucessor) e rebalanceie só esses nós, na volta da recursão"
+              `),
+            },
           ],
         },
       },
@@ -744,7 +770,7 @@ const heaps = lesson({
   id: 'l3-heap-binario',
   moduleId: 'm3-4',
   title: 'Heaps por dentro: a árvore guardada numa lista',
-  titleEn: 'Binary heaps inside: a tree stored in an array',
+  titleEn: 'Inside binary heaps: a tree stored in an array',
   summary: 'Como o heapq funciona: árvore binária completa dentro de uma lista, subir e descer, construir um heap em O(n) e ordenar no lugar com heapsort.',
   minutes: 45,
   objectives: [
@@ -769,7 +795,7 @@ const heaps = lesson({
       md(`
         Na lição de filas de prioridade, você usou o \`heapq\` como caixa-preta: \`h[0]\` é sempre o menor, \`heappush\` e \`heappop\` custam O(log n) e \`heapify\` custa O(n). Agora vamos abrir a caixa.
 
-        Um {{heap binário|binary heap}} é uma árvore, mas com uma regra mais fraca que a da BST e um formato tão regular que dispensa nós e ponteiros: a árvore inteira mora numa \`list\` comum, e pai e filhos se encontram por contas com os índices. Isso dá ao heap vantagens que uma BST não tem: o mínimo sempre na posição 0, altura que **nunca** degenera sem precisar de rotações e nenhuma memória gasta com ponteiros.
+        Um {{heap binário|binary heap}} é uma árvore, mas com uma regra mais fraca que a da BST e um formato tão regular que dispensa nós e ponteiros: a árvore inteira mora numa \`list\` comum, e pai e filhos se encontram por contas com os índices. Isso dá ao heap vantagens que uma BST não tem: o mínimo sempre na posição 0, uma altura que **nunca** degenera (sem precisar de rotações) e nenhuma memória gasta com ponteiros.
 
         Entender o heap por dentro explica por que a lista do \`heapq\` "parece bagunçada", permite operações que o módulo não oferece (como cancelar um item do meio) e traz de brinde um algoritmo de ordenação: o heapsort.
       `),
@@ -857,7 +883,7 @@ const heaps = lesson({
         O {{heapsort|heapsort}} custa **O(n log n) no pior caso**, com qualquer entrada, sem memória extra. Mas não é estável (iguais podem trocar de ordem entre si) e, na prática, costuma ser mais lento que um merge sort ou um quick sort bem implementados (o \`sorted\` do Python usa o Timsort, derivado do merge sort), porque salta de i para 2i + 1 na memória e aproveita mal o cache. Ele brilha como rede de segurança: o \`std::sort\` do C++, nas implementações comuns (o *introsort*), começa com quick sort e passa para heapsort se a recursão ficar funda demais, garantindo O(n log n).
       `),
       deep(`
-        Vale ler o arquivo \`heapq.py\` (o Python usa uma versão em C, mas o código em Python está lá, comentado). Duas surpresas:
+        Vale ler o arquivo \`heapq.py\`: o Python usa uma versão em C, mais rápida, mas a versão em Python continua no arquivo, com comentários longos que explicam cada escolha. Duas surpresas:
         - Os nomes estão ao contrário do que a maioria dos livros usa: \`_siftdown\` é a função que faz o item **subir** (ela "desce os pais" para abrir espaço) e \`_siftup\` é a que faz **descer**.
         - O \`heappop\` usa um truque: em vez de comparar o elemento que veio do fim com os filhos a cada nível, ele sobe o menor filho até abrir um buraco numa folha e só então faz o elemento subir o pouco que precisar. Como quem vem do fim quase sempre pertence ao fundo, isso economiza comparações em média.
       `, 'Lendo o código-fonte do heapq'),
@@ -1238,7 +1264,7 @@ const heaps = lesson({
             'Depois de mandar o maior para o fim, a parte final da lista já está pronta e não pode mais ser mexida. Que informação a sua função de descer precisa receber para não invadir essa parte?',
             'Primeiro construa o heap máximo (de baixo para cima). Depois, quantas vezes você precisa repetir "trocar o topo com o fim da parte heap e descer o novo topo"?',
           ],
-          explanation: 'Construir o heap máximo custa O(n); cada uma das n − 1 retiradas custa O(log n): O(n log n) no pior caso, com qualquer entrada, inclusive já ordenada ou invertida. A memória extra é O(1) porque a parte ordenada cresce no fim da própria lista enquanto o heap encolhe no começo. O preço: não é estável e aproveita mal o cache (salta de i para 2i + 1), por isso as bibliotecas costumam preferir variantes de merge sort e quick sort e guardam o heapsort como rede de segurança.',
+          explanation: 'Construir o heap máximo custa O(n); cada uma das n − 1 retiradas custa O(log n): O(n log n) no pior caso, com qualquer entrada, inclusive já ordenada ou invertida. Um dos testes usa um adversário (McIlroy, 1999) que decide os valores durante a execução para forçar o pior caso: os quick sorts comuns, mesmo com pivô aleatório ou mediana de três, caem para O(n²), mas o heapsort não se abala. A memória extra é O(1) porque a parte ordenada cresce no fim da própria lista enquanto o heap encolhe no começo. O preço: não é estável e aproveita mal o cache (salta de i para 2i + 1), por isso as bibliotecas costumam preferir variantes de merge sort e quick sort e guardam o heapsort como rede de segurança.',
           starter: dedent(`
             def heapsort(xs):
                 # 1. transforme xs num heap MÁXIMO (de baixo para cima)
@@ -1364,6 +1390,53 @@ const heaps = lesson({
               `),
             },
             {
+              name: 'pior caso escolhido por um adversário',
+              code: dedent(`
+                import math
+
+                class _Adversario:
+                    # Os valores só são decididos durante a ordenação, sempre do jeito que mais
+                    # atrapalha (M. D. McIlroy, "A Killer Adversary for Quicksort", 1999).
+                    GAS = 10 ** 9
+                    solidos = 0
+                    candidato = None
+                    comparacoes = 0
+                    limite = 0
+                    def __init__(self):
+                        self.v = _Adversario.GAS
+                    def _cmp(self, o):
+                        A = _Adversario
+                        A.comparacoes += 1
+                        assert A.comparacoes <= A.limite, f"mais de {A.limite} comparações para ordenar {n} itens cujos valores um adversário escolheu durante a execução: o seu algoritmo tem pior caso O(n²) (um quick sort, talvez?). O heapsort garante O(n log n) com qualquer entrada"
+                        if self.v == A.GAS and o.v == A.GAS:
+                            alvo = self if self is A.candidato else o
+                            alvo.v = A.solidos
+                            A.solidos += 1
+                        if self.v == A.GAS:
+                            A.candidato = self
+                        elif o.v == A.GAS:
+                            A.candidato = o
+                        return self.v - o.v
+                    def __lt__(self, o):
+                        return self._cmp(o) < 0
+                    def __le__(self, o):
+                        return self._cmp(o) <= 0
+                    def __gt__(self, o):
+                        return self._cmp(o) > 0
+                    def __ge__(self, o):
+                        return self._cmp(o) >= 0
+                    def __eq__(self, o):
+                        return self._cmp(o) == 0
+
+                n = 1024
+                _Adversario.limite = int(4 * n * math.log2(n))
+                xs = [_Adversario() for _ in range(n)]
+                heapsort(xs)
+                vs = [x.v for x in xs]
+                assert all(vs[i] <= vs[i + 1] for i in range(n - 1)), "com os valores escolhidos pelo adversário, a lista não ficou ordenada"
+              `),
+            },
+            {
               name: 'memória extra O(1)',
               code: dedent(`
                 xs = [(i * 7919) % 1009 for i in range(1000)]
@@ -1404,7 +1477,7 @@ const heaps = lesson({
 
         From the Python docs (module heapq): *"Heaps are binary trees for which every parent node has a value less than or equal to any of its children. We refer to this condition as the heap invariant."* The same page shows the index arithmetic: \`heap[k] <= heap[2*k+1]\` and \`heap[k] <= heap[2*k+2]\`, "counting elements from zero".
 
-        Typical interview question: "Why can you build a heap in linear time, while sorting by comparisons needs O(n log n)?"
+        Typical interview question: "Why can you build a heap in linear time, while any comparison-based sort needs on the order of n log n comparisons?"
       `),
     ],
   },

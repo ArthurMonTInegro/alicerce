@@ -8,22 +8,22 @@ Revisão feita ao fim da construção, em 06/10/2026, contra o pedido original. 
 |---|---|---|
 | Níveis 0 a 14 | Feito | 15 níveis, 59 módulos, todos com pelo menos uma lição completa ([CURRICULO.md](CURRICULO.md)) |
 | Metodologia CONCEITO → REVISÃO | Feito | 8 etapas em toda lição; teste de conteúdo garante a ordem |
-| Inglês técnico PT → EN | Feito | Termos em toda lição, glossário com 413 termos, pronúncia por voz do navegador |
+| Inglês técnico PT → EN | Feito | Termos em toda lição, glossário com 584 termos, pronúncia por voz do navegador |
 | Erros explicados (o que, por que, investigar, corrigir, evitar) | Feito para Python e os erros comuns de JavaScript | `features/runner/errors.ts`; teste e2e confere |
-| Vários tipos de exercício | Feito | 7 tipos, 237 exercícios; 135 verificados executando a solução |
+| Vários tipos de exercício | Feito | 7 tipos, 364 exercícios; 214 verificados executando a solução |
 | Editor que executa código | Feito | Python (Pyodide), JavaScript (worker), SQL (SQLite), sem servidor |
 | Árvore de habilidades com pré-requisitos | Feito | Grafo validado em teste; 78 habilidades |
 | Diagnóstico | Feito | Adaptativo, 5 áreas, opção "Não sei" |
 | Visualizações e simuladores | Feito | 18 visualizações, execução passo a passo, simulador de terminal |
-| Quizzes e flashcards com repetição espaçada | Feito | 198 cartões, FSRS |
+| Quizzes e flashcards com repetição espaçada | Feito | 357 cartões, FSRS |
 | Tutor que não dá a resposta | Feito | IA (Claude) para contas, offline para todos; solução nunca enviada |
 | Carreira e referências | Feito | 28 perguntas de entrevista, currículo, GitHub, portfólio; 77 referências verificadas |
 | Pesquisa internacional sem inventar fontes | Feito, com ressalvas abaixo | [PESQUISA.md](PESQUISA.md) |
-| Desempenho, acessibilidade, segurança, SEO, celular | Feito, com ressalvas abaixo | axe WCAG 2.2 AA em 15 páginas, 168 páginas pré-renderizadas, CSP estrita |
+| Desempenho, acessibilidade, segurança, SEO, celular | Feito, com ressalvas abaixo | axe WCAG 2.2 AA em 15 páginas e nas etapas Explicação, Exercícios e Desafio de todas as lições, 190 páginas pré-renderizadas, CSP estrita |
 
 ## Fraquezas reais
 
-1. **Profundidade desigual.** Os níveis 0 a 2 têm 7 a 9 lições cada; os níveis 5, 8, 9, 11, 12 e 13 têm 3. Todo módulo tem lição, mas um módulo como "Redes de computadores" cobriria várias semanas numa universidade e aqui tem uma lição longa. Os roteiros (`outline`) de cada módulo mostram o que falta. É o maior déficit do projeto.
+1. **Profundidade desigual (atenuado no ciclo 2).** Os níveis 0 a 2 têm 7 a 9 lições cada e, desde o ciclo 2, o nível 3 tem 15 e o 4 tem 18 (3 por módulo); os níveis 5, 8, 9, 11, 12 e 13 continuam com 3. Todo módulo tem lição, mas um módulo como "Redes de computadores" cobriria várias semanas numa universidade e aqui tem uma lição longa. Os roteiros (`outline`) de cada módulo mostram o que falta. É o maior déficit do projeto.
 2. **Pacote JavaScript principal (resolvido no ciclo 2).** Páginas, texto das lições, cartões e glossário são baixados sob demanda. O JavaScript inicial caiu de 1,09 MB (344 KB com gzip) para 427 KB (132 KB com gzip). O que resta é sobretudo o React.
 3. **Explicação de erros incompleta fora do Python.** Python tem explicação em cinco partes para os erros mais frequentes; JavaScript só para os três mais comuns (nome não declarado, propriedade de `undefined`, chamada de não função); SQL mostra a mensagem do SQLite e a comparação com o resultado esperado, sem as cinco partes.
 4. **Conclusão sem acerto (atenuado no ciclo 2).** Concluir uma lição exige resolver cada exercício ou, depois de tentar de verdade (2 erros ou todas as dicas), ver a solução. Quem viu a solução recebe o exercício de volta em Revisão → Para refazer até resolver sem ajuda.

@@ -2,7 +2,7 @@
 
 Plataforma interativa de formação em computação, do zero ao avançado, em português com o inglês técnico ao lado de cada termo (**variável → variable**).
 
-São 15 níveis (0 a 14), 59 módulos, 69 lições e 237 exercícios corrigidos automaticamente. O código roda no próprio navegador: Python via Pyodide (WebAssembly), JavaScript num worker isolado e SQL num SQLite em memória. Há árvore de habilidades com pré-requisitos, teste diagnóstico, revisão espaçada (FSRS), visualizações interativas, tutor que dá pistas e nunca entrega a resposta, área de carreira e referências verificadas.
+São 15 níveis (0 a 14), 59 módulos, 91 lições e 364 exercícios corrigidos automaticamente. O código roda no próprio navegador: Python via Pyodide (WebAssembly), JavaScript num worker isolado e SQL num SQLite em memória. Há árvore de habilidades com pré-requisitos, teste diagnóstico, revisão espaçada (FSRS), visualizações interativas, tutor que dá pistas e nunca entrega a resposta, área de carreira e referências verificadas.
 
 ## Rodando localmente
 
@@ -10,7 +10,7 @@ Requisitos: Node.js 22.18 ou mais novo (o projeto usa TypeScript executado diret
 
 ```bash
 npm ci
-npm run build      # gera apps/web/dist com as 168 páginas pré-renderizadas
+npm run build      # gera apps/web/dist com as 190 páginas pré-renderizadas
 npm start          # API + site em http://localhost:3001
 ```
 

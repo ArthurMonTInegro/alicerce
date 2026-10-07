@@ -53,7 +53,7 @@ const crescimento = lesson({
         ### Multiplicar: {{crescimento geométrico|geometric growth}}
         Começando com capacidade 1 e dobrando, as cópias acontecem quando a lista tem 1, 2, 4, 8, … elementos. Até o n-ésimo append, o total copiado é \`1 + 2 + 4 + … + 2^k\`, com \`2^k < n\`. Essa soma vale \`2^(k+1) − 1\`, que é **menor que 2n**. Somando as n escritas, tudo fica abaixo de **3n**: O(n) para n appends, ou seja, **O(1) amortizado** por append.
 
-        Com outro {{fator de crescimento|growth factor}} r > 1 a conta é a mesma progressão geométrica: as cópias somam menos de \`n × r / (r − 1)\`. Para r = 1,5, menos de 3n. O fator muda a constante, não a ordem de grandeza.
+        Com outro {{fator de crescimento|growth factor}} r > 1 a conta é a mesma progressão geométrica: as cópias somam menos de \`n × r / (r − 1)\`. Para r = 1,5, menos de 3n. O fator muda a constante, não a ordem de grandeza. (Essa conta supõe multiplicar exatamente por r. Como a capacidade é um número inteiro, o arredondamento mexe um pouco na constante: com a regra \`c + c // 2\` da tabela abaixo, há valores de n em que as cópias passam de 3n, por muito pouco.)
 
         ### Somar: {{crescimento aritmético|arithmetic growth}}
         Crescendo de k em k, as cópias acontecem com k, 2k, 3k, … elementos: são cerca de n/k realocações, e as últimas copiam quase n elementos cada. O total é \`k × (1 + 2 + … + n/k)\`, perto de **n² / (2k)**: **O(n²)**. Um k maior só divide a constante; o crescimento continua quadrático.
@@ -83,7 +83,7 @@ const crescimento = lesson({
         head: ['Medida', 'Pergunta que responde', 'Exemplo'],
         rows: [
           ['Pior caso de uma operação', 'Quanto **uma** chamada pode custar, no máximo?', '`append` que encontra a lista cheia: O(n)'],
-          ['Custo amortizado', 'Pegando **qualquer** sequência de n operações a partir da estrutura vazia, quanto dá o custo total dividido por n?', '`append` na lista que dobra: O(1)'],
+          ['Custo amortizado', 'Para **qualquer** sequência de n operações a partir da estrutura vazia, quanto dá, no máximo, o custo total dividido por n?', '`append` na lista que dobra: O(1)'],
           ['Caso médio', 'Quanto custa, em média, quando a **entrada é sorteada**?', '`x in xs` com x numa posição aleatória: cerca de n/2 comparações, O(n)'],
         ],
       },
@@ -179,7 +179,7 @@ const crescimento = lesson({
         print("depois de +=, mesma lista?", id(xs) == antes)
         xs = xs + [5]
         print("depois de xs + [5], mesma lista?", id(xs) == antes)
-      `, { caption: 'Dobrar n mais ou menos dobra o tempo do append e quase quadruplica o de xs = xs + [i]. O id() mostra o motivo: + cria outra lista.' }),
+      `, { caption: 'A cada vez que n dobra, o tempo de xs = xs + [i] quase quadruplica. O do append é tão pequeno que oscila de uma execução para outra, mas cresce só na proporção de n. O id() mostra o motivo: + cria outra lista.' }),
     ],
     exercicio: [
       {
@@ -284,7 +284,7 @@ const crescimento = lesson({
             'Com fator 1,25, os tamanhos copiados ainda formam uma progressão geométrica?',
             'Na tabela da explicação, a regra ×1,5 ficou do lado O(n) ou do lado O(n²)? O que separa os dois lados?',
           ],
-          explanation: 'Qualquer fator constante r > 1 deixa as cópias somando menos de n × r / (r − 1): para 1,25, menos de 5n. Logo depois de crescer, a fração vazia do bloco é cerca de (r − 1) / r: 20% em vez de 50%. É uma troca de constantes entre tempo e memória; a ordem de grandeza continua O(n).',
+          explanation: 'Qualquer fator constante r > 1 deixa as cópias somando no máximo cerca de n × r / (r − 1): para 1,25, cerca de 5n. Logo depois de crescer, a fração vazia do bloco é cerca de (r − 1) / r: 20% em vez de 50%. É uma troca de constantes entre tempo e memória; a ordem de grandeza continua O(n).',
           options: [
             { text: 'Continua O(n) no total: há mais realocações e o limite das cópias sobe de 2n para 5n, mas logo depois de crescer o bloco fica só 20% vazio (em vez de 50%).', correct: true, feedback: 'Isso. O fator ajusta a troca entre tempo e memória, sem mudar a ordem de grandeza.' },
             { text: 'Vira O(n²), porque 1,25 está perto demais de 1.', feedback: 'Qualquer fator constante maior que 1 deixa a soma das cópias geométrica, logo O(n). O que leva a O(n²) é somar uma constante (+k), por maior que ela seja.' },
@@ -425,6 +425,10 @@ const crescimento = lesson({
                     raise AssertionError("depois de remover o único elemento, a lista está vazia: deveria lançar IndexError")
                 anexar(arr, 2)
                 assert arr["tamanho"] == 1 and arr["bloco"] == [2], f"depois de esvaziar, a lista precisa continuar aceitando elementos; veio {arr}"
+                anexar(arr, 3)
+                remover_ultimo(arr)
+                remover_ultimo(arr)
+                assert len(arr["bloco"]) == 1, f"com capacidade 2 e nenhum elemento, 0 * 4 < 2: o bloco deveria voltar à capacidade 1; veio {len(arr['bloco'])}. Use exatamente a regra tamanho * 4 < capacidade."
               `),
             },
             {
@@ -466,7 +470,9 @@ const crescimento = lesson({
                 import ast
                 proibidos = {"append", "pop", "insert", "extend", "remove", "clear"}
                 usados = set()
-                for no in ast.walk(ast.parse(_source)):
+                # só o código das funções: testes soltos no fim do arquivo não contam
+                funcoes = [f for f in ast.walk(ast.parse(_source)) if isinstance(f, (ast.FunctionDef, ast.Lambda))]
+                for no in (n for f in funcoes for n in ast.walk(f)):
                     if isinstance(no, ast.Call) and isinstance(no.func, ast.Attribute) and no.func.attr in proibidos:
                         usados.add(no.func.attr)
                     if isinstance(no, ast.Delete):
@@ -481,7 +487,7 @@ const crescimento = lesson({
     revisao: [
       md(`
         - Lista dinâmica: bloco com capacidade ≥ tamanho; quando enche, realoca e copia tudo.
-        - Multiplicar a capacidade por um fator r (×2, ×1,5): cópias somam menos de n × r / (r − 1), então n appends custam O(n): **O(1) amortizado**.
+        - Multiplicar a capacidade por um fator r (×2, ×1,5): cópias somam menos de n × r / (r − 1) (a menos de arredondamentos), então n appends custam O(n): **O(1) amortizado**.
         - Somar uma constante k (+1, +100): cópias somam cerca de n² / (2k): **O(n²)**.
         - Amortizado é garantia sobre o total de qualquer sequência; um append isolado ainda pode custar O(n).
         - Para encolher sem tremer: dobrar quando enche, reduzir à metade só abaixo de 1/4 (histerese).
@@ -528,7 +534,7 @@ const doisPonteiros = lesson({
   ],
   skills: ['ed-arrays'],
   terms: [
-    t('dois ponteiros', 'two pointers', 'Técnica que percorre a lista com dois índices que só andam num sentido, descartando candidatos a cada passo.', 'This problem can be solved in O(n) with the two pointers technique.'),
+    t('dois ponteiros', 'two pointers', 'Técnica que percorre a lista com dois índices que nunca voltam atrás, descartando candidatos a cada passo.', 'This problem can be solved in O(n) with the two pointers technique.'),
     t('ponteiro', 'pointer', 'Aqui, uma variável que guarda uma posição (índice) da lista. Em C, é um endereço de memória.'),
     t('ponteiros convergentes', 'converging pointers', 'Um índice em cada ponta, andando um em direção ao outro até se cruzarem.'),
     t('leitor e escritor', 'read/write pointers', 'Dois índices no mesmo sentido: um lê todos os elementos, o outro só avança quando um elemento é mantido.'),
@@ -542,7 +548,7 @@ const doisPonteiros = lesson({
       md(`
         Na primeira lição deste módulo você inverteu uma lista e achou um par com soma alvo usando dois índices. Esse truque tem nome: **{{dois ponteiros|two pointers}}**. Aqui, {{ponteiro|pointer}} é só uma variável que guarda uma posição da lista.
 
-        Em vez de testar **todos os pares** com dois laços aninhados (O(n²)), você mantém dois índices que **só andam num sentido** e, a cada passo, descarta com segurança uma parte do problema. Como nenhum índice volta, o total de passos é no máximo n (ou n + m, com duas listas): **O(n)**, quase sempre com **O(1) de memória extra**.
+        Em vez de testar **todos os pares** com dois laços aninhados (O(n²)), você mantém dois índices que **nunca voltam atrás** e, a cada passo, descarta com segurança uma parte do problema. Como cada passo move pelo menos um índice, o total de passos é no máximo n (ou n + m, com duas listas): **O(n)**, quase sempre com **O(1) de memória extra**.
 
         Quase todo problema desse tipo segue um de três padrões. Reconhecer o padrão é metade da solução; saber **por que** ele não perde respostas é a outra metade, e é o que o entrevistador vai perguntar em seguida.
       `),
@@ -551,8 +557,8 @@ const doisPonteiros = lesson({
       md(`
         ### Os três padrões
         - **{{Ponteiros convergentes|converging pointers}}**: \`i\` começa no início, \`j\` no fim, e eles se aproximam.
-        - **{{Leitor e escritor|read/write pointers}}**: os dois andam para a frente; \`leitura\` avança sempre, \`escrita\` só quando um elemento fica. Também é chamado de ponteiros rápido e lento (*fast and slow*).
-        - **Duas sequências**: um índice em cada lista ordenada; a cada passo avança o que aponta para o menor.
+        - **{{Leitor e escritor|read/write pointers}}**: os dois andam para a frente; \`leitura\` avança sempre, \`escrita\` só quando um elemento fica. Serve para filtrar a lista {{no lugar|in place}}, sem criar outra. Também é chamado de ponteiros rápido e lento (*fast and slow*).
+        - **Duas sequências**: um índice em cada lista ordenada; a cada passo avança o que aponta para o menor, como ao {{intercalar|merge}} duas listas.
       `),
       {
         type: 'table',
@@ -574,16 +580,16 @@ const doisPonteiros = lesson({
         Pense na tabela de todos os n² pares: cada passo risca uma linha ou uma coluna inteira do {{espaço de busca|search space}}. Por isso n passos bastam para examinar, sem olhar um por um, todos os pares.
 
         ### O invariante do leitor e escritor
-        \`leitura\` percorre todos os elementos; \`escrita\` marca onde vai o próximo elemento mantido. O invariante: **\`xs[:escrita]\` contém exatamente os elementos mantidos entre os já lidos, na ordem original**. Como \`escrita <= leitura\`, nunca sobrescrevemos algo que ainda não foi lido. No fim, \`xs[:escrita]\` é a resposta e o resto é sobra: quem chama usa só esse começo, ou corta com \`del xs[escrita:]\`. Tudo {{no lugar|in place}}, sem lista auxiliar.
+        \`leitura\` percorre todos os elementos; \`escrita\` marca onde vai o próximo elemento mantido. O invariante: **\`xs[:escrita]\` contém exatamente os elementos mantidos entre os já lidos, na ordem original**. Como \`escrita <= leitura\`, nunca sobrescrevemos algo que ainda não foi lido. No fim, \`xs[:escrita]\` é a resposta e o resto é sobra: quem chama usa só esse começo, ou corta com \`del xs[escrita:]\`. Tudo no lugar, sem lista auxiliar.
 
         ### Duas sequências
-        Com duas listas ordenadas, o menor elemento ainda não usado está sempre na frente de uma delas. Compare as duas frentes, consuma a menor e avance só aquele índice. Isso é **{{intercalar|merge}}**, o coração do merge sort que você verá no Nível 4.
+        Com duas listas ordenadas, o menor elemento ainda não usado está sempre na frente de uma delas. Compare as duas frentes, consuma a menor e avance só aquele índice. Isso é **intercalar**, o coração do merge sort que você verá no Nível 4.
       `),
       warn(`
         O convergente da soma alvo **exige lista ordenada**: o argumento de descarte usa \`xs[k] <= xs[j]\`. Numa lista desordenada, ordenar antes custa O(n log n) e perde as posições originais; com um dicionário (assunto do módulo de tabelas hash), dá para resolver em O(n) em média.
       `, 'Confira a pré-condição'),
       info(`
-        No dia a dia, \`[x for x in xs if x != 0]\` é o jeito mais legível de filtrar: O(n) de tempo, mas O(n) de memória extra e uma lista **nova**. O leitor e escritor importa quando a memória é apertada, quando outros nomes apontam para a mesma lista (aliasing) e quando a entrevista pede "in place". E fuja de remover itens de uma lista enquanto um \`for\` percorre essa mesma lista: o resultado sai errado (nos exercícios você vai ver por quê) e cada \`remove\` custa O(n).
+        No dia a dia, \`[x for x in xs if x != 0]\` é o jeito mais legível de filtrar: O(n) de tempo, mas O(n) de memória extra e uma lista **nova**. O leitor e escritor importa quando a memória é apertada, quando outros nomes apontam para a mesma lista (o que em inglês se chama *aliasing*) e quando a entrevista pede "in place". E fuja de remover itens de uma lista enquanto um \`for\` percorre essa mesma lista: o resultado sai errado (nos exercícios você vai ver por quê) e cada \`remove\` custa O(n).
       `, 'Compreensão de lista ou dois ponteiros?'),
     ],
     exemplo: [
@@ -659,7 +665,7 @@ const doisPonteiros = lesson({
           options: [
             { text: 'Percorrer com `for p in pedidos` e chamar `pedidos.remove(0)` sempre que achar um zero.', feedback: 'Remover enquanto o `for` percorre a mesma lista faz o laço pular elementos, e cada `remove` desloca o resto da lista: O(n) por remoção, O(n²) no total.' },
             { text: 'Um índice de leitura que percorre tudo e um de escrita que só avança quando o pedido é válido; no fim, cortar o que sobrou depois da escrita.', correct: true, feedback: 'Isso: é o padrão leitor e escritor. O(n) de tempo, O(1) de memória extra e a ordem é mantida.' },
-            { text: 'Criar `[p for p in pedidos if p != 0]` e usar essa nova lista.', feedback: 'É O(n) e é a escolha mais legível no dia a dia, mas cria outra lista do mesmo tamanho: O(n) de memória extra, e quem guardava a lista original não vê a mudança.' },
+            { text: 'Criar `[p for p in pedidos if p != 0]` e usar essa nova lista.', feedback: 'É O(n) e é a escolha mais legível no dia a dia, mas cria outra lista com todos os pedidos válidos: O(n) de memória extra, e quem guardava a lista original não vê a mudança.' },
             { text: 'Ordenar a lista para juntar os zeros no começo e depois cortá-los.', feedback: 'Ordenar custa O(n log n) e destrói a ordem de chegada dos pedidos, que precisava ser mantida.' },
           ],
         },
@@ -695,7 +701,7 @@ const doisPonteiros = lesson({
           id: 'e3-2p-3',
           kind: 'code',
           lang: 'python',
-          prompt: 'Escreva `mover_zeros(xs)` que leva todos os zeros para o **fim** da lista, mantendo a ordem relativa dos outros valores: `[0, 3, 0, 5, 7]` vira `[3, 5, 7, 0, 0]`. Modifique **a própria lista** (não devolva outra), em O(n) e com O(1) de memória extra: sem listas auxiliares, fatias (`xs[a:b]`) ou compreensões, e sem `sort`, `sorted`, `remove`, `insert`, `pop`, `append` ou `del`.',
+          prompt: 'Escreva `mover_zeros(xs)` que leva todos os zeros para o **fim** da lista, mantendo a ordem relativa dos outros valores: `[0, 3, 0, 5, 7]` vira `[3, 5, 7, 0, 0]`. Modifique **a própria lista** (não devolva outra), em O(n) e com O(1) de memória extra: sem listas ou outras estruturas auxiliares, fatias (`xs[a:b]`) ou compreensões, e sem `sort`, `sorted`, `remove`, `insert`, `pop`, `append` ou `del`.',
           difficulty: 'intermediario',
           skills: ['ed-arrays'],
           hints: [
@@ -727,9 +733,11 @@ const doisPonteiros = lesson({
             { name: 'modifica a própria lista', code: 'xs = [0, 1, 0, 2]\nident = id(xs)\nmover_zeros(xs)\nassert id(xs) == ident and xs == [1, 2, 0, 0], f"altere a lista recebida (xs[i] = ...): quem chamou continua olhando para ela. Ficou {xs}"' },
             { name: 'sem atalhos nem lista auxiliar', code: dedent(`
               import ast
-              proibidos = {"sorted", "sort", "remove", "insert", "pop", "append", "extend", "count", "copy", "list", "tuple", "filter", "index"}
+              proibidos = {"sorted", "sort", "remove", "insert", "pop", "append", "extend", "count", "copy", "list", "tuple", "dict", "set", "deque", "filter", "index"}
               usados = set()
-              for no in ast.walk(ast.parse(_source)):
+              # só o código das funções: testes soltos no fim do arquivo, como mover_zeros([0, 1]), não contam
+              funcoes = [f for f in ast.walk(ast.parse(_source)) if isinstance(f, (ast.FunctionDef, ast.Lambda))]
+              for no in (n for f in funcoes for n in ast.walk(f)):
                   if isinstance(no, ast.Call):
                       nome = no.func.id if isinstance(no.func, ast.Name) else getattr(no.func, "attr", "")
                       if nome in proibidos:
@@ -740,9 +748,11 @@ const doisPonteiros = lesson({
                       usados.add("compreensão")
                   if isinstance(no, ast.List):
                       usados.add("lista auxiliar [...]")
+                  if isinstance(no, (ast.Dict, ast.Set)):
+                      usados.add("dicionário ou conjunto auxiliar")
                   if isinstance(no, ast.Slice):
                       usados.add("fatia xs[a:b]")
-              assert not usados, f"resolva só com índices e atribuições (xs[i] = ...): outra lista ou uma fatia gasta O(n) de memória extra. Evite: {', '.join(sorted(usados))}"
+              assert not usados, f"resolva só com índices e atribuições (xs[i] = ...): outra estrutura ou uma fatia gasta O(n) de memória extra. Evite: {', '.join(sorted(usados))}"
             `) },
             { name: 'O(n) passos com os zeros no começo', code: dedent(`
               import sys
@@ -799,7 +809,7 @@ const doisPonteiros = lesson({
           id: 'e3-2p-4',
           kind: 'code',
           lang: 'python',
-          prompt: 'Escreva `eh_palindromo(frase)` que diz se a frase se lê igual nos dois sentidos, **ignorando** tudo que não for letra ou dígito e sem diferenciar maiúsculas de minúsculas: `"A base do teto desaba"` dá `True`. Use O(1) de memória extra: compare direto na frase original, um caractere por vez, com dois ponteiros convergentes que pulam o que não interessa. Nada de montar uma frase limpa, chamar `lower()` na frase inteira, fatiar, `[::-1]`, `reversed`, `join` ou compreensões.',
+          prompt: 'Escreva `eh_palindromo(frase)` que diz se a frase se lê igual nos dois sentidos, **ignorando** tudo que não for letra ou dígito e sem diferenciar maiúsculas de minúsculas: `"A base do teto desaba"` dá `True`. Letras acentuadas são letras como as outras (`"ô"` e `"o"` são caracteres diferentes). Use O(1) de memória extra: compare direto na frase original, um caractere por vez, com dois ponteiros convergentes que pulam o que não interessa. Nada de montar uma frase limpa, chamar `lower()` na frase inteira, fatiar, `[::-1]`, `reversed`, `join` ou compreensões.',
           difficulty: 'intermediario',
           skills: ['ed-arrays', 'prog-strings'],
           hints: [
@@ -831,7 +841,7 @@ const doisPonteiros = lesson({
           `),
           tests: [
             { name: 'frases palíndromas', code: 'for f in ["A base do teto desaba", "Anotaram a data da maratona", "Roma, me tem amor!", "A (torre) da derrota;", "\\"Ovo\\": ovo"]:\n    assert eh_palindromo(f) is True, f"{f!r} é palíndromo quando ignoramos espaços, pontuação e maiúsculas"' },
-            { name: 'não palíndromos', code: 'for f in ["Alicerce", "ab", "Ovo frito", "abca"]:\n    assert eh_palindromo(f) is False, f"{f!r} não é palíndromo"' },
+            { name: 'não palíndromos', code: 'for f in ["Alicerce", "ab", "Ovo frito", "abca"]:\n    assert eh_palindromo(f) is False, f"{f!r} não é palíndromo"\nf = "Socorram-me, subi no ônibus em Marrocos"\nassert eh_palindromo(f) is False, f"{f!r}: \\"ô\\" é letra (não pode ser ignorada) e é um caractere diferente de \\"o\\", então sem tirar acentos não é palíndromo. Use str.isalnum() para decidir o que é letra ou dígito."' },
             { name: 'casos de borda', code: 'for f in ["", "a", "!!", "Aa", " ,a. "]:\n    assert eh_palindromo(f) is True, f"{f!r} deveria dar True (vazio, um caractere ou só pontuação contam como palíndromo)"' },
             { name: 'dígitos contam', code: 'assert eh_palindromo("12321") is True, "dígitos são comparados como letras"\nassert eh_palindromo("1231") is False, "\\"1231\\" não é palíndromo: os dígitos não podem ser ignorados"\nassert eh_palindromo("A1b-2B1a") is True, "\\"A1b-2B1a\\" é palíndromo: compare letras e dígitos, sem diferenciar maiúsculas"' },
             { name: 'sem inverter nem montar outra frase', code: dedent(`
@@ -849,10 +859,12 @@ const doisPonteiros = lesson({
                   return False
 
               achados = set()
-              for no in ast.walk(ast.parse(_source)):
+              # só o código das funções: testes soltos no fim do arquivo não contam
+              funcoes = [f for f in ast.walk(ast.parse(_source)) if isinstance(f, (ast.FunctionDef, ast.Lambda))]
+              for no in (n for f in funcoes for n in ast.walk(f)):
                   if isinstance(no, ast.Call):
                       nome = no.func.id if isinstance(no.func, ast.Name) else getattr(no.func, "attr", "")
-                      if nome in {"reversed", "reverse", "join", "list", "sorted"}:
+                      if nome in {"reversed", "reverse", "join", "list", "sorted", "filter", "map", "sub", "findall"}:
                           achados.add(nome)
                   if isinstance(no, ast.Slice):
                       achados.add("fatia")
@@ -1001,16 +1013,21 @@ const doisPonteiros = lesson({
                       sys.settrace(None)
                   return passos[0], resultado[0]
 
-              alturas = [(i * 7919 + 13) % 1009 for i in range(1000)]
-              limite = 30 * len(alturas)
-              passos, r = _contar_linhas(maior_area, alturas, limite)
-              assert passos <= limite, f"para 1 000 tábuas, maior_area executou mais de {limite} linhas: isso é testar todos os pares (O(n²)). Descarte uma tábua por passo."
-              assert r == 965264, f"resultado errado para 1 000 tábuas: veio {r}"
+              casos = [
+                  ("alturas sorteadas", [(i * 7919 + 13) % 1009 for i in range(1000)], 965264),
+                  ("alturas em forma de montanha", [1000 - abs(500 - i) * 2 for i in range(1000)], 250000),
+              ]
+              for nome, alturas, esperado in casos:
+                  limite = 30 * len(alturas)
+                  passos, r = _contar_linhas(maior_area, alturas, limite)
+                  assert passos <= limite, f"com 1 000 tábuas ({nome}), maior_area executou mais de {limite} linhas: isso é testar quase todos os pares (O(n²)), mesmo que você pule alguns. Descarte uma tábua por passo."
+                  assert r == esperado, f"resultado errado com 1 000 tábuas ({nome}): esperado {esperado}, veio {r}"
             `) },
             { name: 'sem ordenar', code: dedent(`
               import ast
               achados = set()
-              for no in ast.walk(ast.parse(_source)):
+              funcoes = [f for f in ast.walk(ast.parse(_source)) if isinstance(f, (ast.FunctionDef, ast.Lambda))]
+              for no in (n for f in funcoes for n in ast.walk(f)):
                   if isinstance(no, ast.Call):
                       nome = no.func.id if isinstance(no.func, ast.Name) else getattr(no.func, "attr", "")
                       if nome in {"sorted", "sort"}:

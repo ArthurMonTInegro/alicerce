@@ -25,7 +25,7 @@ Quatro camadas, todas rodando no CI (`.github/workflows/ci.yml`) a cada push e p
 
 `e2e/fluxos.spec.ts`: navegação sem erros de console, as 8 etapas de uma lição com conclusão, Python executado de verdade no laboratório, erro traduzido e explicado, JavaScript no worker isolado, diagnóstico completo, cadastro com sincronização e saída, tutor recusando entregar a resposta, 404 amigável e HTML pré-renderizado legível sem JavaScript.
 
-`e2e/a11y.spec.ts`: axe-core com regras WCAG 2.2 AA em 15 páginas, contraste no tema escuro e ausência de rolagem horizontal no celular em todas as páginas principais.
+`e2e/a11y.spec.ts`: axe-core com regras WCAG 2.2 AA em 15 páginas e nas etapas Explicação, Exercícios e Desafio de todas as lições (lista lida do sitemap), contraste no tema escuro e ausência de rolagem horizontal no celular em todas as páginas principais.
 
 Para rodar localmente, faça `npm run build` antes; o Playwright sobe o servidor sozinho, com banco descartável em `test-results/` e sem chave de IA.
 

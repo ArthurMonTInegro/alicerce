@@ -2,7 +2,7 @@
 
 <!-- gerado por scripts/gen-docs.ts a partir de packages/content; não edite à mão -->
 
-15 níveis, 59 módulos, 69 lições e 237 exercícios. A seta indica pré-requisitos.
+15 níveis, 59 módulos, 91 lições e 364 exercícios. A seta indica pré-requisitos.
 
 ## Nível 0: Introdução à Computação (Introduction to Computing)
 
@@ -63,14 +63,24 @@ Escolher e implementar a estrutura certa para cada problema, sabendo o custo de 
 
 - **m3-1 Arrays e listas** (Arrays and lists) ← m2-2
   - Arrays e listas dinâmicas
+  - Crescimento amortizado: a conta do append
+  - Dois ponteiros: padrões e invariantes
 - **m3-2 Pilhas e filas** (Stacks and queues) ← m3-1
   - Pilhas e filas
+  - Expressões com pilhas: da infixa à notação polonesa reversa
+  - Filas de prioridade: quando a ordem de chegada não basta
 - **m3-3 Tabelas hash e conjuntos** (Hash tables and sets) ← m3-1
   - Tabelas hash
+  - Colisões por dentro: endereçamento aberto e fator de carga
+  - Funções hash e chaves: o contrato entre hash e igualdade
 - **m3-4 Árvores e heaps** (Trees and heaps) ← m3-2, m4-4
   - Árvores e árvores binárias de busca
+  - Árvores balanceadas: rotações e AVL
+  - Heaps por dentro: a árvore guardada numa lista
 - **m3-5 Grafos** (Graphs) ← m3-4
   - Grafos e busca em largura
+  - Busca em profundidade a fundo: representações, componentes e ciclos
+  - Union-Find: grupos que se juntam em tempo quase constante
 
 ## Nível 4: Algoritmos (Algorithms)
 
@@ -78,16 +88,28 @@ Analisar e projetar algoritmos eficientes: complexidade, busca, ordenação, rec
 
 - **m4-1 Complexidade e Big O** (Complexity and Big O) ← m3-1
   - Complexidade e notação Big O
+  - Crescimento de funções: O, Ω e Θ
+  - Análise amortizada: o custo pelo total
 - **m4-2 Busca** (Searching) ← m4-1
   - Busca linear e busca binária
+  - Fronteiras: primeira e última ocorrência com bisect
+  - Busca binária na resposta
 - **m4-3 Ordenação** (Sorting) ← m4-2, m4-4
   - Algoritmos de ordenação
+  - Quicksort por dentro: partição, pivô e valores repetidos
+  - Abaixo de n log n: árvore de decisão, counting sort e radix sort
 - **m4-4 Recursão e dividir para conquistar** (Recursion and divide and conquer) ← m2-4
   - Recursão e dividir para conquistar
+  - Dividir para conquistar: dividir, resolver, combinar
+  - Backtracking: escolher, explorar, desfazer
 - **m4-5 Programação dinâmica e gulosos** (Dynamic programming and greedy) ← m4-4, m3-3
   - Programação dinâmica e algoritmos gulosos
+  - Mochila e LCS: PD em duas dimensões e a resposta por trás do número
+  - Escolha gulosa e prova: escalonamento de intervalos
 - **m4-6 Algoritmos em grafos** (Graph algorithms) ← m3-5, m4-1
   - Caminhos mínimos com pesos: Dijkstra
+  - Ordenação topológica: dependências na ordem certa
+  - Árvore geradora mínima: Kruskal e Prim
 
 ## Nível 5: Programação Orientada a Objetos (Object-Oriented Programming)
 

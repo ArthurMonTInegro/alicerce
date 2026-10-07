@@ -44,7 +44,7 @@ const expressoesRpn = lesson({
     t('notação prefixa / polonesa', 'prefix notation / Polish notation', 'O operador vem antes dos operandos, como em + 3 4. Proposta por Jan Łukasiewicz em 1924.'),
     t('precedência', 'operator precedence', 'Regra que diz qual operador é aplicado primeiro quando estão em níveis diferentes: * antes de +.'),
     t('associatividade', 'associativity', 'Regra de desempate entre operadores de mesma precedência: à esquerda, (8 - 3) - 2; à direita, 2 ** (3 ** 2).', 'Operators in the same box group left to right (except for exponentiation and conditional expressions, which group from right to left).'),
-    t('algoritmo do pátio de manobras', 'shunting-yard algorithm', 'Algoritmo de Dijkstra (1961) que converte infixa em pós-fixa usando uma pilha de operadores.', 'The shunting-yard algorithm converts an infix expression to postfix in linear time.'),
+    t('algoritmo do pátio de manobras', 'shunting-yard algorithm', 'Método publicado por Edsger Dijkstra em 1961 (não confundir com o algoritmo de Dijkstra de menor caminho) que converte infixa em pós-fixa usando uma pilha de operadores.', 'The shunting-yard algorithm converts an infix expression to postfix in linear time.'),
     t('token', 'token', 'Menor pedaço com significado em um texto: um número, um operador, um parêntese.', 'The tokenize module provides a lexical scanner for Python source code.'),
     t('máquina de pilha', 'stack machine', 'Máquina (real ou virtual) cujas instruções tiram operandos de uma pilha e empilham o resultado. CPython, JVM e WebAssembly funcionam assim.'),
   ],
@@ -73,8 +73,8 @@ const expressoesRpn = lesson({
       md(`
         Repare em duas coisas. Primeiro, **os números nunca mudam de ordem**: converter de uma notação para outra só muda a posição dos operadores. Segundo, na pós-fixa os parênteses somem porque cada operador age sobre os dois valores mais recentes que ainda não foram usados (em \`3 4 2 * +\`, o \`*\` junta 4 e 2; o \`+\` junta 3 e o 8 que acabou de surgir); na prefixa, sobre as duas subexpressões que vêm logo depois dele.
 
-        **Para converter à mão**: ponha parênteses em volta de cada conta, na ordem em que ela é feita, e depois leve cada operador para logo depois do parêntese que fecha a conta dele.
-        \`3 + 4 * 2\` → \`(3 + (4 * 2))\` → \`3 4 2 * +\`.
+        **Para converter à mão**: ponha parênteses em volta de cada conta, na ordem em que ela é feita; depois leve cada operador para logo depois do parêntese que fecha a conta dele e apague os parênteses.
+        \`3 + 4 * 2\` → \`(3 + (4 * 2))\` → \`3 4 2 * +\`. Para a prefixa, leve cada operador para logo antes do parêntese que abre a conta dele: \`+ 3 * 4 2\`.
 
         ### Precedência e associatividade
         A {{precedência|operator precedence}} decide entre operadores de **níveis diferentes**: \`*\` e \`/\` antes de \`+\` e \`-\` (você viu isso no Nível 1). E quando os operadores estão **no mesmo nível**, como \`-\` e \`-\`, ou \`+\` e \`-\`? Quem decide é a {{associatividade|associativity}}:
@@ -325,7 +325,7 @@ const expressoesRpn = lesson({
           prompt: dedent(`
             Faça o caminho de volta. Escreva \`rpn_para_infixa(expr)\` que recebe uma expressão em RPN (tokens separados por espaço; operadores \`+ - * /\`; números inteiros não negativos) e devolve a infixa com o **mínimo de parênteses** para que o Python, lendo com suas regras de precedência e associatividade à esquerda, agrupe as contas exatamente como a RPN indica. Use um espaço de cada lado de cada operador e nenhum espaço colado aos parênteses.
 
-            Exemplos: \`"3 4 + 2 *"\` → \`"(3 + 4) * 2"\`; \`"3 4 2 * +"\` → \`"3 + 4 * 2"\`; \`"8 3 2 - -"\` → \`"8 - (3 - 2)"\`; \`"8 3 - 2 -"\` → \`"8 - 3 - 2"\`.
+            Exemplos: \`"3 4 + 2 *"\` → \`"(3 + 4) * 2"\`; \`"3 4 2 * +"\` → \`"3 + 4 * 2"\`; \`"8 3 2 - -"\` → \`"8 - (3 - 2)"\`; \`"8 3 - 2 -"\` → \`"8 - 3 - 2"\`. O que conta é o agrupamento, não só o valor: \`"1 2 3 + +"\` → \`"1 + (2 + 3)"\`, porque sem os parênteses o Python somaria 1 + 2 primeiro.
 
             Se a RPN for inválida (faltam ou sobram operandos, ou está vazia), lance \`ValueError\`.
           `),
@@ -403,6 +403,9 @@ const expressoesRpn = lesson({
                     ("1 2 3 4 + * -", "1 - 2 * (3 + 4)"),
                     ("5 1 2 + 4 * + 3 -", "5 + (1 + 2) * 4 - 3"),
                     ("1 2 - 3 - 4 5 - -", "1 - 2 - 3 - (4 - 5)"),
+                    ("1 2 3 * + 4 *", "(1 + 2 * 3) * 4"),
+                    ("2 3 * 4 + 5 *", "(2 * 3 + 4) * 5"),
+                    ("1 2 3 * 4 - -", "1 - (2 * 3 - 4)"),
                 ]
                 for e, esperado in casos:
                     r = rpn_para_infixa(e)
@@ -533,7 +536,7 @@ const filasPrioridade = lesson({
 
         \`heappush\` e \`heappop\` trabalham com heap mínimo. Para um {{heap máximo|max-heap}}, em que o maior sai primeiro, o truque clássico, que funciona em qualquer versão do Python, é guardar a chave com o sinal trocado (\`-valor\`) e destrocar ao retirar. Como o heap consegue esses custos por dentro (uma árvore guardada em um array) é assunto do módulo Árvores e heaps; aqui, use-o como ferramenta.
       `),
-      warn('Depois de `heapify([5, 1, 8, 3, 2])`, a lista fica `[1, 2, 8, 3, 5]`: só `h[0]` tem posição garantida. Imprimir o heap ou percorrê-lo com `for` **não** mostra a ordem de prioridade; para isso, chame `heappop` repetidamente. E insira sempre com `heappush`: um `append` comum pode quebrar a organização.', 'Um heap não é uma lista ordenada'),
+      warn('Com `h = [5, 1, 8, 3, 2]`, depois de `heapq.heapify(h)` a lista fica `[1, 2, 8, 3, 5]` (o `heapify` muda a própria lista e devolve `None`): só `h[0]` tem posição garantida. Imprimir o heap ou percorrê-lo com `for` **não** mostra a ordem de prioridade; para isso, chame `heappop` repetidamente. E insira sempre com `heappush`: um `append` comum pode quebrar a organização.', 'Um heap não é uma lista ordenada'),
       md(`
         ### Empates e itens que não se comparam
         O \`heapq\` compara os próprios elementos. Com tuplas, compara o primeiro campo; se empatar, o segundo; e assim por diante. Guardar \`(prioridade, item)\` traz dois problemas:
@@ -629,7 +632,7 @@ const filasPrioridade = lesson({
         exercise: {
           id: 'e3-fp-2',
           kind: 'mcq',
-          prompt: 'Depois de `heapq.heapify(h)`, qual afirmação vale para **qualquer** lista `h`, e não só para um exemplo?',
+          prompt: 'Depois de `heapq.heapify(h)`, qual afirmação vale para **qualquer** lista `h` não vazia, e não só para um exemplo?',
           difficulty: 'intermediario',
           skills: ['ed-pilhas-filas'],
           hints: [
@@ -790,6 +793,14 @@ const filasPrioridade = lesson({
               `),
             },
             {
+              name: 'cada chamada de atender começa com a sala vazia',
+              code: dedent(`
+                atender([("Ana", "vermelho"), ("Bia", "azul")])
+                r = atender(["proximo"])
+                assert r == [None], f"Ana e Bia ficaram esperando numa chamada anterior de atender e reapareceram nesta ({r}). A fila precisa ser criada dentro da função, a cada chamada"
+              `),
+            },
+            {
               name: 'usa heapq',
               code: 'assert "heappush" in _source or "heapify" in _source, "use heapq.heappush e heapq.heappop: esse é o objetivo do exercício"',
             },
@@ -817,7 +828,7 @@ const filasPrioridade = lesson({
           id: 'e3-fp-desafio',
           kind: 'code',
           lang: 'python',
-          prompt: 'Um banco quer, ao fim do dia, os `k` Pix de **maior valor** entre milhões que chegam um a um, como um {{fluxo de dados|data stream}}. Guardar tudo para ordenar depois gasta memória demais. Escreva `k_maiores(fluxo, k)` que percorre o fluxo (pode ser um gerador) **uma única vez**, guarda **no máximo k valores** ao mesmo tempo e devolve os k maiores em ordem **decrescente**. Se houver menos de k valores, devolva todos, também em ordem decrescente. Não use `sorted`, `.sort`, `nlargest` nem `nsmallest`.',
+          prompt: 'Um banco quer, ao fim do dia, os `k` Pix de **maior valor** entre milhões que chegam um a um, como um {{fluxo de dados|data stream}}. Guardar tudo para ordenar depois gasta memória demais. Escreva `k_maiores(fluxo, k)` que percorre o fluxo **uma única vez**, com `for` (ele pode ser um iterador, que não tem `len` nem volta ao começo), guarda **no máximo k valores** ao mesmo tempo e devolve os k maiores em ordem **decrescente**. Se houver menos de k valores, devolva todos, também em ordem decrescente. Cada valor do fluxo deve custar no máximo O(log k): um dos testes conta as comparações. Não use `sorted`, `.sort`, `nlargest` nem `nsmallest`.',
           difficulty: 'avancado',
           skills: ['ed-pilhas-filas'],
           hints: [
@@ -912,6 +923,32 @@ const filasPrioridade = lesson({
                     tracemalloc.stop()
                     assert pico < 50000, f"pico de {pico} bytes: parece que o fluxo inteiro foi guardado; mantenha só k valores"
                 assert r == [100001, 99999, 99997, 99995, 99993], f"resultado errado no fluxo grande: {r}"
+              `),
+            },
+            {
+              name: 'O(log k) por valor: conta as comparações',
+              code: dedent(`
+                class _Demais(BaseException):
+                    pass
+
+                class _V(int):
+                    comparacoes = 0
+                    def _conta(self):
+                        _V.comparacoes += 1
+                        if _V.comparacoes > 300000:
+                            raise _Demais()
+                    def __lt__(self, o): self._conta(); return int.__lt__(self, o)
+                    def __le__(self, o): self._conta(); return int.__le__(self, o)
+                    def __gt__(self, o): self._conta(); return int.__gt__(self, o)
+                    def __ge__(self, o): self._conta(); return int.__ge__(self, o)
+
+                n, k = 5000, 500
+                try:
+                    r = k_maiores((_V(x) for x in range(n)), k)  # crescente: todo valor novo entra no grupo
+                except _Demais:
+                    r = None
+                assert r is not None, f"com n = {n} e k = {k}, sua função passou de 300 000 comparações entre valores (a versão com heap faz cerca de 50 000). Achar o menor do grupo não pode exigir percorrer os k valores"
+                assert r == list(range(n - 1, n - k - 1, -1)), "resultado errado num fluxo crescente de 5 000 valores com k = 500"
               `),
             },
           ],
