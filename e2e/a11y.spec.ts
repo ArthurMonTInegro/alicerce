@@ -13,6 +13,26 @@ for (const path of PAGES) {
   });
 }
 
+test('acessibilidade das lições: explicação, exercícios e desafio de todas', async ({ page, request }, info) => {
+  test.skip(info.project.name !== 'desktop');
+  test.setTimeout(15 * 60_000);
+  // A lista vem do sitemap, então toda lição nova entra na verificação sem mexer aqui.
+  const sitemap = await (await request.get('/sitemap.xml')).text();
+  const lessons = [...sitemap.matchAll(/\/licao\/([^<]+)</g)].map((m) => m[1]!);
+  expect(lessons.length).toBeGreaterThan(50);
+  const problems: string[] = [];
+  for (const id of lessons) {
+    for (const stage of ['explicacao', 'exercicio', 'desafio']) {
+      await page.goto(`/licao/${id}?etapa=${stage}`);
+      if (!(await page.locator('#stage-title').count())) continue;
+      await page.waitForLoadState('networkidle');
+      const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+      for (const v of result.violations) problems.push(`${id} ${stage}: ${v.id} (${v.nodes.length}×) ${v.nodes[0]?.target.join(' ')}`);
+    }
+  }
+  expect(problems).toEqual([]);
+});
+
 test('tema escuro também passa no contraste', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/');

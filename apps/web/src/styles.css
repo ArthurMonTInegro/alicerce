@@ -250,6 +250,7 @@ a.card:hover { border-color: var(--accent); transform: translateY(-2px); }
 /* termo bilíngue: {{pt|en}} */
 .term { border-bottom: 1px dashed var(--accent); cursor: help; background: none; border-top: 0; border-left: 0; border-right: 0; padding: 0; font: inherit; color: inherit; }
 .term .en { font-family: var(--font-mono); font-size: 0.82em; color: var(--accent); margin-left: 0.2em; }
+.callout .term .en { color: inherit; }
 .term .en::before { content: '('; }
 .term .en::after { content: ')'; }
 
@@ -274,7 +275,7 @@ a.card:hover { border-color: var(--accent); transform: translateY(-2px); }
 .tok-kw { color: #f0a46b; }
 .tok-str { color: #a8d38b; }
 .tok-num { color: #f6d77a; }
-.tok-com { color: #8a8f9e; font-style: italic; }
+.tok-com { color: #9a9fad; font-style: italic; }
 .tok-fn { color: #8fc1ff; }
 .tok-bi { color: #d6a8ff; }
 
@@ -295,7 +296,7 @@ a.card:hover { border-color: var(--accent); transform: translateY(-2px); }
 .exercise-kind { font: 600 0.78rem/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .exercise-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.85rem; align-items: center; }
 .options { list-style: none; padding: 0; margin: 0.75rem 0 0; display: grid; gap: 0.5rem; }
-.options li { margin: 0; }
+.options > div { margin: 0; }
 .option { display: flex; gap: 0.7rem; align-items: flex-start; width: 100%; text-align: left; background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--radius-sm); padding: 0.65rem 0.8rem; cursor: pointer; font: inherit; color: inherit; }
 .option:hover { border-color: var(--line-strong); background: var(--surface-2); }
 .option[aria-checked='true'] { border-color: var(--info); background: var(--info-soft); }
@@ -492,7 +493,7 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 @media (max-width: 760px) { .tracer { grid-template-columns: 1fr; } }
 .tracer-code { background: var(--code-bg); color: var(--code-ink); border-radius: var(--radius); padding: 0.5rem 0; font: 0.86rem/1.6 var(--font-mono); overflow-x: auto; }
 .tracer-code div { padding: 0 0.75rem 0 0; white-space: pre; display: flex; }
-.tracer-code .ln { display: inline-block; width: 2.5rem; text-align: right; padding-right: 0.75rem; color: #7d8494; user-select: none; flex: none; }
+.tracer-code .ln { display: inline-block; width: 2.5rem; text-align: right; padding-right: 0.75rem; color: #9198a8; user-select: none; flex: none; }
 .tracer-code .cur { background: rgb(246 215 122 / 0.22); box-shadow: inset 3px 0 0 var(--highlight); }
 .tracer-code .prev { background: rgb(143 193 255 / 0.1); }
 .frames { display: grid; gap: 0.5rem; align-content: start; }

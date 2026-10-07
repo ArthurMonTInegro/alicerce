@@ -49,12 +49,12 @@ export function Mcq({ ex, lessonId }: { ex: McqExercise; lessonId?: string | und
           <CodeView code={ex.code.code} lang={ex.code.lang} />
         </div>
       )}
-      <ul className="options" role="radiogroup" aria-label="Opções">
+      <div className="options" role="radiogroup" aria-label="Opções">
         {order.map((i, pos) => {
           const o = ex.options[i]!;
           const cls = done && o.correct ? ' right' : checked === i && !o.correct ? ' wrong' : '';
           return (
-            <li key={i}>
+            <div key={i}>
               <button
                 type="button"
                 role="radio"
@@ -68,7 +68,7 @@ export function Mcq({ ex, lessonId }: { ex: McqExercise; lessonId?: string | und
                     e.preventDefault();
                     const next = order[(pos + (e.key === 'ArrowDown' ? 1 : order.length - 1)) % order.length]!;
                     setPicked(next);
-                    (e.currentTarget.closest('ul')?.querySelectorAll('button')[order.indexOf(next)] as HTMLButtonElement | undefined)?.focus();
+                    (e.currentTarget.closest('[role="radiogroup"]')?.querySelectorAll('button')[order.indexOf(next)] as HTMLButtonElement | undefined)?.focus();
                   }
                 }}
               >
@@ -77,10 +77,10 @@ export function Mcq({ ex, lessonId }: { ex: McqExercise; lessonId?: string | und
                 </span>
                 <span>{inline(o.text)}</span>
               </button>
-            </li>
+            </div>
           );
         })}
-      </ul>
+      </div>
     </ExerciseShell>
   );
 }

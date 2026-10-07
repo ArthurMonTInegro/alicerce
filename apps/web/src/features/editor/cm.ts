@@ -14,7 +14,7 @@ const style = HighlightStyle.define([
   { tag: t.keyword, color: '#f0a46b' },
   { tag: [t.string, t.special(t.string)], color: '#a8d38b' },
   { tag: [t.number, t.bool, t.null], color: '#f6d77a' },
-  { tag: t.comment, color: '#8a8f9e', fontStyle: 'italic' },
+  { tag: t.comment, color: '#9a9fad', fontStyle: 'italic' },
   { tag: [t.function(t.variableName), t.function(t.propertyName)], color: '#8fc1ff' },
   { tag: [t.standard(t.variableName), t.className], color: '#d6a8ff' },
   { tag: t.operator, color: '#e9e4d8' },
@@ -24,7 +24,7 @@ const theme = EditorView.theme(
   {
     '&': { backgroundColor: 'var(--code-bg)', color: 'var(--code-ink)' },
     '.cm-content': { fontFamily: 'var(--font-mono)', caretColor: '#f6d77a', padding: '0.6rem 0' },
-    '.cm-gutters': { backgroundColor: 'var(--code-bg)', color: '#7d8494', border: 'none' },
+    '.cm-gutters': { backgroundColor: 'var(--code-bg)', color: '#9198a8', border: 'none' },
     '.cm-activeLine': { backgroundColor: 'rgb(255 255 255 / 0.04)' },
     '.cm-activeLineGutter': { backgroundColor: 'rgb(255 255 255 / 0.06)' },
     '&.cm-focused .cm-cursor': { borderLeftColor: '#f6d77a' },
@@ -67,7 +67,7 @@ export function mountEditor(o: MountOptions): { view: EditorView; set(v: string)
         langExt,
         o.placeholder ? ph(o.placeholder) : [],
         EditorState.readOnly.of(!!o.readOnly),
-        EditorView.contentAttributes.of({ 'aria-label': o.label, spellcheck: 'false', autocapitalize: 'off', autocorrect: 'off' }),
+        EditorView.contentAttributes.of({ 'aria-label': o.label, spellcheck: 'false', autocapitalize: 'off', autocorrect: 'off', tabindex: '0' }),
         keymap.of([
           { key: 'Mod-Enter', run: () => (o.onRun?.(), true) },
           ...defaultKeymap,

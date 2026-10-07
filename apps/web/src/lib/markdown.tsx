@@ -55,7 +55,8 @@ export function Term({ pt, en }: { pt: string; en: string }) {
 
 export function CodeView({ code, lang }: { code: string; lang: string }) {
   return (
-    <pre>
+    // tabIndex: código com linha longa rola na horizontal, e quem usa teclado precisa conseguir rolar
+    <pre tabIndex={0}>
       <code>{highlight(code, lang)}</code>
     </pre>
   );
