@@ -106,7 +106,7 @@ const PROCS: Proc[] = [
   { id: 'P3', arrival: 2, burst: 1 },
   { id: 'P4', arrival: 3, burst: 4 },
 ];
-const COLORS: Record<string, string> = { P1: '#d9822b', P2: '#3b7dd8', P3: '#2f8f5b', P4: '#8a5cc2' };
+const COLORS: Record<string, string> = { P1: '#a3581c', P2: '#2f67b8', P3: '#25764a', P4: '#8a5cc2' };
 type Sched = 'fcfs' | 'sjf' | 'rr';
 function schedule(kind: Sched, procs: Proc[], q = 2): Array<{ id: string; start: number; end: number }> {
   const out: Array<{ id: string; start: number; end: number }> = [];
@@ -464,8 +464,8 @@ function Classifier() {
         )}
         {preds.map((d) => (
           <g key={`${d.x1}${d.x2}`}>
-            <circle cx={P(d.x1)} cy={P(1 - d.x2)} r={11} fill={d.y ? 'var(--ok)' : 'var(--err)'} opacity={0.85} />
-            <text x={P(d.x1)} y={P(1 - d.x2) + 4} textAnchor="middle" fontSize={11} style={{ fill: '#fff' }}>
+            <circle cx={P(d.x1)} cy={P(1 - d.x2)} r={11} fill={d.y ? 'var(--ok)' : 'var(--err)'} />
+            <text x={P(d.x1)} y={P(1 - d.x2) + 4} textAnchor="middle" fontSize={11} style={{ fill: 'var(--surface)' }}>
               {d.y}
             </text>
             <text x={P(d.x1)} y={P(1 - d.x2) + 26} textAnchor="middle" fontSize={9.5} className="mono">
