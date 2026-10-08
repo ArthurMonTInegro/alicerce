@@ -1,166 +1,50 @@
-import { exercises, glossaryCount, lessons, levels, projects, STAGES, STAGE_LABEL } from '../content.ts';
+import { useEffect, useState, type FormEvent } from 'react';
+import { isDue, exercisesToRedo } from '@alicerce/engine';
+import { lessons, levels } from '../content.ts';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
-import { useDerived } from '../state/store.ts';
-import { moduleProgress, nextModules } from '../lib/progress-helpers.ts';
-import { VIZ } from '../features/viz/index.tsx';
-import { PlanoDoDia } from '../components/PlanoDoDia.tsx';
+import { STATIC_SITE } from '../lib/base.ts';
+import { useDerived, useProgress } from '../state/store.ts';
+import { nextModules, moduleProgress } from '../lib/progress-helpers.ts';
+import { DEFAULT_ROUTINE, GOALS, readRoutine, splitSession, type Routine } from '../lib/study-routine.ts';
+import '../study-space.css';
+const KEY='alicerce:autodidata:rotina:v1';
 
-const DIFFERENTIATORS = [
-  { icon: '🧠', title: 'Você pratica, não só assiste', text: 'Cada lição alterna explicação curta e exercício. Recuperar da memória (retrieval practice) fixa mais que reler ou rever um vídeo.' },
-  { icon: '⚡', title: 'Feedback na hora, no navegador', text: 'Python, JavaScript e SQL rodam aqui mesmo, sem instalar nada. Testes automáticos dizem o que passou e o que falhou.' },
-  { icon: '🔍', title: 'Erros explicados em português', text: 'Cada erro vem com tradução, causa, como investigar, como corrigir e como evitar. Ler erros em inglês vira habilidade.' },
-  { icon: '🗓️', title: 'Revisão espaçada', text: 'Um algoritmo de repetição espaçada (FSRS) traz cada conceito de volta pouco antes de você esquecer.' },
-  { icon: '🌳', title: 'Trilha com pré-requisitos', text: 'Você vê o mapa inteiro, sabe o que vem antes de quê e o diagnóstico dispensa o que você já sabe.' },
-  { icon: '💬', title: 'Tutor que não dá a resposta', text: 'O tutor faz perguntas e dá pistas graduais. Ele ajuda você a pensar, em vez de pensar por você.' },
-  { icon: '🌎', title: 'Inglês técnico integrado', text: 'Todo termo aparece em português → inglês, com pronúncia. Ao final, você lê documentação oficial sem medo.' },
-  { icon: '🛠️', title: 'Projetos de portfólio', text: '10 projetos de dificuldade crescente, com requisitos e critérios de aceite, do terminal até um sistema em produção.' },
-];
-
-/** Os 15 níveis empilhados como uma obra: a fundação embaixo, o topo em latão. Decorativa: a lista de níveis vem logo abaixo. */
-const FILEIRAS = [[0, 1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11], [12, 13], [14]];
-
-function Fundacao() {
-  return (
-    <svg className="fundacao" viewBox="0 0 340 262" aria-hidden="true" focusable="false">
-      <rect className="laje" x="0" y="242" width="340" height="18" rx="3" />
-      {FILEIRAS.map((fileira, r) =>
-        fileira.map((n, c) => {
-          const x = 8 + r * 33 + c * 66;
-          const y = 196 - r * 46;
-          return (
-            <g key={n} className={`bloco f${r}`}>
-              <rect x={x} y={y} width="60" height="40" rx="3" />
-              <text x={x + 30} y={y + 26} textAnchor="middle">
-                {n}
-              </text>
-            </g>
-          );
-        }),
-      )}
-    </svg>
-  );
-}
-
-export function Home() {
-  useHead('', 'Aprenda computação do zero ao avançado: lógica, Python, estruturas de dados, algoritmos, web, bancos de dados, redes, segurança, cloud e IA. Prática interativa, revisão espaçada e inglês técnico integrado.');
-  const d = useDerived();
-  const started = d.completedLessons.size > 0 || d.startedModules.size > 0;
-  const next = nextModules(d, 3);
-  return (
-    <>
-      <section className="hero">
-        <div className="container hero-grid">
-          <div>
-            <p className="eyebrow">Formação em computação · do zero ao avançado</p>
-            <h1>
-              Construa uma base <em>sólida</em> em computação.
-            </h1>
-            <p className="lead">
-              Uma trilha completa em 15 níveis, inspirada nos currículos das melhores universidades e escrita em português, com o inglês técnico que o mercado exige. Você aprende fazendo: código rodando no navegador, visualizações e um tutor que guia sem entregar a resposta.
-            </p>
-            <div className="row">
-              {started ? (
-                <Link to={next[0] ? `/modulo/${next[0].id}` : '/trilha'} className="btn accent">
-                  Continuar de onde parei →
-                </Link>
-              ) : (
-                <Link to="/diagnostico" className="btn accent">
-                  Fazer o diagnóstico (10 min)
-                </Link>
-              )}
-              <Link to={started ? '/trilha' : `/licao/${lessons[0]!.id}`} className="btn">
-                {started ? 'Ver a trilha' : 'Começar do zero'}
-              </Link>
-            </div>
-            <p className="small muted" style={{ marginTop: '1rem' }}>
-              Grátis, sem cadastro obrigatório. Seu progresso fica salvo neste navegador; crie uma conta para sincronizar entre dispositivos.
-            </p>
-          </div>
-          <Fundacao />
-        </div>
-      </section>
-
-      <div className="container">
-        {started && <PlanoDoDia />}
-        <section aria-labelledby="h-metodo">
-          <h2 id="h-metodo">Como cada lição funciona</h2>
-          <ol className="steps-inline" aria-label="Etapas de cada lição">
-            {STAGES.map((s) => (
-              <li key={s}>
-                {STAGE_LABEL[s].pt} <span className="muted" lang="en">({STAGE_LABEL[s].en})</span>
-              </li>
-            ))}
-          </ol>
-          <p className="prose">
-            Primeiro a ideia, depois a explicação com analogias, um exemplo resolvido, o código comentado, a prática com dificuldade crescente, um desafio, um passo do seu projeto e a revisão. <Link to="/metodologia">Por que essa ordem funciona →</Link>
-          </p>
-        </section>
-
-        <section aria-labelledby="h-dif">
-          <h2 id="h-dif">Por que estudar aqui e não só assistir vídeos</h2>
-          <div className="grid">
-            {DIFFERENTIATORS.map((x) => (
-              <article className="card feature" key={x.title}>
-                <h3>
-                  <span className="icon" aria-hidden="true">
-                    {x.icon}
-                  </span>{' '}
-                  {x.title}
-                </h3>
-                <p className="small">{x.text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section aria-labelledby="h-num">
-          <h2 id="h-num" className="sr-only">
-            A trilha em números
-          </h2>
-          <ul className="stats-band">
-            {[
-              [levels.length, 'níveis, do computador por dentro à IA'],
-              [lessons.length, 'lições com as 8 etapas completas'],
-              [exercises.length, 'exercícios com correção automática'],
-              [Object.keys(VIZ).length, 'visualizações interativas'],
-              [glossaryCount, 'termos técnicos português → inglês'],
-              [projects.length, 'projetos para o portfólio'],
-            ].map(([n, t]) => (
-              <li key={String(t)}>
-                <span className="stat">{n}</span>
-                <span className="small">{t}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section aria-labelledby="h-niveis">
-          <h2 id="h-niveis">A trilha</h2>
-          <div className="grid">
-            {levels.map((l) => {
-              const prog = l.modules.reduce((s, m) => s + moduleProgress(m, d), 0) / l.modules.length;
-              return (
-                <Link key={l.id} to={`/nivel/${l.id}`} className="card level-card">
-                  <span className="level-num" aria-hidden="true">
-                    {l.number}
-                  </span>
-                  <h3 style={{ margin: 0 }}>
-                    <span className="sr-only">Nível {l.number}: </span>
-                    {l.title}
-                  </h3>
-                  <span className="small muted" lang="en">
-                    {l.titleEn}
-                  </span>
-                  <div className="progress" role="progressbar" aria-valuenow={Math.round(prog * 100)} aria-valuemin={0} aria-valuemax={100} aria-label={`Progresso no nível ${l.number}`} style={{ marginTop: '0.4rem' }}>
-                    <span style={{ width: `${prog * 100}%` }} />
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      </div>
-    </>
-  );
+export function Home(){
+  useHead('Meu estudo','Seu espaço para aprender computação por conta própria. Organize sua rotina, pratique e revise com um próximo passo claro.');
+  const p=useProgress(), d=useDerived();
+  const [routine,setRoutine]=useState<Routine>(DEFAULT_ROUTINE),[draft,setDraft]=useState<Routine>(DEFAULT_ROUTINE);
+  const [editing,setEditing]=useState(false),[message,setMessage]=useState(''),[now,setNow]=useState(0);
+  useEffect(()=>{
+    try{const saved=readRoutine(localStorage.getItem(KEY));setRoutine(saved);setDraft(saved);}catch{setMessage('Não foi possível carregar sua rotina. Você ainda pode estudar.');}
+    const refresh=()=>setNow(Date.now());refresh();window.addEventListener('focus',refresh);return()=>window.removeEventListener('focus',refresh);
+  },[]);
+  const next=nextModules(d,1)[0];
+  const lesson=next?.lessons.find(l=>!d.completedLessons.has(l.id));
+  const path=lesson?`/licao/${lesson.id}`:next?`/modulo/${next.id}`:'/trilha';
+  const visited=lesson?p.lessons[lesson.id]?.visited??[]:[];
+  const stage=lesson?.stages.find(s=>!visited.includes(s));
+  const resume=stage?`${path}?etapa=${stage}`:path;
+  const started=Object.keys(p.lessons).length>0;
+  const due=now?Object.values(p.cards).filter(c=>isDue(c,now)).length:0;
+  const redo=exercisesToRedo(p).length;
+  const time=splitSession(routine.minutes,due>0||redo>0),goal=GOALS[routine.goal];
+  const percent=next?Math.round(moduleProgress(next,d)*100):100;
+  function save(e:FormEvent){e.preventDefault();try{localStorage.setItem(KEY,JSON.stringify(draft));setRoutine(draft);setEditing(false);setMessage('Rotina salva neste navegador.');}catch{setMessage('Não foi possível salvar. Libere o armazenamento do navegador e tente novamente.');}}
+  const session=[
+    {n:'01',title:due||redo?'Reativar a memória':'Entender uma ideia',minutes:time.first,text:due?`${due} cartões esperando por uma revisão. Comece pelos que couberem no seu tempo.`:redo?`${redo} exercícios para tentar novamente sem consultar a solução.`:'Leia o conceito e explique com suas próprias palavras antes de seguir.',path:due||redo?'/revisao':path,action:due||redo?'Abrir revisão':'Explorar conceito'},
+    {n:'02',title:'Aprender fazendo',minutes:time.learn,text:lesson?.summary??'Explore um módulo da trilha e transforme uma ideia em uma pequena experiência.',path:resume,action:started?'Retomar lição':'Abrir lição'},
+    {n:'03',title:'Tentar sem ajuda',minutes:time.practice,text:'Resolva um desafio antes de abrir as dicas. Depois, explique por que sua solução funciona.',path:lesson?.stages.includes('desafio')?`${path}?etapa=desafio`:'/laboratorio',action:lesson?.stages.includes('desafio')?'Ir para o desafio':'Abrir laboratório'},
+  ];
+  return <div className="study-space container">
+    <div className="study-heading"><div><p className="study-kicker">SEU ESPAÇO DE ESTUDO</p><h1>Autonomia se constrói.<br/><span>Um passo de cada vez.</span></h1><p className="study-intro">Uma direção clara para estudar, praticar e descobrir o que você já consegue fazer sozinho.</p></div><Link className="study-map-link" to="/trilha">Explorar a trilha <span aria-hidden="true">↗</span></Link></div>
+    <div className="study-main-grid">
+      <section className="study-next" aria-labelledby="next-title"><div className="study-next-top"><span className="study-pill">{started?'CONTINUE SUA JORNADA':'SEU PRIMEIRO PASSO'}</span><span className="study-step-number" aria-hidden="true">01 / ∞</span></div><div className="study-next-copy"><p className="study-caption">{next?.title??'Continue explorando'}</p><h2 id="next-title">{lesson?.title??'Sua próxima descoberta está na trilha.'}</h2><p>{lesson?.summary??'Revisite um tema, escolha um projeto e coloque sua base à prova.'}</p></div><div className="study-next-actions"><Link to={resume} className="btn study-start">{started?'Continuar meu estudo':'Começar a aprender'} <span aria-hidden="true">→</span></Link>{lesson&&<span>{lesson.minutes} min · estimativa da lição completa</span>}</div>{next&&<div className="study-module-progress"><div><span>Lições concluídas neste módulo</span><strong>{percent}%</strong></div><div className="study-track" role="progressbar" aria-label="Lições concluídas no módulo" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}><span style={{width:`${percent}%`}}/></div><small>Concluir uma lição não significa dominar o assunto. Teste-se sem ajuda.</small></div>}</section>
+      <aside className="study-routine" aria-labelledby="routine-title"><div className="study-section-top"><h2 id="routine-title">No seu ritmo</h2><span className="study-tiny-label">ROTINA</span></div>{editing?<form onSubmit={save} className="study-routine-form"><label htmlFor="study-goal">O que te move?</label><select id="study-goal" value={draft.goal} onChange={e=>setDraft({...draft,goal:e.target.value as Routine['goal']})}>{Object.entries(GOALS).map(([id,g])=><option key={id} value={id}>{g.label}</option>)}</select><label htmlFor="study-minutes">Tempo por sessão</label><select id="study-minutes" value={draft.minutes} onChange={e=>setDraft({...draft,minutes:Number(e.target.value) as Routine['minutes']})}>{[15,30,60].map(n=><option key={n} value={n}>{n} minutos</option>)}</select><label htmlFor="study-days">Sessões por semana</label><select id="study-days" value={draft.days} onChange={e=>setDraft({...draft,days:Number(e.target.value) as Routine['days']})}>{[2,3,5].map(n=><option key={n} value={n}>{n} sessões</option>)}</select><div className="row"><button className="btn accent" type="submit">Salvar rotina</button><button className="btn ghost" type="button" onClick={()=>{setEditing(false);setMessage('');}}>Cancelar</button></div></form>:<><p className="study-routine-goal">{goal.label}</p><div className="study-time"><strong>{routine.minutes}</strong><span>minutos<br/>por sessão</span></div><p className="study-budget">{routine.days} sessões · {routine.minutes*routine.days} minutos planejados por semana</p><div className="study-rhythm" aria-hidden="true">{Array.from({length:5},(_,i)=><span key={i} className={i<routine.days?'chosen':''}/>)}</div><p className="small muted">Uma meta flexível. Se perder um dia, retome no próximo.</p><button className="btn study-edit" onClick={()=>{setDraft(routine);setEditing(true);setMessage('');}}>Ajustar minha rotina</button></>}<p className="study-save-message small" role="status">{message}</p></aside>
+    </div>
+    <section className="study-session" aria-labelledby="session-title"><div className="study-section-top"><div><p className="study-kicker">MENOS DÚVIDA. MAIS PRÁTICA.</p><h2 id="session-title">Sua sessão de {routine.minutes} minutos</h2></div><span className="study-tiny-label">SUGESTÃO DE DIVISÃO DO TEMPO</span></div><div className="study-session-grid">{session.map(s=><article key={s.n} className="study-session-card"><div className="study-session-meta"><span>{s.n}</span><span>{s.minutes} MIN</span></div><h3>{s.title}</h3><p>{s.text}</p><Link to={s.path}>{s.action} →</Link></article>)}</div></section>
+    <section className="study-lower-grid" aria-label="Orientação e progresso"><div className="study-direction"><span className="study-tiny-label">UMA BASE ANTES DO PRÓXIMO ANDAR</span><h2>{started?'Você sabe explicar o que acabou de aprender?':'Já sabe um pouco? Encontre seu ponto de partida.'}</h2><p>{started?'Feche o exemplo. Tente resolver uma variação. Se travar, use uma pista e tente outra vez. É assim que você identifica o que precisa reforçar.':'O diagnóstico ajuda a reconhecer sua base e sugere por onde seguir. Você também pode começar do zero, sem fazer o teste.'}</p><Link to={started?'/projetos':'/diagnostico'} className="btn">{started?'Explorar projetos práticos':'Fazer meu diagnóstico'} →</Link></div><div className="study-evidence"><div className="study-section-top"><h2>Seu caminho até aqui</h2><Link to="/progresso" aria-label="Ver detalhes do progresso">↗</Link></div><dl><div><dt>Lições concluídas</dt><dd>{d.completedLessons.size}<small> / {lessons.length}</small></dd></div><div><dt>Exercícios com acerto</dt><dd>{d.solved.size}</dd></div><div><dt>Cartões para revisar agora</dt><dd>{due}</dd></div></dl><p className="small muted">Contagem de atividade, não certificação de domínio. Consulte os detalhes de cada habilidade.</p></div></section>
+    <section className="study-toolbox" aria-labelledby="toolbox-title"><div className="study-section-top"><h2 id="toolbox-title">Ferramentas para ir além</h2><span className="study-tiny-label">APRENDER • EXPERIMENTAR • CONSTRUIR</span></div><div className="study-tools-grid"><Link to={goal.path} className="study-tool"><span className="study-tool-symbol" aria-hidden="true">↗</span><h3>{goal.tool}</h3><p>{goal.text}</p><span className="study-tool-link">Explorar →</span></Link><Link to="/laboratorio" className="study-tool"><span className="study-tool-symbol" aria-hidden="true">&lt;/&gt;</span><h3>Laboratório livre</h3><p>Teste hipóteses com Python, JavaScript e SQL direto no navegador.</p><span className="study-tool-link">Abrir laboratório →</span></Link><Link to="/glossario" className="study-tool"><span className="study-tool-symbol" aria-hidden="true">Aa</span><h3>Inglês da programação</h3><p>Conecte termos em português ao vocabulário que aparece no código.</p><span className="study-tool-link">Consultar glossário →</span></Link></div></section>
+    <div className="study-local-note"><span aria-hidden="true">◉</span><p>{STATIC_SITE?'Esta versão guarda o progresso neste navegador. Não há sincronização entre dispositivos; o tutor oferece dicas guiadas, sem IA conectada.':'Seu progresso é salvo neste navegador. Confira na área de conta as opções de sincronização.'} <Link to="/progresso">Gerenciar progresso</Link></p><span>{levels.length} níveis para explorar</span></div>
+  </div>;
 }

@@ -4,6 +4,7 @@ import { Link, useLocation } from '../lib/router.tsx';
 import { useAuth, useProgress } from '../state/store.ts';
 import { openTutor, useTutor } from '../features/tutor/context.ts';
 import { TutorPanel } from '../features/tutor/TutorPanel.tsx';
+import { STATIC_SITE } from '../lib/base.ts';
 
 function Logo() {
   return (
@@ -64,6 +65,7 @@ export function Layout({ children }: { children: ReactNode }) {
             ☰ <span className="sr-only">Menu</span>
           </button>
           <nav id="nav-principal" className={`nav${menu ? ' open' : ''}`} aria-label="Principal">
+            <Link to="/" activeExact>Meu estudo</Link>
             <Link to="/trilha">Trilha</Link>
             <Link to="/revisao">
               Revisão
@@ -75,15 +77,13 @@ export function Layout({ children }: { children: ReactNode }) {
             </Link>
             <Link to="/laboratorio">Laboratório</Link>
             <Link to="/projetos">Projetos</Link>
-            <Link to="/carreira">Carreira</Link>
-            <Link to="/glossario">Glossário</Link>
             <Link to="/progresso">Progresso</Link>
           </nav>
           <div className="header-tools">
             <ThemeToggle />
-            <Link to="/conta" className="icon-btn" aria-label={user ? `Conta de ${user.name || user.email}` : 'Entrar ou criar conta'} style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+            {!STATIC_SITE && <Link to="/conta" className="icon-btn" aria-label={user ? `Conta de ${user.name || user.email}` : 'Entrar ou criar conta'} style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
               {user ? '👤' : 'Entrar'}
-            </Link>
+            </Link>}
           </div>
         </div>
       </header>
@@ -96,12 +96,14 @@ export function Layout({ children }: { children: ReactNode }) {
             <Link to="/metodologia">Metodologia</Link>
             <Link to="/diagnostico">Diagnóstico</Link>
             <Link to="/visualizacoes">Visualizações</Link>
+            <Link to="/glossario">Glossário</Link>
+            <Link to="/carreira">Carreira</Link>
             <Link to="/referencias">Referências</Link>
             <Link to="/sobre">Por que a Alicerce</Link>
             <Link to="/planos">Planos</Link>
             <Link to="/privacidade">Privacidade</Link>
           </nav>
-          <p>Alicerce — formação em computação, do zero ao avançado. Conteúdo original, com referências públicas citadas em cada módulo. Seu progresso fica no seu navegador; a conta é opcional.</p>
+          <p>Alicerce — computação para quem aprende por conta própria. Estude, pratique e construa sua autonomia. {STATIC_SITE ? 'Nesta versão, o progresso fica neste navegador e o tutor oferece dicas guiadas.' : 'Seu progresso fica no seu navegador; a conta é opcional.'}</p>
         </div>
       </footer>
       {!open && (
