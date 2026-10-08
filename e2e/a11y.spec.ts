@@ -1,5 +1,9 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+// O axe não mede texto sobre imagem de fundo: com a textura de cimento, o cabeçalho, a capa e o rodapé ficariam de fora.
+// Sem a textura ele mede as cores de base; a textura em si foi medida nos pixels (docs/IDENTIDADE-VISUAL.md).
+const semTextura = (page: Page) => page.addStyleTag({ content: '.site-header, .site-footer, .hero, .nav { background-image: none !important; }' });
 
 const PAGES = ['/', '/trilha', '/revisao', '/diagnostico', '/laboratorio', '/projetos', '/carreira', '/glossario', '/visualizacoes?v=sorting', '/progresso', '/conta', '/metodologia', '/referencias', '/sobre', '/privacidade', '/planos'];
 
@@ -7,6 +11,7 @@ for (const path of PAGES) {
   test(`acessibilidade (WCAG 2.2 AA): ${path}`, async ({ page }) => {
     await page.goto(path);
     await page.waitForLoadState('networkidle');
+    await semTextura(page);
     const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
     const summary = result.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.length}× ${v.nodes[0]?.target.join(' ')}`);
     expect(summary).toEqual([]);
@@ -26,6 +31,7 @@ test('acessibilidade das lições: explicação, exercícios e desafio de todas'
       await page.goto(`/licao/${id}?etapa=${stage}`);
       if (!(await page.locator('#stage-title').count())) continue;
       await page.waitForLoadState('networkidle');
+      await semTextura(page);
       const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
       for (const v of result.violations) problems.push(`${id} ${stage}: ${v.id} (${v.nodes.length}×) ${v.nodes[0]?.target.join(' ')}`);
     }
@@ -34,11 +40,13 @@ test('acessibilidade das lições: explicação, exercícios e desafio de todas'
 });
 
 test('tema escuro também passa no contraste', async ({ page }) => {
+  test.setTimeout(3 * 60_000);
   await page.emulateMedia({ colorScheme: 'dark' });
   const problems: string[] = [];
   for (const path of [...PAGES, '/licao/l0-bits-bytes?etapa=codigo', '/licao/l0-bits-bytes?etapa=exercicio', '/modulo/m0-1', '/nivel/n7']) {
     await page.goto(path);
     await page.waitForLoadState('networkidle');
+    await semTextura(page);
     const result = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
     for (const v of result.violations) for (const n of v.nodes) problems.push(`${path}: ${n.target.join(' ')}`);
   }

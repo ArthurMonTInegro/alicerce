@@ -8,10 +8,10 @@ import { TutorPanel } from '../features/tutor/TutorPanel.tsx';
 function Logo() {
   return (
     <svg viewBox="0 0 32 32" aria-hidden="true">
-      <rect x="5" y="21" width="22" height="5" rx="1" fill="#c9c8c1" />
-      <rect x="7" y="14.5" width="8.5" height="5.5" rx="1" fill="#a9bb72" />
-      <rect x="16.5" y="14.5" width="8.5" height="5.5" rx="1" fill="#a9bb72" />
-      <rect x="11.75" y="8" width="8.5" height="5.5" rx="1" fill="#e3c16a" />
+      <rect x="4" y="22" width="24" height="5" rx="1" fill="#c9c8c1" />
+      <rect x="6" y="15" width="9" height="6" rx="1" fill="#a9bb72" />
+      <rect x="17" y="15" width="9" height="6" rx="1" fill="#a9bb72" />
+      <rect x="11" y="8" width="10" height="6" rx="1" fill="#e3c16a" />
     </svg>
   );
 }
@@ -25,6 +25,8 @@ function ThemeToggle() {
   const toggle = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
+    // A barra do navegador acompanha o cabeçalho, que é mais escuro no tema escuro.
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', next === 'dark' ? '#2c3820' : '#3b4a2a'));
     try {
       localStorage.setItem('alicerce:tema', next);
     } catch {

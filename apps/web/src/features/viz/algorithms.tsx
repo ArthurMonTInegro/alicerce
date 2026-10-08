@@ -207,7 +207,7 @@ export function SortingViz() {
         {k >= ops.length ? ` (total ${total.cmp})` : ''} · escritas: {writes}
       </p>
       <p className="small muted">
-        <span style={{ color: 'var(--info)' }}>■</span> comparando · <span style={{ color: 'var(--accent)' }}>■</span> trocando/escrevendo · <span style={{ color: 'var(--ok)' }}>■</span> na posição final. Compare os totais de comparações entre os algoritmos com o mesmo tamanho.
+        <span style={{ color: 'var(--info)' }}>■</span> comparando · <span style={{ color: 'var(--warn)' }}>■</span> trocando/escrevendo · <span style={{ color: 'var(--ok)' }}>■</span> na posição final. Compare os totais de comparações entre os algoritmos com o mesmo tamanho.
       </p>
     </div>
   );
@@ -299,9 +299,9 @@ const FUNS: Array<{ id: string; label: string; f: (n: number) => number; color: 
   { id: '1', label: 'O(1)', f: () => 1, color: '#2f8f5b' },
   { id: 'log', label: 'O(log n)', f: (n) => Math.max(1, Math.log2(n)), color: '#3b7dd8' },
   { id: 'n', label: 'O(n)', f: (n) => n, color: '#8a5cc2' },
-  { id: 'nlog', label: 'O(n log n)', f: (n) => n * Math.max(1, Math.log2(n)), color: '#d9822b' },
+  { id: 'nlog', label: 'O(n log n)', f: (n) => n * Math.max(1, Math.log2(n)), color: 'var(--warn)' },
   { id: 'n2', label: 'O(n²)', f: (n) => n * n, color: '#c0392b' },
-  { id: '2n', label: 'O(2ⁿ)', f: (n) => 2 ** n, color: '#6b1d1d' },
+  { id: '2n', label: 'O(2ⁿ)', f: (n) => 2 ** n, color: 'var(--ink)' },
 ];
 const fmtTime = (ops: number) => {
   const s = ops / 1e8; // ~10⁸ operações simples por segundo

@@ -14,19 +14,26 @@ Um canteiro de obra. O nome é Alicerce, então a base é concreto: fundos e lin
 | Superfície | `--surface` | `#fbfbf9` | `#1b1e1a` | cartões, campos |
 | Superfície 2 e 3 | `--surface-2`, `--surface-3` | `#e5e4df`, `#d9d8d2` | `#232722`, `#2d322b` | rodapé, cabeçalho de tabela, trilho do progresso |
 | Texto | `--ink`, `--ink-2`, `--muted` | `#1d221c`, `#3d443b`, `#585e55` | `#e9e8e3`, `#c8c7c0`, `#a3a39b` | texto principal, secundário, apoio |
-| Linhas | `--line`, `--line-strong` | `#d1cfc8`, `#8f8d85` | `#30352e`, `#687062` | divisórias; bordas de campos e botões |
-| Verde militar (marca) | `--brand`, `--brand-2` | `#3b4a2a`, `#2f3c21` | `#2c3820`, `#232d19` | cabeçalho, painel do tutor, avisos |
+| Linhas | `--line`, `--line-strong` | `#d1cfc8`, `#83817a` | `#30352e`, `#6e7668` | divisórias; bordas de campos e botões |
+| Verde militar (marca) | `--brand` | `#3b4a2a` | `#2c3820` | cabeçalho, painel do tutor, avisos |
 | Botão principal | `--primary`, `--primary-2` | `#3b4a2a`, `#2f3c21` | `#5a6f2e`, `#4c5f25` | `.btn.primary`, botões alternados; no escuro é mais claro para não sumir no fundo |
 | Verde de destaque | `--accent`, `--accent-ink`, `--accent-soft` | `#4e6324`, `#ffffff`, `#e1e6cf` | `#aec27a`, `#151a10`, `#2b331f` | chamada principal (`.btn.accent`), sobretítulos, números, etapa atual |
-| Cimento | `--cement`, `--cement-2` | `#a3a29b`, `#c9c8c1` | `#6c6d66`, `#3a3c37` | faixa sob o cabeçalho, laje da pirâmide |
+| Cimento | `--cement` | `#a3a29b` | `#6c6d66` | faixa sob o cabeçalho, fileira de base da pirâmide |
+| Pirâmide da capa | `--fx-laje`, `--fx-1`, `--fx-2`, `--fx-3` | `#8a8982`, `#67773f`, `#4e6324`, `#3b4a2a` | `#4f504a`, `#4c5f25`, `#5a6f2e`, `#7a9140` | laje e fileiras verdes; escurecem para cima no claro e clareiam no escuro |
 | Latão | `--brass`, `--brass-ink` | `#e3c16a`, `#1d221c` | `#d9b85e`, `#151a10` | foco no cabeçalho, menu atual, contador |
 | Marca-texto | `--highlight` | `#ecd383` | `#6e5c22` | seleção, palavra destacada da capa, valores que mudaram |
 
-As cores de estado (`--ok`, `--warn`, `--err`, `--info`, `--deep`) não são da marca. O sucesso (`--ok`) é um verde-azulado (`#1c6b52` no claro) para não se confundir com o verde militar: na árvore da trilha, "disponível" usa o verde da marca e "concluído" o verde de sucesso, com preenchimento diferente.
+As cores de estado (`--ok`, `--warn`, `--err`, `--info`, `--deep`) não são da marca. O sucesso (`--ok`) é um verde-azulado (`#1c6b52` no claro), mas tem a mesma luminância do verde de destaque, então os dois nunca separam estados lado a lado:
+
+- na árvore da trilha, "disponível" usa o verde da marca, "em andamento" o azul (`--info`), "concluído" o verde de sucesso e "dispensado" o roxo (`--deep`), igual aos selos de status;
+- na visualização de ordenação, "trocando" usa o âmbar (`--warn`), e não o verde da marca, ao lado de "na posição final" em verde de sucesso;
+- a barra de progresso é verde de destaque sólido, sem degradê, para a ponta, que marca o valor, não sumir no trilho.
+
+As superfícies de código são escuras nos dois temas. Por isso as cores dentro delas são fixas: os tokens de sintaxe, a linha atual do passo a passo (latão `#e3c16a`) e o anel de foco (azul claro `#8cb4ff`).
 
 ## Contraste
 
-Todo par de texto e fundo passa de 4,5:1 nos dois temas, e as bordas de campos e botões (`--line-strong`) passam de 3:1 sobre a superfície. Alguns valores medidos:
+Todo par de texto e fundo passa de 4,5:1 nos dois temas, e as bordas de campos e botões (`--line-strong`) passam de 3:1 sobre `--bg`, `--surface` e `--surface-2` (claro 3,4, 3,8 e 3,1; escuro 3,9, 3,6 e 3,2). Alguns valores medidos:
 
 | Par | Claro | Escuro |
 | --- | --- | --- |
@@ -37,9 +44,9 @@ Todo par de texto e fundo passa de 4,5:1 nos dois temas, e as bordas de campos e
 | Texto do botão principal | 9,6 | 5,6 |
 | Latão sobre o cabeçalho (anel de foco) | 5,5 | 6,5 |
 
-A textura fica atrás de texto só na capa. Medido nos pixels da página, no pior 1% do fundo manchado o texto de apoio ainda tem 4,8:1 (claro) e 5,2:1 (escuro). Por isso a textura não vai para trás de lições ou de texto longo.
+A textura fica atrás de texto no cabeçalho (verde, com texto claro), na capa e no rodapé, e nunca atrás de lições ou de texto longo. Medido nos pixels da página, no pior 1% do fundo manchado o texto de apoio da capa tem 4,8:1 (claro) e 5,2:1 (escuro). No rodapé o texto de apoio caía abaixo de 4,5:1 em algumas manchas, por isso o rodapé usa `--ink-2` (pior trecho 6,5:1 no claro e 5,8:1 no escuro).
 
-O teste `e2e/a11y.spec.ts` roda o axe (WCAG 2.2 AA) em todas as páginas e o contraste do tema escuro em todas elas e em etapas de lição. O axe não consegue medir texto sobre imagem de fundo: quem mudar a textura mede de novo como acima.
+O teste `e2e/a11y.spec.ts` roda o axe (WCAG 2.2 AA) em todas as páginas e o contraste do tema escuro em todas elas e em etapas de lição. O axe não consegue medir texto sobre imagem de fundo, então o teste tira a textura antes de medir e confere as cores de base; quem mudar a textura mede de novo nos pixels, como acima. O teste `apps/web/src/styles.test.ts` garante que os dois blocos do tema escuro (o do sistema e o do botão de tema) continuam idênticos.
 
 ## Textura de cimento queimado
 
@@ -47,7 +54,7 @@ Duas camadas em SVG gerado (`feTurbulence`), sem baixar imagem: `--tex-grain` (g
 
 ## Logo e ícone
 
-Blocos empilhados: a laje de cimento embaixo, dois blocos verde-claros e o bloco de latão no topo, sobre o verde militar no ícone (`apps/web/public/favicon.svg`) e direto no cabeçalho (`Logo` em `apps/web/src/components/Layout.tsx`). A cor do navegador (`theme-color` em `apps/web/index.html` e `manifest.webmanifest`) é o verde militar `#3b4a2a`.
+Blocos empilhados: a laje de cimento embaixo, dois blocos verde-claros e o bloco de latão no topo, sobre o verde militar no ícone (`apps/web/public/favicon.svg`) e direto no cabeçalho (`Logo` em `apps/web/src/components/Layout.tsx`). O desenho usa a grade de 32 unidades com bordas em números inteiros, para ficar nítido a 32 px. A cor do navegador (`theme-color` em `apps/web/index.html` e `manifest.webmanifest`) acompanha o cabeçalho: `#3b4a2a` no claro e `#2c3820` no escuro, inclusive quando a pessoa escolhe o tema no botão.
 
 ## Capa
 
