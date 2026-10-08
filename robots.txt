@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Sitemap: https://ArthurMonTInegro.github.io/alicerce/sitemap.xml
