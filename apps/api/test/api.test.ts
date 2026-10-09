@@ -81,8 +81,11 @@ describe('API', () => {
     a.attempts.push({ exerciseId: 'e1', skills: ['s'], difficulty: 'facil', correct: true, score: 1, hintsUsed: 0, wrongTries: 0, revealed: false, at: 1000 });
     const b = emptyProgress();
     b.attempts.push({ exerciseId: 'e2', skills: ['s'], difficulty: 'facil', correct: false, score: 0.2, hintsUsed: 1, wrongTries: 2, revealed: false, at: 2000 });
-    await app.inject({ method: 'PUT', url: '/api/progress', headers: { ...H, cookie }, payload: { progress: a } });
-    const res = await app.inject({ method: 'PUT', url: '/api/progress', headers: { ...H, cookie }, payload: { progress: b } });
+    const expectedUserId=reg.json().user.id;
+    const mismatch=await app.inject({method:'PUT',url:'/api/progress',headers:{...H,cookie},payload:{progress:a,expectedUserId:'another-user'}});
+    expect(mismatch.statusCode).toBe(409);
+    await app.inject({ method: 'PUT', url: '/api/progress', headers: { ...H, cookie }, payload: { progress: a,expectedUserId } });
+    const res = await app.inject({ method: 'PUT', url: '/api/progress', headers: { ...H, cookie }, payload: { progress: b,expectedUserId } });
     expect(res.json().progress.attempts.map((x: { exerciseId: string }) => x.exerciseId).sort()).toEqual(['e1', 'e2']);
     const anon = await app.inject({ method: 'PUT', url: '/api/progress', headers: H, payload: { progress: a } });
     expect(anon.statusCode).toBe(401);

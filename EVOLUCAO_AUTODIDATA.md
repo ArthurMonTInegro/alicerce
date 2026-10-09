@@ -1,5 +1,14 @@
 # Alicerce — versão independente para autodidatas
 
+## Segunda entrega: aplicação do plano
+
+O acompanhamento vigente está em `/evolucao` e em `apps/web/src/lib/roadmap.ts`.
+São 36 itens: 8 concluídos, 8 parciais, 12 com dependências externas, 7 planejados
+e 1 retirado (turmas/mentores). A primeira entrega descrita abaixo é histórica.
+Esta rodada corrige conflitos, reinício, logout, retenção e registro de tentativas;
+adiciona avisos de salvamento, limites de saída e autoavaliação. As limitações de
+isolamento de origem, QA de navegador e serviços externos continuam explícitas.
+
 Base preservada: commit `1d91d5df176294c34a70f04f540b745459808c80`, de 07/10/2026. Esta cópia não acompanha automaticamente alterações posteriores no projeto original.
 
 ## Primeira evolução

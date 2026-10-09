@@ -1,3 +1,5 @@
+> Atualização da cópia autodidata: progresso e rascunhos têm namespaces por perfil; reinícios usam tombstones. O cliente informa expectedUserId na sincronização; divergências de sessão são rejeitadas. A publicação Sites continua estática.
+
 # Arquitetura
 
 ## Visão geral

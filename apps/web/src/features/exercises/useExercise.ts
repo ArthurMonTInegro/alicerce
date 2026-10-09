@@ -10,17 +10,22 @@ export function useExercise(ex: Exercise) {
   const [solved, setSolved] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const recorded = useRef(false);
+  const startedAt = useRef(Date.now());
+  const failures = useRef(0);
 
   const check = useCallback(
     (correct: boolean) => {
+      if(recorded.current)return;
       if (correct) {
         setSolved(true);
         if (!recorded.current) {
           recorded.current = true;
-          recordAttempt(ex, { correct: true, hintsUsed: hintsShown, wrongTries, revealed });
+          recordAttempt(ex, { correct: true, hintsUsed: hintsShown, wrongTries:failures.current, revealed, durationMs:Date.now()-startedAt.current });
         }
       } else {
-        setWrongTries((n) => n + 1);
+        failures.current++;
+        setWrongTries(failures.current);
+        recordAttempt(ex,{correct:false,hintsUsed:hintsShown,wrongTries:failures.current,revealed,durationMs:Date.now()-startedAt.current});
       }
     },
     [ex, hintsShown, wrongTries, revealed],
@@ -32,7 +37,7 @@ export function useExercise(ex: Exercise) {
     setRevealed(true);
     if (!recorded.current) {
       recorded.current = true;
-      recordAttempt(ex, { correct: false, hintsUsed: hintsShown, wrongTries, revealed: true });
+      recordAttempt(ex, { correct: false, hintsUsed: hintsShown, wrongTries:failures.current, revealed: true, durationMs:Date.now()-startedAt.current });
     }
   }, [ex, hintsShown, wrongTries]);
 
@@ -42,6 +47,8 @@ export function useExercise(ex: Exercise) {
     setWrongTries(0);
     setHintsShown(0);
     recorded.current = false;
+    failures.current=0;
+    startedAt.current=Date.now();
   }, []);
 
   return {

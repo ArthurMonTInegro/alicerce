@@ -70,7 +70,7 @@ export function Conta() {
         <p>
           <strong>Situação:</strong> {SYNC_LABEL[syncStatus]}
         </p>
-        <p className="small muted">O progresso é salvo no navegador e enviado para sua conta automaticamente. Se você estudar em dois aparelhos, os dois progressos são somados, nada se perde.</p>
+        <p className="small muted">Cada conta tem seu próprio progresso e rascunhos. O progresso de visitante não é importado automaticamente: exporte-o antes de entrar e importe o arquivo em Progresso se quiser combiná-lo com esta conta. Reiniciar o progresso prevalece sobre cópias antigas.</p>
         {user.entitlements && (
           <section aria-labelledby="h-plano" style={{ margin: '1.5rem 0' }}>
             <h2 id="h-plano">
@@ -92,7 +92,7 @@ export function Conta() {
           <button type="button" className="btn" onClick={() => void syncNow()} disabled={syncStatus === 'syncing'}>
             Sincronizar agora
           </button>
-          <button type="button" className="btn" onClick={() => void signOut().then(() => setMode('login'))}>
+          <button type="button" className="btn" onClick={() => void signOut().then(() => setMode('login')).catch(e=>setError(String(e.message)))}>
             Sair
           </button>
           <button type="button" className="btn danger" onClick={deleteAccount}>

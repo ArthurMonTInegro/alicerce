@@ -5,6 +5,7 @@ import { useAuth, useProgress } from '../state/store.ts';
 import { openTutor, useTutor } from '../features/tutor/context.ts';
 import { TutorPanel } from '../features/tutor/TutorPanel.tsx';
 import { STATIC_SITE } from '../lib/base.ts';
+import { SaveStatus } from './SaveStatus.tsx';
 
 function Logo() {
   return (
@@ -88,11 +89,13 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main id="conteudo" tabIndex={-1}>
-        {children}
+        <SaveStatus />
+        <div key={user?.id ?? 'guest'}>{children}</div>
       </main>
       <footer className="site-footer">
         <div className="container">
           <nav aria-label="Rodapé">
+            <Link to="/evolucao">Evolução do projeto</Link>
             <Link to="/metodologia">Metodologia</Link>
             <Link to="/diagnostico">Diagnóstico</Link>
             <Link to="/visualizacoes">Visualizações</Link>
@@ -111,7 +114,7 @@ export function Layout({ children }: { children: ReactNode }) {
           💬 Tutor
         </button>
       )}
-      <TutorPanel />
+      <TutorPanel key={user?.id ?? 'guest'} />
     </>
   );
 }

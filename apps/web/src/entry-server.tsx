@@ -7,6 +7,8 @@ import { glossary, lessons } from '@alicerce/content';
 import { cardsResource, glossaryResource, seedLessons } from './content.ts';
 import { seedPages } from './routes.tsx';
 import * as home from './pages/Home.tsx';
+import * as autonomia from './pages/Autonomia.tsx';
+import * as evolucao from './pages/Evolucao.tsx';
 import * as trilha from './pages/Trilha.tsx';
 import * as nivel from './pages/Nivel.tsx';
 import * as modulo from './pages/Modulo.tsx';
@@ -30,7 +32,7 @@ import * as planos from './pages/Planos.tsx';
 seedLessons(lessons);
 cardsResource.seed(Object.fromEntries(lessons.map((l) => [l.id, l.cards])));
 glossaryResource.seed(glossary);
-seedPages({ home, trilha, nivel, modulo, licao, revisao, diagnostico, laboratorio, projetos, carreira, glossario, visualizacoes, progresso, conta, metodologia, referencias, sobre, privacidade, planos });
+seedPages({ evolucao, autonomia, home, trilha, nivel, modulo, licao, revisao, diagnostico, laboratorio, projetos, carreira, glossario, visualizacoes, progresso, conta, metodologia, referencias, sobre, privacidade, planos });
 
 export function render(url: string): { html: string; head: HeadData } {
   const head: HeadData = { title: 'Alicerce', description: '' };

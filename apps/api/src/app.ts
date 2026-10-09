@@ -151,6 +151,7 @@ export async function buildApp({ config, db, tutor, logger = false }: AppDeps) {
   app.put('/api/progress', async (req, reply) => {
     const u = requireUser(req, reply);
     if (!u) return reply;
+    if((req.body as {expectedUserId?:unknown}|null)?.expectedUserId!==u.id)return reply.code(409).send({error:'A conta mudou. Reabra a sessão antes de sincronizar.'});
     const incoming = sanitizeProgress((req.body as { progress?: unknown } | null)?.progress);
     const row = db.prepare('SELECT data FROM progress WHERE user_id = ?').get(u.id) as { data: string } | undefined;
     let stored = emptyProgress();

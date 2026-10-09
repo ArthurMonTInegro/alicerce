@@ -1,8 +1,10 @@
 # Alicerce
 
+Esta é a cópia independente para autodidatas. A publicação Sites é estática: não possui contas de aluno, sincronização ou IA conectada. Acompanhe entregas em `/evolucao`; o repositório original permanece separado.
+
 Plataforma interativa de formação em computação, do zero ao avançado, em português com o inglês técnico ao lado de cada termo (**variável → variable**).
 
-São 15 níveis (0 a 14), 59 módulos, 91 lições e 364 exercícios corrigidos automaticamente. O código roda no próprio navegador: Python via Pyodide (WebAssembly), JavaScript num worker isolado e SQL num SQLite em memória. Há árvore de habilidades com pré-requisitos, teste diagnóstico, revisão espaçada (FSRS), visualizações interativas, tutor que dá pistas e nunca entrega a resposta, área de carreira e referências verificadas.
+São 15 níveis (0 a 14), 59 módulos, 91 lições e 364 exercícios corrigidos automaticamente. O código roda no próprio navegador: Python via Pyodide (WebAssembly), JavaScript num worker isolado e SQL num SQLite em memória. Há árvore de habilidades com pré-requisitos, teste diagnóstico, revisão espaçada (FSRS), visualizações interativas, tutor guiado por pistas progressivas, área de carreira e referências verificadas.
 
 ## Rodando localmente
 

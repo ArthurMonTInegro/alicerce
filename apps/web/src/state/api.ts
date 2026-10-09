@@ -69,7 +69,7 @@ export const api = {
   login: async (email: string, password: string) => withEnt(await call<AuthReply>('POST', '/auth/login', { email, password }))!,
   register: async (email: string, password: string, name: string) => withEnt(await call<AuthReply>('POST', '/auth/register', { email, password, name }))!,
   logout: () => call<void>('POST', '/auth/logout'),
-  putProgress: async (p: ProgressState) => (await call<{ progress: ProgressState }>('PUT', '/progress', { progress: p })).progress,
+  putProgress: async (p: ProgressState, expectedUserId:string) => (await call<{ progress: ProgressState }>('PUT', '/progress', { progress: p, expectedUserId })).progress,
   deleteAccount: () => call<void>('DELETE', '/auth/me'),
   tutor: (req: TutorRequest) => call<TutorReply>('POST', '/tutor', req),
 };

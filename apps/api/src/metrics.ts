@@ -27,7 +27,7 @@ export interface Metrics {
   generatedAt: number;
   users: { total: number; new7d: number; new30d: number; premium: number };
   active: { dau: number; wau: number; mau: number };
-  /** % de contas com atividade em ou depois de N dias após o cadastro (só contas com idade suficiente) */
+  /** Retorno no dia exato N, calendário UTC, somente após encerrar o dia observado. Não inclui a demo anônima. */
   retention: Record<'d1' | 'd7' | 'd30', { eligible: number; rate: number }>;
   funnel: { anyActivity: number; firstLesson: number; fiveLessons: number; diagnostic: number; reviews: number };
   learning: { attempts: number; solveRate: number; reviewsLast30d: number; lessonsCompleted: number };
@@ -45,11 +45,12 @@ const activityTimes = (p: ProgressState) => [...p.attempts.map((a) => a.at), ...
 
 export function computeMetrics(users: UserSnapshot[], now = Date.now(), minUsers = 5): Metrics {
   const lastActive = users.map((u) => Math.max(0, ...activityTimes(u.progress)));
-  const activeWithin = (days: number) => lastActive.filter((t) => t > now - days * DAY).length;
+  const activeWithin = (days: number) => lastActive.filter((t) => t > now - days * DAY && t <= now).length;
 
   const retention = (days: number) => {
-    const eligible = users.filter((u) => u.createdAt <= now - days * DAY);
-    const kept = eligible.filter((u) => activityTimes(u.progress).some((t) => t >= u.createdAt + days * DAY));
+    const start = (u:UserSnapshot) => Math.floor(u.createdAt / DAY)*DAY + days*DAY;
+    const eligible = users.filter((u) => start(u)+DAY <= now);
+    const kept = eligible.filter((u) => activityTimes(u.progress).some((t) => t >= start(u) && t < start(u)+DAY && t <= now));
     return { eligible: eligible.length, rate: eligible.length ? kept.length / eligible.length : 0 };
   };
 

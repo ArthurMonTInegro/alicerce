@@ -99,7 +99,7 @@ export function Metodologia() {
       <p>Toda mensagem de erro é traduzida e explicada em cinco partes: o que aconteceu, por que, como investigar, como corrigir e como evitar. A mensagem original em inglês continua visível, porque é ela que você vai pesquisar no trabalho.</p>
 
       <h2>Tutor que não entrega a resposta</h2>
-      <p>O tutor faz perguntas e dá a próxima pista, nunca a solução. Sem conexão com IA, um tutor offline usa a escada de dicas do exercício e perguntas específicas para cada tipo de erro. A solução só aparece depois de várias tentativas, sempre com a explicação.</p>
+      <p>O tutor foi projetado para orientar com perguntas e pistas progressivas. Nesta versão, ele usa as dicas guiadas do conteúdo. Uma integração futura com IA precisa ser avaliada: respostas geradas podem conter erros ou revelar mais ajuda do que o esperado. Tente resolver antes de consultar a solução e depois refaça sem ajuda.</p>
 
       <h2>Inglês técnico o tempo todo</h2>
       <p>

@@ -52,7 +52,7 @@ Um banco de 30 itens em 5 áreas (computação, lógica, programação, matemát
 
 ## Revisão espaçada
 
-Ao concluir uma lição, seus cartões (198 no total) entram na fila. O agendamento usa o FSRS (`fsrs.ts`): cada cartão tem estabilidade e dificuldade, e o próximo intervalo é o tempo até a recuperabilidade cair para 90%. A tela de revisão mostra quanto tempo cada resposta (errei, difícil, bom, fácil) vai adiar o cartão.
+Ao concluir uma lição, seus cartões (357 no catálogo-base) entram na fila. O agendamento usa o FSRS (`fsrs.ts`): cada cartão tem estabilidade e dificuldade, e o próximo intervalo é o tempo até a recuperabilidade cair para 90%. A tela de revisão mostra quanto tempo cada resposta (errei, difícil, bom, fácil) vai adiar o cartão.
 
 ## Inglês técnico
 
@@ -62,7 +62,7 @@ Todo termo novo aparece como **termo PT → EN**, com pronúncia por síntese de
 
 O tutor (com IA ou offline) segue regras fixas:
 
-- nunca entrega a solução nem código que resolva o exercício;
+- é orientado a evitar a entrega de soluções; uma integração com IA exige avaliação contínua;
 - responde com uma pergunta ou uma pista de cada vez;
 - aponta onde investigar e pede que o estudante tente antes de seguir;
 - recusa pedidos de "só me dá a resposta" e explica por que isso atrapalha.
