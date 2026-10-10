@@ -99,6 +99,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <Link to="/metodologia">Metodologia</Link>
             <Link to="/diagnostico">Diagnóstico</Link>
             <Link to="/visualizacoes">Visualizações</Link>
+            <Link to="/ingles">Inglês comunicativo</Link>
             <Link to="/glossario">Glossário</Link>
             <Link to="/carreira">Carreira</Link>
             <Link to="/referencias">Referências</Link>
