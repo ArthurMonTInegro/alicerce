@@ -7,3 +7,5 @@ export * from './tutor.ts';
 export * from './achievements.ts';
 export * from './plans.ts';
 export * from './retention.ts';
+
+export * from "./coaching.ts";

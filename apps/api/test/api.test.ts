@@ -121,6 +121,13 @@ describe('API', () => {
     expect(calls).toBe(2);
   });
 
+  it('informa indisponibilidade do provedor e mantém apoio local após falha', async () => {
+    app=await setup({name:'ia',answer:async()=>{throw new Error('private-provider-detail');}});
+    const reg=await app.inject({method:'POST',url:'/api/auth/register',headers:H,payload:{email:'fallback@test.co',password:'uma frase longa'}});
+    const res=await app.inject({method:'POST',url:'/api/tutor',headers:{...H,cookie:cookieOf(reg)},payload:{message:'Explique variáveis'}});
+    expect(res.json().mode).toBe('offline');expect(res.json().reason).toBe('provider_unavailable');expect(res.json().reply).not.toContain('private-provider-detail');
+  });
+
   it('planos: conta nasce gratuita; premium e vencimento refletem nos direitos e no limite do tutor', async () => {
     const db = openDb(':memory:');
     const config = { ...loadConfig({}), webDist: '/nao-existe', tutorDailyLimit: 2 };
@@ -183,7 +190,8 @@ describe('ClaudeTutor', () => {
     expect(msgs[0]!.role).toBe('user');
     expect(msgs.at(-1)!.content).toContain('<codigo_do_aluno>');
     expect(captured.model).toBe('claude-sonnet-5-5');
-    expect(captured.fallbacks).toBe('default');
+    expect(captured.fallbacks).toBeUndefined();
+    expect(captured.max_tokens).toBe(1200);
   });
 
   it('recusa do modelo vira erro (cai no offline)', async () => {

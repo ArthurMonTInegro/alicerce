@@ -8,7 +8,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { glossary, levels, skills } from '@alicerce/content';
+import { glossary, levels, skills, tutorKnowledge } from '@alicerce/content';
 
 const out = fileURLToPath(new URL('../src/generated/', import.meta.url));
 rmSync(out, { recursive: true, force: true });
@@ -46,3 +46,5 @@ for (const l of levels) for (const m of l.modules) for (const lesson of m.lesson
   n++;
 }
 console.log(`conteúdo: catálogo + ${n} lições em src/generated/`);
+
+writeFileSync(join(out, 'tutor-knowledge.json'), JSON.stringify(tutorKnowledge));

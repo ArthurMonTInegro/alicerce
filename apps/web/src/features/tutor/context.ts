@@ -24,7 +24,8 @@ const emit = () => {
 };
 
 export function setTutorContext(c: TutorContext) {
-  ctx = { ...ctx, ...c };
+  const changed=('exerciseId' in c && c.exerciseId!==ctx.exerciseId)||('lessonId' in c && c.lessonId!==ctx.lessonId);
+  ctx = { ...ctx, ...(changed?{code:undefined,error:undefined,hintsSeen:undefined}:{}), ...c };
   emit();
 }
 export function resetTutorContext(c: TutorContext = {}) {

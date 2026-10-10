@@ -48,6 +48,7 @@ export function Licao({ id }: { id: string }) {
     if (!lesson) return;
     visitStage(lesson.id, stage);
     resetTutorContext({ lessonId: lesson.id });
+    return () => resetTutorContext();
   }, [lesson, stage]);
 
   if (!lesson || !mod || !level || !stages.length) return <NotFound />;

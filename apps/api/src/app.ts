@@ -183,6 +183,7 @@ export async function buildApp({ config, db, tutor, logger = false }: AppDeps) {
     const retry = limits.tutor.take(u ? `u:${u.id}` : `ip:${req.ip}`);
     if (retry) return tooMany(reply, retry);
 
+    let reason: TutorReply['reason'] = !ai?'not_configured':!u?'login_required':'daily_limit';
     // IA só para quem tem conta (controla custo e abuso), com limite diário.
     if (ai && u) {
       const day = new Date().toISOString().slice(0, 10);
@@ -192,11 +193,12 @@ export async function buildApp({ config, db, tutor, logger = false }: AppDeps) {
         try {
           return { reply: await ai.answer(parsed), mode: 'ia' };
         } catch (err) {
-          req.log.warn({ err: (err as Error).message }, 'tutor IA falhou; usando offline');
+          reason='provider_unavailable';
+          req.log.warn('tutor IA indisponível; usando apoio local');
         }
       }
     }
-    return { reply: await offline.answer(parsed), mode: 'offline' };
+    return { reply: await offline.answer(parsed), mode: 'offline', reason };
   });
 
   app.all('/api/*', async (_req, reply) => reply.code(404).send({ error: 'Rota não encontrada.' }));

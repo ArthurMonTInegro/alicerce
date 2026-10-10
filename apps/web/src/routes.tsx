@@ -13,6 +13,7 @@ import { cardsResource, glossaryResource, loadLesson } from './content.ts';
 import { matchPath } from './lib/router.tsx';
 
 const PAGES = {
+  tutor: () => import('./pages/Tutor.tsx'),
   ingles: () => import('./pages/Ingles.tsx'),
   evolucao: () => import('./pages/Evolucao.tsx'),
   autonomia: () => import('./pages/Autonomia.tsx'),
@@ -57,6 +58,7 @@ const route = <K extends PageKey>(pattern: string, page: K, render: (mod: PageMo
 
 /** A pré-renderização usa os mesmos padrões (scripts/prerender.ts). */
 export const ROUTES: Route[] = [
+  route('/tutor','tutor',m=><m.Tutor />),
   route('/ingles','ingles',m=><m.Ingles />),
   route('/evolucao','evolucao',m=><m.Evolucao />),
   route('/autonomia','autonomia',m=><m.Autonomia />),
