@@ -54,7 +54,7 @@ export function Conta() {
       <div className="container prose" style={{ maxWidth: '60ch' }}>
         <p className="eyebrow">Conta · account</p>
         <h1>Conta</h1>
-        <p>Esta é a versão de demonstração, publicada sem servidor. Tudo funciona, mas o progresso fica só neste navegador: criar conta, sincronizar entre aparelhos e o tutor com IA ficam disponíveis quando a plataforma roda com o servidor dela.</p>
+        <p>Esta é a versão de demonstração, publicada sem servidor. A trilha inicial está disponível e o progresso fica neste navegador: criar conta, sincronizar entre aparelhos e o tutor com IA ficam disponíveis quando a plataforma roda com o servidor dela.</p>
         <p>
           Seu progresso pode ser exportado e importado em <Link to="/progresso">Progresso</Link>.
         </p>
@@ -81,10 +81,10 @@ export function Conta() {
               {user.entitlements.features.map((f) => (
                 <li key={f}>{FEATURES[f].title}</li>
               ))}
-              <li>Tutor com IA: até {user.entitlements.tutorDailyLimit} perguntas por dia</li>
+              <li>Tutor com IA: até {user.entitlements.tutorDailyLimit} perguntas por dia e {user.entitlements.tutorMonthlyLimit} por mês</li>
             </ul>
             <p className="small muted">
-              {PREMIUM_FOR_SALE ? 'A trilha inteira é gratuita.' : 'Hoje, tudo é gratuito. O premium ainda não está à venda.'} Veja <Link to="/planos">Planos</Link>.
+              A trilha inicial é gratuita. O Premium libera os níveis seguintes e ainda não está à venda. Veja <Link to="/planos">Planos</Link>.
             </p>
           </section>
         )}

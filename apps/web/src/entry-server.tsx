@@ -3,7 +3,7 @@ import { renderToString } from 'react-dom/server';
 import { App } from './App.tsx';
 import { HeadProvider, type HeadData } from './lib/head.tsx';
 import { RouterProvider } from './lib/router.tsx';
-import { glossary, lessons } from '@alicerce/content';
+import { glossary, lessons, canReadLesson } from '@alicerce/content';
 import { cardsResource, glossaryResource, seedLessons } from './content.ts';
 import { seedPages } from './routes.tsx';
 import * as ingles from './pages/Ingles.tsx';
@@ -31,8 +31,8 @@ import * as privacidade from './pages/Privacidade.tsx';
 import * as planos from './pages/Planos.tsx';
 
 // No build, tudo já está em memória: cada página sai completa, sem "Carregando".
-seedLessons(lessons);
-cardsResource.seed(Object.fromEntries(lessons.map((l) => [l.id, l.cards])));
+seedLessons(lessons.filter(l=>canReadLesson('free',l.id)));
+cardsResource.seed(Object.fromEntries(lessons.filter(l=>canReadLesson('free',l.id)).map((l) => [l.id, l.cards])));
 glossaryResource.seed(glossary);
 seedPages({ tutor, ingles, evolucao, autonomia, home, trilha, nivel, modulo, licao, revisao, diagnostico, laboratorio, projetos, carreira, glossario, visualizacoes, progresso, conta, metodologia, referencias, sobre, privacidade, planos });
 

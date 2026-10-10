@@ -1,3 +1,5 @@
+> Estratégia vigente: [Acesso e planos v3](docs/ESTRATEGIA_ASSINATURA.md). Níveis 0–1 gratuitos; 2–14 Premium. Cobrança ainda não ativa.
+
 # Alicerce
 
 Esta é a cópia independente para autodidatas. A publicação Sites é estática: não possui contas de aluno, sincronização ou IA conectada. Acompanhe entregas em `/evolucao`; o repositório original permanece separado.
@@ -30,7 +32,7 @@ Todas são opcionais; veja `.env.example`.
 | `DATABASE_PATH` | `apps/api/data/alicerce.db` | Arquivo SQLite (contas e progresso) |
 | `ANTHROPIC_API_KEY` | vazio | Liga o tutor com IA. Sem ela, o tutor usa o modo offline de pistas guiadas |
 | `TUTOR_MODEL` | `claude-sonnet-5-5` | Modelo usado pelo tutor |
-| `TUTOR_DAILY_LIMIT` | `60` | Perguntas por dia, por conta, ao tutor com IA |
+| `TUTOR_DAILY_LIMIT` | `20` | Teto diário de IA Premium (não aumenta o máximo de 20); 200/mês calendário UTC. Gratuito: sem IA externa. |
 | `TRUST_PROXY` | `false` | Ative só atrás de um proxy reverso conhecido |
 | `COOKIE_SECURE` | ligado em produção | Cookie de sessão com atributo `Secure` (exige HTTPS) |
 | `SITE_URL` | vazio | Usado no build para canonical, sitemap e robots.txt |

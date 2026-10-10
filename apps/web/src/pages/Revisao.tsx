@@ -1,3 +1,7 @@
+import {useAccessPlan,lessonAccess} from '../lib/access.ts';
+import {BASE,STATIC_SITE} from '../lib/base.ts';
+import {useAuth} from '../state/store.ts';
+import type {Flashcard} from '../content.ts';
 import { useEffect, useMemo, useState } from 'react';
 import { cardsResource, exerciseById, exercises, findExercise, lessons, lessonById, skillById, useLesson, useResource, type LessonMeta } from '../content.ts';
 import { exercisesToRedo, isDue, previewIntervals, skillStatus, type Grade } from '@alicerce/engine';
@@ -18,15 +22,26 @@ const GRADES: Array<{ g: Grade; label: string; en: string; key: string }> = [
 export function Revisao() {
   useHead('Revisão espaçada', 'Revise no momento certo: cartões de recuperação ativa agendados pelo algoritmo FSRS e desafios de retenção para as habilidades que estão enfraquecendo.');
   const p = useProgress();
+  const plan=useAccessPlan();
+  const {user}=useAuth();
+  const [privateCards,setPrivateCards]=useState<{owner:string;data:Record<string,Flashcard[]>}|null>(null);
+  const [privateFailed,setPrivateFailed]=useState(false);
+  const [retryPrivate,setRetryPrivate]=useState(0);
+  useEffect(()=>{
+    if(STATIC_SITE||plan!=='premium'||!user)return;let alive=true;const owner=user.id;const controller=new AbortController();setPrivateFailed(false);
+    fetch(`${BASE}/api/content/cards`,{credentials:'same-origin',cache:'no-store',signal:controller.signal}).then(r=>{if(!r.ok)throw new Error();return r.json();}).then(data=>{if(alive)setPrivateCards({owner,data});}).catch(()=>{if(alive)setPrivateFailed(true);});
+    return()=>{alive=false;controller.abort();};
+  },[plan,user?.id,retryPrivate]);
   const d = useDerived();
   const [now, setNow] = useState(0);
   const [shown, setShown] = useState(false);
   const [session, setSession] = useState(0);
   useEffect(() => setNow(Date.now()), [p.cards]);
-  const { value: cardsByLesson, failed: cardsFailed, retry: retryCards } = useResource(cardsResource);
+  const { value: freeCards, failed: cardsFailed, retry: retryCards } = useResource(cardsResource);
+  const cardsByLesson=plan==='premium'&&privateCards?.owner===user?.id?privateCards?.data:freeCards;
   const CARD_INDEX = useMemo(
-    () => new Map(lessons.flatMap((l: LessonMeta) => (cardsByLesson?.[l.id] ?? []).map((c) => [c.id, { ...c, lesson: l }] as const))),
-    [cardsByLesson],
+    () => new Map(lessons.filter(l=>lessonAccess(plan,l.id)).flatMap((l: LessonMeta) => (cardsByLesson?.[l.id] ?? []).map((c) => [c.id, { ...c, lesson: l }] as const))),
+    [cardsByLesson,plan],
   );
 
   // fila: cartões vencidos, intercalando lições (interleaving)
@@ -66,23 +81,23 @@ export function Revisao() {
     const weak = [...d.skills.values()].filter((s) => ['revisar', 'reforco'].includes(skillStatus(s, now))).sort((a, b) => a.mastery - b.mastery);
     const out: Array<{ skill: string; ex: (typeof exercises)[number] }> = [];
     for (const s of weak) {
-      const pool = exercises.filter((x) => x.exercise.skills.includes(s.skill) && d.completedLessons.has(x.lessonId) && x.exercise.kind !== 'mcq');
+      const pool = exercises.filter((x) => lessonAccess(plan,x.lessonId) && x.exercise.skills.includes(s.skill) && d.completedLessons.has(x.lessonId) && x.exercise.kind !== 'mcq');
       const pick = pool.find((x) => !d.solved.has(x.exercise.id)) ?? pool[(Math.floor(now / 86_400_000) + s.skill.length) % Math.max(1, pool.length)];
       if (pick && !out.some((o) => o.ex.exercise.id === pick.exercise.id)) out.push({ skill: s.skill, ex: pick });
       if (out.length >= 3) break;
     }
     return out;
-  }, [d, now]);
+  }, [d, now,plan]);
 
   // exercícios em que a pessoa viu a solução: voltam aqui até serem resolvidos sem ajuda
-  const redo = useMemo(() => exercisesToRedo(p).flatMap((id) => exerciseById.get(id) ?? []), [p]);
+  const redo = useMemo(() => exercisesToRedo(p).flatMap((id) => exerciseById.get(id) ?? []).filter(e=>lessonAccess(plan,e.lessonId)), [p,plan]);
 
   const totalCards = Object.keys(p.cards).length;
   const nextDue = now ? Math.min(...Object.values(p.cards).map((c) => c.due).filter((t) => t > now)) : Infinity;
   const reviewedToday = now ? p.reviews.filter((r) => now - r.at < 86_400_000).length : 0;
 
   return (
-    <div className="container">
+    <div className="container">{privateFailed&&<p role="alert">Não foi possível carregar a revisão Premium. <button className="btn" onClick={()=>setRetryPrivate(n=>n+1)}>Tentar novamente</button></p>}
       <p className="eyebrow">Revisão espaçada · spaced repetition</p>
       <h1>Revisão</h1>
       <p className="lead">Lembrar dá trabalho, e é esse esforço que fixa. Responda de memória antes de virar o cartão e avalie com honestidade: o algoritmo decide quando cada cartão volta.</p>

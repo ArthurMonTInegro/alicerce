@@ -1,3 +1,4 @@
+import {lessonAccess,useAccessPlan} from '../../lib/access.ts';
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {exerciseById,findExercise,lessonById,loadLesson} from '../../content.ts';
 import {coachReply,redactSecrets,type CoachMode,type Knowledge,type Turn} from '@alicerce/engine';
@@ -8,9 +9,10 @@ import {closeTutor,takePendingQuestion,useTutor} from './context.ts';
 interface Msg extends Turn {feedback?:'useful'|'unclear';source?:string}
 const MODES:{id:CoachMode;label:string;starter:string}[]=[{id:'learn',label:'Entender',starter:'Explique variáveis com um exemplo'},{id:'debug',label:'Investigar erro',starter:'Quero investigar um erro no meu código'},{id:'practice',label:'Praticar',starter:'Quero praticar funções'},{id:'plan',label:'Planejar',starter:'Ajude a organizar minha sessão de estudo'},{id:'english',label:'Inglês',starter:'Vamos ensaiar uma conversa em inglês'}];
 const welcome=():Msg[]=>[{role:'tutor',text:'Escolha um objetivo e me diga o que está tentando aprender. Posso buscar explicações na trilha, orientar uma investigação e propor um próximo passo. O modo local usa conteúdo e roteiros; respostas livres com IA dependem do servidor.'}];
-const reasons={not_configured:'IA não configurada. Apoio local ativo.',login_required:'Entre na conta para usar a IA. Apoio local ativo.',daily_limit:'Limite diário atingido. Apoio local ativo.',provider_unavailable:'IA temporariamente indisponível. Apoio local ativo.'};
+const reasons={premium_required:'IA disponível no Premium. Apoio local ativo.',monthly_limit:'Cota mensal de IA atingida. Apoio local ativo.',not_configured:'IA não configurada. Apoio local ativo.',login_required:'Entre na conta para usar a IA. Apoio local ativo.',daily_limit:'Limite diário atingido. Apoio local ativo.',provider_unavailable:'IA temporariamente indisponível. Apoio local ativo.'};
 export function TutorPanel(){
  const {ctx,open}=useTutor();
+ const accessPlan=useAccessPlan();
  const [msgs,setMsgs]=useState<Msg[]>(welcome),[text,setText]=useState(''),[busy,setBusy]=useState(false),[goal,setGoal]=useState<CoachMode>('learn'),[mode,setMode]=useState<'ia'|'offline'>('offline'),[status,setStatus]=useState(STATIC_SITE?'Apoio local · sem IA conectada':'O modo usado será informado em cada resposta.'),[share,setShare]=useState(false);
  const log=useRef<HTMLDivElement>(null),input=useRef<HTMLTextAreaElement>(null),opener=useRef<Element|null>(null),running=useRef(false),generation=useRef(0),controller=useRef<AbortController|null>(null);
  const exRef=ctx.exerciseId?exerciseById.get(ctx.exerciseId):undefined;
@@ -24,6 +26,7 @@ export function TutorPanel(){
  useEffect(()=>()=>{generation.current++;controller.current?.abort();},[]);
  async function send(raw:string){
   if(!raw.trim()||running.current)return;
+  if(lessonId&&!lessonAccess(accessPlan,lessonId)){setStatus('O tutor desta lição requer Premium ativo.');return;}
   const message=redactSecrets(raw.trim().slice(0,2000));const history=(scopeChanged?[]:msgs).slice(-10).map(({role,text})=>({role,text}));
   const requestId=++generation.current;running.current=true;setBusy(true);setText('');setMsgs(m=>[...m,{role:'user' as const,text:message}].slice(-40));
   const abort=new AbortController();controller.current=abort;

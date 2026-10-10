@@ -8,7 +8,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { glossary, levels, skills, tutorKnowledge } from '@alicerce/content';
+import { glossary, levels, skills, tutorKnowledge, canReadLesson } from '@alicerce/content';
 
 const out = fileURLToPath(new URL('../src/generated/', import.meta.url));
 rmSync(out, { recursive: true, force: true });
@@ -38,13 +38,14 @@ const catalog = {
 };
 writeFileSync(join(out, 'catalog.json'), JSON.stringify(catalog));
 writeFileSync(join(out, 'glossary.json'), JSON.stringify(glossary));
-const cards = Object.fromEntries(levels.flatMap((l) => l.modules.flatMap((m) => m.lessons.map((lesson) => [lesson.id, lesson.cards]))));
+const cards = Object.fromEntries(levels.flatMap((l) => l.modules.flatMap((m) => m.lessons.filter(lesson=>canReadLesson('free',lesson.id)).map((lesson) => [lesson.id, lesson.cards]))));
 writeFileSync(join(out, 'cards.json'), JSON.stringify(cards));
 let n = 0;
 for (const l of levels) for (const m of l.modules) for (const lesson of m.lessons) {
+  if(!canReadLesson('free',lesson.id))continue;
   writeFileSync(join(out, 'lessons', `${lesson.id}.json`), JSON.stringify(lesson));
   n++;
 }
 console.log(`conteúdo: catálogo + ${n} lições em src/generated/`);
 
-writeFileSync(join(out, 'tutor-knowledge.json'), JSON.stringify(tutorKnowledge));
+writeFileSync(join(out, 'tutor-knowledge.json'), JSON.stringify(tutorKnowledge.filter(d=>canReadLesson('free',d.id))));

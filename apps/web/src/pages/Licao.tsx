@@ -1,3 +1,5 @@
+import {PremiumGate} from '../components/PremiumGate.tsx';
+import {useAccessPlan,lessonAccess} from '../lib/access.ts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { lessonById, levelById, moduleById, modules, referenceById, STAGE_LABEL, useLesson, type LessonMeta, type Stage } from '../content.ts';
 import { exercisesToRedo, topologicalOrder } from '@alicerce/engine';
@@ -17,7 +19,12 @@ function nextLesson(id: string): LessonMeta | undefined {
   return i >= 0 ? ORDERED_LESSONS[i + 1] : undefined;
 }
 
-export function Licao({ id }: { id: string }) {
+export function Licao({id}:{id:string}){
+  const plan=useAccessPlan();const lesson=lessonById.get(id);
+  if(lesson&&!lessonAccess(plan,id))return <PremiumGate title={lesson.title} summary={lesson.summary}/>;
+  return <LessonBody key={id+plan} id={id}/>;
+}
+function LessonBody({ id }: { id: string }) {
   const lesson = lessonById.get(id);
   const { lesson: full, failed, retry } = useLesson(lesson?.id);
   const mod = lesson ? moduleById.get(lesson.moduleId) : undefined;
@@ -213,7 +220,7 @@ export function Licao({ id }: { id: string }) {
                   )}
                   {next && (
                     <Link to={`/licao/${next.id}`} className={`btn${done ? ' primary' : ''}`}>
-                      Próxima lição: {next.title} →
+                      {lessonAccess('free',next.id)?'Próxima lição':'Continue no Premium'}: {next.title} →
                     </Link>
                   )}
                 </div>

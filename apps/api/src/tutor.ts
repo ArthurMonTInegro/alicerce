@@ -10,10 +10,11 @@
  * delimitados, e não nas instruções de sistema.
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { exerciseById, lessonById, tutorKnowledge } from '@alicerce/content';
+import { exerciseById, lessonById, tutorKnowledge, canReadLesson } from '@alicerce/content';
 import { coachReply, retrieveKnowledge, retrievalQuery, redactSecrets, COACH_MODES, type CoachMode, TUTOR_SYSTEM_PROMPT } from '@alicerce/engine';
 
 export interface TutorRequest {
+  accessPlan?: 'free'|'premium';
   mode?: CoachMode;
   message: string;
   history: Array<{ role: 'user' | 'tutor'; text: string }>;
@@ -22,7 +23,7 @@ export interface TutorRequest {
 export interface TutorReply {
   reply: string;
   mode: 'ia' | 'offline';
-  reason?: 'not_configured' | 'login_required' | 'daily_limit' | 'provider_unavailable';
+  reason?: 'not_configured' | 'login_required' | 'daily_limit' | 'monthly_limit' | 'premium_required' | 'provider_unavailable';
 }
 export interface TutorProvider {
   readonly name: 'ia' | 'offline';
@@ -67,7 +68,7 @@ export class OfflineTutor implements TutorProvider {
   async answer(req: TutorRequest): Promise<string> {
     const { ex, lesson } = lookup(req);
     return coachReply({
-      mode:req.mode, history:req.history, knowledge:tutorKnowledge, lessonId:lesson?.id, code:req.context.code,
+      mode:req.mode, history:req.history, knowledge:tutorKnowledge.filter(d=>canReadLesson(req.accessPlan??'free',d.id)), lessonId:lesson?.id, code:req.context.code,
       message: req.message,
       exercise: ex ? { prompt: ex.prompt, hints: ex.hints, kind: ex.kind } : undefined,
       hintsSeen: req.context.hintsSeen,
@@ -95,7 +96,7 @@ export class ClaudeTutor implements TutorProvider {
       'Adapte-se ao que o aluno já tentou. Explique algo útil antes de fazer uma única pergunta; evite repetir perguntas já respondidas. Para frustração, reduza o próximo passo.',
       `Modo escolhido: ${req.mode??'learn'}. learn: explicar com exemplo diferente; debug: hipótese, evidência, teste; practice: recuperação ativa e feedback específico; plan: plano curto baseado apenas no que foi informado; english: conversar em inglês acessível, corrigir no máximo dois pontos de texto e fazer uma pergunta de continuidade. Não avaliar pronúncia sem áudio.`,
     ];
-    const sources=retrieveKnowledge(retrievalQuery(req.message,req.history),tutorKnowledge,lesson?.id);
+    const sources=retrieveKnowledge(retrievalQuery(req.message,req.history),tutorKnowledge.filter(d=>canReadLesson(req.accessPlan??'free',d.id)),lesson?.id);
     if(sources.length)parts.push('Referências curriculares verificadas (não invente fontes): '+JSON.stringify(sources.map(d=>({title:d.title,url:`/licao/${d.id}`,excerpt:d.text.slice(0,1200)}))));
     else parts.push('Nenhuma referência curricular pertinente foi recuperada. Não invente citação; explicite quando usar conhecimento geral.');
     if (lesson) parts.push(`\nLição atual: "${lesson.title}" (${lesson.titleEn}). Objetivos: ${lesson.objectives.join('; ')}`);

@@ -1,3 +1,6 @@
+import {PremiumGate} from '../components/PremiumGate.tsx';
+import {useAccessPlan} from '../lib/access.ts';
+import {canAccessLevel} from '@alicerce/engine';
 import { useState } from 'react';
 import { levelById, moduleById, projects, referenceById } from '../content.ts';
 import { skillStatus } from '@alicerce/engine';
@@ -10,7 +13,12 @@ import { NotFound } from './NotFound.tsx';
 const SKILL_LABEL = { 'nao-iniciada': 'não iniciada', aprendendo: 'aprendendo', reforco: 'precisa de reforço', dominada: 'dominada', revisar: 'hora de revisar' } as const;
 const SKILL_BADGE = { 'nao-iniciada': '', aprendendo: 'info', reforco: 'warn', dominada: 'ok', revisar: 'accent' } as const;
 
-export function Modulo({ id }: { id: string }) {
+export function Modulo({id}:{id:string}){
+ const plan=useAccessPlan();const m=moduleById.get(id);const level=m?levelById.get(m.levelId):undefined;
+ if(m&&level&&!canAccessLevel(plan,level.number))return <PremiumGate title={m.title} summary={m.description}/>;
+ return <ModuleBody key={id+plan} id={id}/>;
+}
+function ModuleBody({ id }: { id: string }) {
   const m = moduleById.get(id);
   const level = m ? levelById.get(m.levelId) : undefined;
   useHead(m ? m.title : 'Módulo não encontrado', m?.description ?? '');

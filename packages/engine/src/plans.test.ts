@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { can, effectivePlan, entitlements, FEATURES, FOREVER_FREE, formatBRL, PLANS, PREMIUM_FOR_SALE, yearlyDeal } from './plans.ts';
+import { can, effectivePlan, entitlements, FEATURES, FREE_FEATURES, formatBRL, PLANS, PREMIUM_FOR_SALE, yearlyDeal } from './plans.ts';
 
 describe('planos', () => {
   it('plano vencido ou desconhecido vira gratuito', () => {
@@ -10,17 +10,17 @@ describe('planos', () => {
     expect(effectivePlan(null, null)).toBe('free');
   });
 
-  it('o gratuito tem a trilha inteira e o tutor com IA', () => {
+  it('o gratuito oferece a iniciação sem chamadas de IA', () => {
     const e = entitlements('free', null, 60);
-    for (const f of ['trilha-completa', 'exercicios-e-revisao', 'laboratorio', 'tutor-ia'] as const) expect(can(e, f)).toBe(true);
-    expect(e.tutorDailyLimit).toBe(60);
+    for (const f of ['trilha-inicial', 'exercicios-e-revisao', 'laboratorio'] as const) expect(can(e, f)).toBe(true);
+    expect(can(e,'trilha-completa')).toBe(false);expect(can(e,'tutor-ia')).toBe(false);expect(e.tutorDailyLimit).toBe(0);expect(e.tutorMonthlyLimit).toBe(0);
   });
 
   it('recursos planejados não aparecem como direitos até existirem', () => {
     const e = entitlements('premium', 123, 60);
     expect(can(e, 'certificado')).toBe(FEATURES.certificado.status === 'disponivel');
     expect(e.expiresAt).toBe(123);
-    expect(e.tutorDailyLimit).toBeGreaterThanOrEqual(60);
+    expect(e.tutorDailyLimit).toBe(20);expect(e.tutorMonthlyLimit).toBe(200);
   });
 
   it('o pago inclui tudo do gratuito', () => {
@@ -46,8 +46,8 @@ describe('planos', () => {
     expect(PREMIUM_FOR_SALE && !paidReady).toBe(false);
   });
 
-  it('o que é gratuito para sempre está em todos os planos e já existe', () => {
-    for (const f of FOREVER_FREE) {
+  it('os recursos gratuitos estão em todos os planos', () => {
+    for (const f of FREE_FEATURES) {
       expect(FEATURES[f].status).toBe('disponivel');
       for (const plan of Object.values(PLANS)) expect(plan.features).toContain(f);
       expect(can(entitlements('free', null, 60), f)).toBe(true);

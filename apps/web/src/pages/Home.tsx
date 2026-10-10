@@ -1,3 +1,4 @@
+import {useAccessPlan} from '../lib/access.ts';
 import { useEffect, useState, type FormEvent } from 'react';
 import { isDue, exercisesToRedo } from '@alicerce/engine';
 import { lessons, levels } from '../content.ts';
@@ -12,6 +13,7 @@ const KEY='alicerce:autodidata:rotina:v1';
 
 export function Home(){
   useHead('Meu estudo','Seu espaço para aprender computação por conta própria. Organize sua rotina, pratique e revise com um próximo passo claro.');
+  const plan=useAccessPlan();
   const p=useProgress(), d=useDerived();
   const [routine,setRoutine]=useState<Routine>(DEFAULT_ROUTINE),[draft,setDraft]=useState<Routine>(DEFAULT_ROUTINE);
   const [editing,setEditing]=useState(false),[message,setMessage]=useState(''),[now,setNow]=useState(0);
@@ -19,7 +21,7 @@ export function Home(){
     try{const saved=readRoutine(localStorage.getItem(KEY));setRoutine(saved);setDraft(saved);}catch{setMessage('Não foi possível carregar sua rotina. Você ainda pode estudar.');}
     const refresh=()=>setNow(Date.now());refresh();window.addEventListener('focus',refresh);return()=>window.removeEventListener('focus',refresh);
   },[]);
-  const next=nextModules(d,1)[0];
+  const next=nextModules(d,1,plan)[0];
   const lesson=next?.lessons.find(l=>!d.completedLessons.has(l.id));
   const path=lesson?`/licao/${lesson.id}`:next?`/modulo/${next.id}`:'/trilha';
   const visited=lesson?p.lessons[lesson.id]?.visited??[]:[];
@@ -38,7 +40,7 @@ export function Home(){
   ];
   return <div className="study-space container">
     <div className="study-heading"><div><p className="study-kicker">SEU ESPAÇO DE ESTUDO</p><h1>Autonomia se constrói.<br/><span>Um passo de cada vez.</span></h1><p className="study-intro">Uma direção clara para estudar, praticar e descobrir o que você já consegue fazer sozinho.</p></div><Link className="study-map-link" to="/trilha">Explorar a trilha <span aria-hidden="true">↗</span></Link></div>
-    <div className="study-main-grid">
+    <p className="callout">Sua trilha gratuita inclui os níveis 0 e 1. Continue a partir de Python com <Link to="/planos">Premium</Link>, em preparação.</p><div className="study-main-grid">
       <section className="study-next" aria-labelledby="next-title"><div className="study-next-top"><span className="study-pill">{started?'CONTINUE SUA JORNADA':'SEU PRIMEIRO PASSO'}</span><span className="study-step-number" aria-hidden="true">01 / ∞</span></div><div className="study-next-copy"><p className="study-caption">{next?.title??'Continue explorando'}</p><h2 id="next-title">{lesson?.title??'Sua próxima descoberta está na trilha.'}</h2><p>{lesson?.summary??'Revisite um tema, escolha um projeto e coloque sua base à prova.'}</p></div><div className="study-next-actions"><Link to={resume} className="btn study-start">{started?'Continuar meu estudo':'Começar a aprender'} <span aria-hidden="true">→</span></Link>{lesson&&<span>{lesson.minutes} min · estimativa da lição completa</span>}</div>{next&&<div className="study-module-progress"><div><span>Lições concluídas neste módulo</span><strong>{percent}%</strong></div><div className="study-track" role="progressbar" aria-label="Lições concluídas no módulo" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}><span style={{width:`${percent}%`}}/></div><small>Concluir uma lição não significa dominar o assunto. Teste-se sem ajuda.</small></div>}</section>
       <aside className="study-routine" aria-labelledby="routine-title"><div className="study-section-top"><h2 id="routine-title">No seu ritmo</h2><span className="study-tiny-label">ROTINA</span></div>{editing?<form onSubmit={save} className="study-routine-form"><label htmlFor="study-goal">O que te move?</label><select id="study-goal" value={draft.goal} onChange={e=>setDraft({...draft,goal:e.target.value as Routine['goal']})}>{Object.entries(GOALS).map(([id,g])=><option key={id} value={id}>{g.label}</option>)}</select><label htmlFor="study-minutes">Tempo por sessão</label><select id="study-minutes" value={draft.minutes} onChange={e=>setDraft({...draft,minutes:Number(e.target.value) as Routine['minutes']})}>{[15,30,60].map(n=><option key={n} value={n}>{n} minutos</option>)}</select><label htmlFor="study-days">Sessões por semana</label><select id="study-days" value={draft.days} onChange={e=>setDraft({...draft,days:Number(e.target.value) as Routine['days']})}>{[2,3,5].map(n=><option key={n} value={n}>{n} sessões</option>)}</select><div className="row"><button className="btn accent" type="submit">Salvar rotina</button><button className="btn ghost" type="button" onClick={()=>{setEditing(false);setMessage('');}}>Cancelar</button></div></form>:<><p className="study-routine-goal">{goal.label}</p><div className="study-time"><strong>{routine.minutes}</strong><span>minutos<br/>por sessão</span></div><p className="study-budget">{routine.days} sessões · {routine.minutes*routine.days} minutos planejados por semana</p><div className="study-rhythm" aria-hidden="true">{Array.from({length:5},(_,i)=><span key={i} className={i<routine.days?'chosen':''}/>)}</div><p className="small muted">Uma meta flexível. Se perder um dia, retome no próximo.</p><button className="btn study-edit" onClick={()=>{setDraft(routine);setEditing(true);setMessage('');}}>Ajustar minha rotina</button></>}<p className="study-save-message small" role="status">{message}</p></aside>
     </div>

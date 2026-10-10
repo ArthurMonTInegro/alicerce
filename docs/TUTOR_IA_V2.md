@@ -1,3 +1,5 @@
+> Atualização v3: IA exclusiva do Premium, até 20 pedidos/dia dentro de 200/mês UTC. A busca local pública usa apenas as 15 lições gratuitas; no servidor, referências respeitam o plano. Veja ESTRATEGIA_ASSINATURA.md.
+
 # Tutor Alicerce v2 — entrega e ativação de IA
 
 ## Estado real

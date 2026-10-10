@@ -1,3 +1,5 @@
+import {canAccessLevel} from '@alicerce/engine';
+import {useAccessPlan} from '../lib/access.ts';
 import { levelById } from '../content.ts';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
@@ -7,12 +9,15 @@ import { Markdown } from '../lib/markdown.tsx';
 import { NotFound } from './NotFound.tsx';
 
 export function Nivel({ id }: { id: string }) {
+  const plan=useAccessPlan();
   const level = levelById.get(id);
   useHead(level ? `Nível ${level.number}: ${level.title}` : 'Nível não encontrado', level?.goal ?? '');
   const d = useDerived();
   if (!level) return <NotFound />;
+  const paid=!canAccessLevel(plan,level.number);
   return (
     <div className="container">
+      <p className="callout">{paid?<>Este nível faz parte do Premium. Explore os assuntos e <Link to="/planos">veja como continuar</Link>.</>:<>Este nível está incluído no seu acesso.</>}</p>
       <nav className="breadcrumbs" aria-label="Você está em">
         <ol>
           <li>

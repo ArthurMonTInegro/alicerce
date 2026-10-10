@@ -8,6 +8,7 @@ import { join, normalize, sep } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
+import {canReadLesson,canReadExercise,lessonById,lessons} from '@alicerce/content';
 import { emptyProgress, mergeProgress, sanitizeProgress } from '@alicerce/engine';
 import {
   clearCookie,
@@ -171,6 +172,18 @@ export async function buildApp({ config, db, tutor, logger = false }: AppDeps) {
     return { progress: merged };
   });
 
+  /* Private lesson bodies are never deployed as public assets. */
+  app.get('/api/content/lessons/:id',async(req,reply)=>{
+    const {id}=req.params as {id:string};const user=currentUser(req);const plan=user?ent(user.id).plan:'free';
+    if(!lessonById.has(id))return reply.code(404).send({error:'Lição não encontrada.'});
+    if(!canReadLesson(plan,id))return reply.code(403).send({error:'Esta lição requer Premium ativo.'});
+    return lessonById.get(id);
+  });
+  app.get('/api/content/cards',async(req)=>{
+    const user=currentUser(req);const plan=user?ent(user.id).plan:'free';
+    return Object.fromEntries(lessons.filter(l=>canReadLesson(plan,l.id)).map(l=>[l.id,l.cards]));
+  });
+
   /* ---------- tutor ---------- */
   app.post('/api/tutor', async (req, reply): Promise<TutorReply | FastifyReply> => {
     let parsed;
@@ -184,11 +197,18 @@ export async function buildApp({ config, db, tutor, logger = false }: AppDeps) {
     if (retry) return tooMany(reply, retry);
 
     let reason: TutorReply['reason'] = !ai?'not_configured':!u?'login_required':'daily_limit';
+    const rights=u?ent(u.id):null;
+    parsed.accessPlan=rights?.plan??'free';
+    if((parsed.context.lessonId&&!canReadLesson(parsed.accessPlan,parsed.context.lessonId))||(parsed.context.exerciseId&&!canReadExercise(parsed.accessPlan,parsed.context.exerciseId)))
+      return reply.code(403).send({error:'O tutor deste conteúdo requer Premium ativo.'});
+    if(rights?.plan==='free')reason='premium_required';
     // IA só para quem tem conta (controla custo e abuso), com limite diário.
-    if (ai && u) {
+    if (ai && u && rights?.plan==='premium') {
       const day = new Date().toISOString().slice(0, 10);
       const used = (db.prepare('SELECT count FROM tutor_usage WHERE user_id = ? AND day = ?').get(u.id, day) as { count: number } | undefined)?.count ?? 0;
-      if (used < ent(u.id).tutorDailyLimit) {
+      const monthly=(db.prepare('SELECT COALESCE(SUM(count),0) AS total FROM tutor_usage WHERE user_id = ? AND day LIKE ?').get(u.id,day.slice(0,7)+'%') as {total:number}).total;
+      if(monthly>=rights.tutorMonthlyLimit)reason='monthly_limit';
+      if (used < rights.tutorDailyLimit && monthly < rights.tutorMonthlyLimit) {
         db.prepare('INSERT INTO tutor_usage (user_id, day, count) VALUES (?, ?, 1) ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1').run(u.id, day);
         try {
           return { reply: await ai.answer(parsed), mode: 'ia' };

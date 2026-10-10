@@ -9,3 +9,5 @@ export { SETUP_ESCOLA } from './sql-setup.ts';
 export * from './research.ts';
 
 export * from "./tutor-knowledge.ts";
+
+export * from "./access.ts";

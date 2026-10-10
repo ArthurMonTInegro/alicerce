@@ -1,5 +1,5 @@
 import { levels, modules, type Module } from '../content.ts';
-import { nodeStatus, topologicalOrder, type NodeStatus } from '@alicerce/engine';
+import { nodeStatus, topologicalOrder, canAccessLevel, type PlanId, type NodeStatus } from '@alicerce/engine';
 import type { Derived } from '../state/store.ts';
 
 export function moduleStatus(m: Module, d: Derived): NodeStatus {
@@ -26,10 +26,10 @@ export const STATUS_BADGE: Record<NodeStatus, string> = {
 const ORDER = topologicalOrder(modules);
 
 /** Próximos módulos recomendados: primeiro os em andamento, depois os disponíveis, na ordem da trilha. */
-export function nextModules(d: Derived, n = 3): Module[] {
+export function nextModules(d: Derived, n = 3, plan: PlanId = 'free'): Module[] {
   const st = (m: Module) => moduleStatus(m, d);
-  const doing = ORDER.filter((m) => st(m) === 'em-andamento' && m.lessons.length > 0);
-  const avail = ORDER.filter((m) => st(m) === 'disponivel');
+  const doing = ORDER.filter((m) => canAccessLevel(plan,levelNumber(m)) && st(m) === 'em-andamento' && m.lessons.length > 0);
+  const avail = ORDER.filter((m) => canAccessLevel(plan,levelNumber(m)) && st(m) === 'disponivel');
   // prioriza a sequência principal (níveis menores) e módulos com lições prontas
   avail.sort((a, b) => Number(b.lessons.length > 0) - Number(a.lessons.length > 0) || levelNumber(a) - levelNumber(b));
   return [...doing, ...avail].slice(0, n);

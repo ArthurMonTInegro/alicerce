@@ -9,9 +9,10 @@ import { ClaudeTutor, parseTutorRequest, type TutorProvider } from '../src/tutor
 
 const H = { 'content-type': 'application/json', 'x-alicerce': '1' };
 
+let fixtureDb:ReturnType<typeof openDb>;
 async function setup(tutor?: TutorProvider) {
   const config = { ...loadConfig({}), webDist: '/nao-existe', tutorDailyLimit: 2 };
-  return buildApp({ config, db: openDb(':memory:'), ...(tutor ? { tutor } : {}) });
+  return buildApp({ config, db: (fixtureDb=openDb(':memory:')), ...(tutor ? { tutor } : {}) });
 }
 const cookieOf = (res: { headers: Record<string, unknown> }) => String(res.headers['set-cookie']).split(';')[0]!;
 
@@ -114,6 +115,7 @@ describe('API', () => {
     expect(anon.json().mode).toBe('offline');
     const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'd@d.co', password: 'uma frase longa' } });
     const cookie = cookieOf(reg);
+    setPlan(fixtureDb,reg.json().user.id,'premium',null,'test');
     const ask = () => app.inject({ method: 'POST', url: '/api/tutor', headers: { ...H, cookie }, payload: { message: 'como começo?' } });
     expect((await ask()).json()).toEqual({ reply: 'pergunta socrática', mode: 'ia' });
     expect((await ask()).json().mode).toBe('ia');
@@ -124,6 +126,7 @@ describe('API', () => {
   it('informa indisponibilidade do provedor e mantém apoio local após falha', async () => {
     app=await setup({name:'ia',answer:async()=>{throw new Error('private-provider-detail');}});
     const reg=await app.inject({method:'POST',url:'/api/auth/register',headers:H,payload:{email:'fallback@test.co',password:'uma frase longa'}});
+    setPlan(fixtureDb,reg.json().user.id,'premium',null,'test');
     const res=await app.inject({method:'POST',url:'/api/tutor',headers:{...H,cookie:cookieOf(reg)},payload:{message:'Explique variáveis'}});
     expect(res.json().mode).toBe('offline');expect(res.json().reason).toBe('provider_unavailable');expect(res.json().reply).not.toContain('private-provider-detail');
   });
@@ -137,15 +140,16 @@ describe('API', () => {
     const cookie = cookieOf(reg);
     const me = async () => (await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie } })).json();
     const id = (await me()).user.id as string;
-    expect((await me()).entitlements).toMatchObject({ plan: 'free', tutorDailyLimit: 2 });
-    expect((await me()).entitlements.features).toContain('tutor-ia');
+    expect((await me()).entitlements).toMatchObject({ plan: 'free', tutorDailyLimit: 0 });
+    expect((await me()).entitlements.features).not.toContain('tutor-ia');
 
     setPlan(db, id, 'premium', Date.now() + 86_400_000, 'teste');
     const e = (await me()).entitlements;
     expect(e.plan).toBe('premium');
-    expect(e.tutorDailyLimit).toBeGreaterThan(2);
+    expect(e.tutorDailyLimit).toBe(2);
     const ask = () => app.inject({ method: 'POST', url: '/api/tutor', headers: { ...H, cookie }, payload: { message: 'oi' } });
-    for (let i = 0; i < 3; i++) expect((await ask()).json().mode).toBe('ia'); // passou do limite gratuito
+    for (let i = 0; i < 2; i++) expect((await ask()).json().mode).toBe('ia');
+    expect((await ask()).json().reason).toBe('daily_limit');
 
     setPlan(db, id, 'premium', Date.now() - 1, 'teste');
     expect((await me()).entitlements.plan).toBe('free');
