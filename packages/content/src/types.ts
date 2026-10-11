@@ -178,6 +178,8 @@ export interface LessonSection {
 
 export interface Lesson {
   id: string;
+  /** Metadado público; explicações e exemplos continuam nos blocos protegidos. */
+  theoryTitle?: string;
   moduleId: string;
   title: string;
   titleEn: string;

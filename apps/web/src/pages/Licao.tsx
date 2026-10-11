@@ -96,6 +96,7 @@ function LessonBody({ id }: { id: string }) {
 
       <div className="lesson-layout">
         <nav className="stage-nav" aria-label="Etapas da lição">
+          {lesson.theoryTitle && <p className="small callout info">Esta aula inclui aprofundamento em <strong>Explicação</strong>, exemplo resolvido em <strong>Exemplo</strong> e reflexão com retorno em <strong>Desafio</strong> e <strong>Revisão</strong>.</p>}
           <ol>
             {stages.map((st) => ({ stage: st })).map((s) => (
               <li key={s.stage}>

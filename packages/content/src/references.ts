@@ -1,8 +1,8 @@
 import type { Reference } from './types.ts';
 
 /**
- * Referências usadas na trilha. Cada uma existe e foi conferida (URL testada por
- * `npm run check:links`). A nota diz como a fonte influenciou o currículo: a
+ * Referências usadas na trilha. As fontes da ampliação de outubro de 2026 foram
+ * consultadas na pesquisa; URLs históricas exigem revisão periódica. A nota diz como a fonte influenciou o currículo: a
  * plataforma não copia cursos, ela usa essas fontes como régua de escopo,
  * sequência e profundidade, e manda o aluno para elas quando quer ir além.
  */
@@ -17,9 +17,31 @@ const R = (
 ): Reference => ({ id, title, org, url, kind, areas, note });
 
 export const references: Reference[] = [
+  /* Pesquisa de aprofundamento: conferida em 10/10/2026 (America/Fortaleza). */
+  R("ies-study-guide", "Organizing Instruction and Study to Improve Student Learning", "IES / What Works Clearinghouse", "https://ies.ed.gov/ncee/wwc/PracticeGuide/1", "artigo", ["n0","n1","n2","n3","n4","n5","n6","n7","n8","n9","n10","n11","n12","n13","n14"], "Orientou alternância entre exemplo resolvido, autoexplicação e retomada. Evidência geral de aprendizagem; eficácia no Alicerce ainda precisa ser medida."),
+  R("helsinki-python-2026", "Python Programming MOOC 2026", "University of Helsinki", "https://programming-26.mooc.fi/", "universidade", ["n1","n2"], "Referência de organização em introdução e aprofundamento com prática. Não implica equivalência acadêmica."),
+  R("python-objects-deep", "Python Tutorial: Classes, Names and Objects", "Python Software Foundation", "https://docs.python.org/3/tutorial/classes.html", "documentacao", ["n2","n5"], "Nomes associados a objetos, estado de instância e limites de privacidade por convenção."),
+  R("python-copy-deep", "Python: Shallow and Deep Copy", "Python Software Foundation", "https://docs.python.org/3/library/copy.html", "documentacao", ["n2"], "Distinção entre atribuição, cópia rasa e objetos internos compartilhados."),
+  R("python-data-model-deep", "Python: Data Model", "Python Software Foundation", "https://docs.python.org/3/reference/datamodel.html", "documentacao", ["n2"], "Identidade, valor e mutabilidade; exemplos escritos para o Alicerce."),
+  R("mit-algorithms-syllabus", "6.006: Syllabus", "MIT OpenCourseWare", "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/pages/syllabus/", "universidade", ["n3","n4"], "Relação entre correção, modelos de custo e algoritmos. Não foi copiado material de aula."),
+  R("mdn-semantics-deep", "Basic HTML Syntax", "MDN Web Docs", "https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Structuring_content/Basic_HTML_syntax", "documentacao", ["n6"], "Estrutura do documento e escolha de elementos com significado."),
+  R("mdn-accessibility-deep", "What Is Accessibility?", "MDN Web Docs", "https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Accessibility/What_is_accessibility", "documentacao", ["n6"], "Acesso por diferentes formas de interação; separação entre aparência e usabilidade."),
+  R("postgres-transactions-deep", "PostgreSQL: Transactions", "PostgreSQL Global Development Group", "https://www.postgresql.org/docs/current/tutorial-transactions.html", "documentacao", ["n7"], "Atomicidade de mudanças relacionadas; exemplo de empréstimo é original."),
+  R("postgres-isolation-deep", "PostgreSQL: Transaction Isolation", "PostgreSQL Global Development Group", "https://www.postgresql.org/docs/current/transaction-iso.html", "documentacao", ["n7"], "Concorrência, níveis de isolamento e necessidade de tratar conflitos conforme o SGBD."),
+  R("ostep-locks-deep", "Operating Systems: Three Easy Pieces — Locks", "Remzi e Andrea Arpaci-Dusseau / University of Wisconsin-Madison", "https://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks.pdf", "livro", ["n8"], "Operações compostas, exclusão mútua e interpretação de intercalações."),
+  R("tcp-rfc9293-deep", "RFC 9293: Transmission Control Protocol", "IETF", "https://www.rfc-editor.org/rfc/rfc9293.html", "padrao", ["n9"], "Fluxo ordenado de bytes não define fronteiras de mensagens da aplicação."),
+  R("python-sockets-deep", "Socket Programming HOWTO", "Python Software Foundation", "https://docs.python.org/3/howto/sockets.html", "documentacao", ["n9"], "Leituras parciais, enquadramento de mensagens e fechamento de conexão."),
+  R("swe-testing-deep", "Software Engineering at Google — Testing Overview", "Google / Titus Winters, Tom Manshreck e Hyrum Wright", "https://abseil.io/resources/swe-book/html/ch11.html", "livro", ["n10"], "Testes de comportamento e limites da evidência fornecida por uma suíte."),
+  R("owasp-authorization-deep", "Authorization Cheat Sheet", "OWASP Foundation", "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html", "documentacao", ["n11"], "Autorização por pedido e recurso, negação por padrão e menor privilégio."),
+  R("owasp-threat-model-deep", "Threat Modeling Cheat Sheet", "OWASP Foundation", "https://cheatsheetseries.owasp.org/cheatsheets/Threat_Modeling_Cheat_Sheet.html", "documentacao", ["n11"], "Ativos, ameaças e fronteiras de confiança."),
+  R("sre-slo-deep", "Site Reliability Engineering — Service Level Objectives", "Google", "https://sre.google/sre-book/service-level-objectives/", "livro", ["n12"], "Indicadores, metas e janelas de medição; percentuais do exemplo são hipotéticos."),
+  R("sre-data-integrity-deep", "Site Reliability Engineering — Data Integrity", "Google", "https://sre.google/sre-book/data-integrity/", "livro", ["n12"], "Recuperação verificável e integridade de dados além da existência de um backup."),
+  R("ml-split-deep", "Datasets: Dividing the Original Dataset", "Google Machine Learning Crash Course", "https://developers.google.com/machine-learning/crash-course/overfitting/dividing-datasets", "curso", ["n13"], "Separação de ajuste, seleção e avaliação; atenção à contaminação do teste."),
+  R("ml-metrics-deep", "Classification: Accuracy, Recall, Precision", "Google Machine Learning Crash Course", "https://developers.google.com/machine-learning/crash-course/classification/accuracy-precision-recall", "curso", ["n13"], "Métricas por classe e seus denominadores; matriz de 100 mensagens é original."),
+  R("mit-math-2015-deep", "6.042J Mathematics for Computer Science (2015)", "MIT OpenCourseWare", "https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-spring-2015/", "universidade", ["n1","n14"], "Definições, provas e modelos discretos como apoio ao raciocínio sobre programas."),
   /* ---------- Currículos de referência ---------- */
   R('cs2023', 'Computer Science Curricula 2023 (CS2023)', 'ACM / IEEE-CS / AAAI', 'https://csed.acm.org/', 'padrao', ['n0', 'n3', 'n4', 'n8', 'n9', 'n10', 'n11', 'n13', 'n14'],
-    'Corpo de conhecimento usado como checklist de cobertura: cada área de conhecimento (Knowledge Area) do CS2023 foi mapeada para um nível da trilha.'),
+    'Referência para revisar escopo e competências. Não representa auditoria de cobertura integral nem equivalência a uma graduação.'),
   R('cs50', "CS50's Introduction to Computer Science", 'Harvard University', 'https://cs50.harvard.edu/x/', 'universidade', ['n0', 'n1', 'n6', 'n7'],
     'Inspirou a ideia de começar pelo "como o computador representa as coisas" antes da sintaxe, e de fechar cada bloco com um problema real.'),
   R('mit-6100l', '6.100L Introduction to CS and Programming Using Python', 'MIT OpenCourseWare', 'https://ocw.mit.edu/courses/6-100l-introduction-to-cs-and-programming-using-python-fall-2022/', 'universidade', ['n1', 'n2'],

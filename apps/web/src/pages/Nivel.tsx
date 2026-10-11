@@ -15,6 +15,7 @@ export function Nivel({ id }: { id: string }) {
   const d = useDerived();
   if (!level) return <NotFound />;
   const paid=!canAccessLevel(plan,level.number);
+  const theory = level.modules.flatMap(m => m.lessons).find(lesson => lesson.theoryTitle);
   return (
     <div className="container">
       <p className="callout">{paid?<>Este nível faz parte do Premium. Explore os assuntos e <Link to="/planos">veja como continuar</Link>.</>:<>Este nível está incluído no seu acesso.</>}</p>
@@ -40,6 +41,12 @@ export function Nivel({ id }: { id: string }) {
           <Markdown text={level.why} />
         </aside>
       </div>
+      {theory && <aside className="callout info" aria-label="Aprofundamento teórico do nível">
+        <p className="callout-title">Entenda o porquê</p>
+        <p>{theory.theoryTitle}</p>
+        <p className="small">Uma leitura com explicação conceitual, exemplo resolvido, equívocos comuns e uma pergunta para justificar com suas palavras.</p>
+        <Link to={`/licao/${theory.id}?etapa=explicacao`}>{paid ? 'Ver prévia da aula Premium' : 'Abrir explicação aprofundada'}</Link>
+      </aside>}
       <h2>Módulos</h2>
       <div className="grid two">
         {level.modules.map((m) => {
