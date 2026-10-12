@@ -21,7 +21,7 @@ export interface ExerciseMeta {
   skills: string[];
   stage: Stage;
 }
-export type LessonMeta = Omit<Lesson, 'sections' | 'terms' | 'objectives' | 'cards'> & { stages: Stage[]; exercises: ExerciseMeta[]; cardCount: number };
+export type LessonMeta = Omit<Lesson, 'sections' | 'terms' | 'objectives' | 'cards' | 'autonomy'> & { stages: Stage[]; exercises: ExerciseMeta[]; cardCount: number };
 export type Module = Omit<FullModule, 'lessons'> & { lessons: LessonMeta[] };
 export type Level = Omit<FullLevel, 'modules'> & { modules: Module[] };
 export interface ExerciseRef {

@@ -1,3 +1,4 @@
+import {autonomyByLesson} from './autonomy.ts';
 import type { Exercise, Lesson, Level, Module } from './types.ts';
 import { deepenLevels } from './theory-expansions.ts';
 import { level0 } from './levels/n00-computacao.ts';
@@ -12,7 +13,7 @@ import { level8, level9, level10 } from './levels/n08-n10.ts';
 import { level11, level12, level13, level14 } from './levels/n11-n14.ts';
 
 export const levels: Level[] = deepenLevels([level0, level1, level2, level3, level4, level5, level6, level7,
-  level8, level9, level10, level11, level12, level13, level14]);
+  level8, level9, level10, level11, level12, level13, level14]).map(level => ({...level, modules: level.modules.map(module => ({...module, lessons: module.lessons.map(lesson => ({...lesson, ...(autonomyByLesson[lesson.id] ? {autonomy: autonomyByLesson[lesson.id]} : {})}))}))}));
 
 export const modules: Module[] = levels.flatMap((l) => l.modules);
 export const lessons: Lesson[] = modules.flatMap((m) => m.lessons);

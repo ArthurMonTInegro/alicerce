@@ -19,7 +19,7 @@ const catalog = {
     ...l,
     modules: l.modules.map((m) => ({
       ...m,
-      lessons: m.lessons.map(({ sections, terms, objectives, cards, ...meta }) => ({
+      lessons: m.lessons.map(({ sections, terms, objectives, cards, autonomy, ...meta }) => ({
         ...meta,
         cardCount: cards.length,
         stages: sections.map((s) => s.stage),

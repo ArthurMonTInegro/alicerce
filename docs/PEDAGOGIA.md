@@ -67,8 +67,12 @@ O tutor (com IA ou offline) segue regras fixas:
 - aponta onde investigar e pede que o estudante tente antes de seguir;
 - recusa pedidos de "só me dá a resposta" e explica por que isso atrapalha.
 
-O tutor com IA não recebe a solução oficial, então não tem como vazá-la.
+O tutor com IA não recebe a solução oficial, mas ainda pode gerar uma solução por conta própria. A integração exige avaliação contínua; não há garantia absoluta de impedir revelação.
 
 ## Projetos e carreira
 
 10 projetos de portfólio com requisitos, critérios de avaliação e extensões, ligados aos módulos que pedem. A área de carreira cobre entrevistas (28 perguntas com o que o entrevistador avalia), currículo, GitHub e portfólio.
+
+## Avaliação formativa v8
+
+A página /autonomia oferece 12 situações nos níveis 0–2, quatro por nível. O nível 2 acompanha a autorização Premium. Respostas fechadas recebem feedback; perguntas de transferência são abertas, sem correção automática. Histórico local separado não aumenta o indicador de domínio. Repetições são identificadas e o aviso de sete dias não comprova retenção. Os dois primeiros projetos permitem registrar e baixar evidências; o preenchimento não é aprovação automática.

@@ -6,4 +6,5 @@ export function checkpoint(version:number){
     {id:'trace',skill:'logica-variaveis',title:'Acompanhar mudanças de estado',prompt:`Sem executar: saldo = ${price}; saldo = saldo + 4; saldo = saldo - ${discount}. Qual é o valor final de saldo? Responda só com o número.`,answer:String(price+4-discount),explain:`A atribuição atualiza o valor anterior: ${price} + 4 − ${discount}.`,review:'/modulo/m1-2'},
   ];
 }
-export const checkAnswer=(answer:string,expected:string)=>answer.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(',','.').replace(/\.0+$/,'')===expected;
+const normalizeAnswer=(value:string)=>value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(',','.').replace(/\.0+$/,'');
+export const checkAnswer=(answer:string,expected:string)=>normalizeAnswer(answer)===normalizeAnswer(expected);
