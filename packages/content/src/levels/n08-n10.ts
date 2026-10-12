@@ -406,7 +406,7 @@ const tcpip = lesson({
       md(`
         **IP**: \`192.168.0.10/24\` — os primeiros 24 bits identificam a **rede**, o resto o **host**. Roteadores olham o destino e escolhem o próximo salto pela tabela de rotas. O IPv4 tem só ~4,3 bilhões de endereços (2³²); por isso existem **NAT** e o **IPv6** (2¹²⁸).
 
-        **TCP** garante: entrega, ordem, sem duplicatas, controle de fluxo e de congestionamento. Custo: o *handshake* (SYN → SYN-ACK → ACK) e retransmissões.
+        **TCP** fornece um fluxo ordenado de bytes, com retransmissão, controle de fluxo e de congestionamento. A conexão ainda pode falhar; receber bytes não comprova que a aplicação concluiu a operação. Custo: o *handshake* (SYN → SYN-ACK → ACK) e retransmissões.
 
         **UDP**: só envia. Ideal quando atraso é pior que perda: chamadas de vídeo, jogos, DNS. O **QUIC** (base do HTTP/3) é construído sobre UDP.
       `),
@@ -522,7 +522,7 @@ const dnsHttps = lesson({
 
         **TLS (simplificado)**: no *handshake*, o servidor apresenta um **certificado** assinado por uma **CA** em que seu sistema confia; cliente e servidor combinam uma **chave de sessão** (troca de chaves Diffie-Hellman) e daí em diante tudo é criptografado com criptografia simétrica (rápida).
 
-        **Evolução do HTTP**: 1.1 (texto, uma requisição por vez por conexão) → 2 (binário, multiplexação numa conexão TCP) → 3 (sobre QUIC/UDP, sem bloqueio entre fluxos).
+        **Evolução do HTTP**: 1.1 (cabeçalhos textuais, conexões persistentes e possibilidade de pipelining com respostas em ordem) → 2 (binário, fluxos multiplexados numa conexão TCP) → 3 (sobre QUIC/UDP, reduzindo o bloqueio entre fluxos causado pela perda no transporte).
       `),
       warn('O cadeado do navegador garante que você fala com **o dono do domínio** de forma segura — não que o site seja honesto. Sites de phishing também têm HTTPS. Confira o domínio.'),
     ],
@@ -582,7 +582,7 @@ const dnsHttps = lesson({
           explanation: 'Resolvedores e sistemas guardam a resposta antiga em cache até o TTL expirar. Antes de migrações, reduza o TTL com antecedência.',
           options: [
             { text: 'O TTL da resposta antiga ainda não expirou nos caches', correct: true, feedback: 'Isso.' },
-            { text: 'O TCP guardou a conexão', feedback: 'Conexões não duram horas entre acessos distintos.' },
+            { text: 'O TCP guardou a conexão', feedback: 'Uma conexão pode permanecer aberta, mas uma mudança no DNS não a encerra. Para novas conexões, o cache DNS e seu TTL explicam a persistência temporária do endereço antigo.' },
             { text: 'O certificado TLS expirou', feedback: 'Isso daria erro de certificado, não o servidor antigo.' },
             { text: 'O DNS só atualiza uma vez por dia no mundo todo', feedback: 'Não há atualização global; é cache com TTL.' },
           ],
@@ -716,7 +716,7 @@ const git = lesson({
       c1, _ = fazer_commit({"a.txt": "oi"}, None, "primeiro commit")
       c2, _ = fazer_commit({"a.txt": "oi, mundo"}, c1, "amplia saudação")
       print(c1, "<-", c2)
-      # Mudar qualquer coisa no passado muda todos os hashes seguintes: a história é à prova de adulteração.
+      # Mudar qualquer coisa no passado muda todos os hashes seguintes: alterações podem ser detectadas comparando com uma referência confiável; hashes não impedem reescrever a história.
     `)],
     exercicio: [
       {

@@ -1,26 +1,17 @@
+import {systemsAppliedTheory} from './theory/systems-applied.ts';
+import {systemsWebTheory} from './theory/systems-web.ts';
+import {algorithmTheory} from './theory/algorithms.ts';
+import {structureTheory} from './theory/structures.ts';
 import type { Block, Level } from './types.ts';
 import { referenceById } from './references.ts';
 
-interface TheoryExpansion {
-  level: number;
-  lessonId: string;
-  title: string;
-  prerequisite: string;
-  objective: string;
-  explanation: string;
-  worked: string;
-  misconception: string;
-  question: string;
-  feedback: string;
-  extension: string;
-  sources: string[];
-  table?: { head: string[]; rows: string[][]; caption: string };
-}
+import type { TheoryExpansion } from './theory-types.ts';
+import { foundationTheory } from './theory/foundations.ts';
 
 /** Redação original. Pesquisa e limites editoriais: docs/APROFUNDAMENTO_TEORICO.md.
  * Não exportar este módulo em lite.ts: inclui corpos de aulas Premium.
  */
-export const theoryExpansions: TheoryExpansion[] = [
+const initialTheoryExpansions: TheoryExpansion[] = [
   {
     "level": 0,
     "lessonId": "l0-o-que-e-computador",
@@ -404,7 +395,10 @@ export const theoryExpansions: TheoryExpansion[] = [
   }
 ];
 
+export const theoryExpansions: TheoryExpansion[] = [...initialTheoryExpansions, ...foundationTheory, ...structureTheory, ...algorithmTheory, ...systemsWebTheory, ...systemsAppliedTheory];
+
 const byLesson = new Map(theoryExpansions.map(entry => [entry.lessonId, entry]));
+if (byLesson.size !== theoryExpansions.length) throw new Error('Aprofundamento duplicado por lição');
 const md = (text: string): Block => ({ type: 'md', text });
 
 /** Enriquece cópias das lições sem renumerar exercícios/cartões ou alterar progresso. */

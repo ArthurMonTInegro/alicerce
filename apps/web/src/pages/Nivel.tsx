@@ -15,7 +15,7 @@ export function Nivel({ id }: { id: string }) {
   const d = useDerived();
   if (!level) return <NotFound />;
   const paid=!canAccessLevel(plan,level.number);
-  const theory = level.modules.flatMap(m => m.lessons).find(lesson => lesson.theoryTitle);
+  const theoryLessons = level.modules.flatMap(m => m.lessons).filter(lesson => lesson.theoryTitle);
   return (
     <div className="container">
       <p className="callout">{paid?<>Este nível faz parte do Premium. Explore os assuntos e <Link to="/planos">veja como continuar</Link>.</>:<>Este nível está incluído no seu acesso.</>}</p>
@@ -41,11 +41,19 @@ export function Nivel({ id }: { id: string }) {
           <Markdown text={level.why} />
         </aside>
       </div>
-      {theory && <aside className="callout info" aria-label="Aprofundamento teórico do nível">
+      {theoryLessons.length > 0 && <aside className="callout info" aria-label="Aprofundamentos teóricos do nível">
         <p className="callout-title">Entenda o porquê</p>
-        <p>{theory.theoryTitle}</p>
-        <p className="small">Uma leitura com explicação conceitual, exemplo resolvido, equívocos comuns e uma pergunta para justificar com suas palavras.</p>
-        <Link to={`/licao/${theory.id}?etapa=explicacao`}>{paid ? 'Ver prévia da aula Premium' : 'Abrir explicação aprofundada'}</Link>
+        <p className="small">{theoryLessons.length} {theoryLessons.length === 1 ? 'aula com explicação conceitual' : 'aulas com explicação conceitual'}, exemplos resolvidos e perguntas para justificar com suas palavras. Siga a ordem dos módulos e confira os pré-requisitos de cada aula.</p>
+        <details className="disclosure">
+          <summary>Explorar os aprofundamentos deste nível{paid ? ' · Premium' : ''}</summary>
+          <ul>
+            {theoryLessons.map(lesson => <li key={lesson.id} style={{marginBottom:'0.75rem'}}>
+              <Link to={`/licao/${lesson.id}?etapa=explicacao`}>{lesson.title}</Link>
+              <p className="small" style={{margin:'0.15rem 0'}}>{lesson.theoryTitle}</p>
+            </li>)}
+          </ul>
+          {paid && <p className="small">Os links mostram a prévia da aula. O conteúdo completo acompanha o acesso Premium.</p>}
+        </details>
       </aside>}
       <h2>Módulos</h2>
       <div className="grid two">

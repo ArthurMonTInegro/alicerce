@@ -184,7 +184,7 @@ const pilhasFilas = lesson({
         **Onde aparecem filas**: fila de impressão, requisições a um servidor, mensagens entre sistemas, escalonamento de processos, BFS.
 
         **Em Python**:
-        - Pilha: \`list\` com \`append\` (push) e \`pop\` (pop) — ambos O(1) no fim.
+        - Pilha: \`list\` com \`append\` (push) e \`pop\` (pop) — O(1) amortizado no fim.
         - Fila: \`collections.deque\` com \`append\` e \`popleft\` — O(1). **Não** use \`list.pop(0)\`, que é O(n).
       `),
     ],
@@ -310,7 +310,7 @@ const hash = lesson({
   titleEn: 'Hash tables',
   summary: 'Como dict e set conseguem buscar em tempo constante: funções hash, buckets e colisões.',
   minutes: 30,
-  objectives: ['Explicar como uma função hash mapeia chaves em posições', 'Entender colisões e como são tratadas', 'Saber por que chaves precisam ser imutáveis', 'Escolher entre lista, set e dict'],
+  objectives: ['Explicar como uma função hash mapeia chaves em posições', 'Entender colisões e como são tratadas', 'Explicar o contrato de chaves hashable', 'Escolher entre lista, set e dict'],
   skills: ['ed-hash'],
   terms: [
     t('tabela hash / tabela de dispersão', 'hash table / hash map', 'Estrutura que usa uma função hash para localizar chaves rapidamente.'),
@@ -318,7 +318,7 @@ const hash = lesson({
     t('colisão', 'collision', 'Quando duas chaves diferentes caem na mesma posição.'),
     t('balde', 'bucket', 'Posição da tabela onde ficam os itens.'),
     t('fator de carga', 'load factor', 'Quantidade de itens dividida pelo número de posições.'),
-    t('hashável', 'hashable', 'Objeto que pode ser usado como chave (imutável).', "TypeError: unhashable type: 'list'"),
+    t('hashável', 'hashable', 'Objeto com hash estável e compatível com igualdade; pode ser chave.', "TypeError: unhashable type: 'list'"),
   ],
   stages: {
     conceito: [md('Uma **{{tabela hash|hash table}}** guarda pares chave → valor em um array. Para saber **onde** colocar uma chave, calcula-se `hash(chave) % tamanho`. Para buscar, faz-se a mesma conta e vai-se direto à posição: em média **O(1)**, sem percorrer nada. É assim que `dict` e `set` funcionam.')],
@@ -329,7 +329,7 @@ const hash = lesson({
         3. **Colisões**: duas chaves podem cair no mesmo índice. Soluções: **encadeamento** (*chaining* — cada posição tem uma lista) ou **endereçamento aberto** (*open addressing* — procura a próxima posição livre; é o que o CPython usa).
         4. **Redimensionamento**: quando o **fator de carga** fica alto, a tabela cresce e todas as chaves são reinseridas — custo amortizado O(1), como na lista dinâmica.
 
-        **Por que chaves imutáveis?** Se uma lista mudasse depois de inserida, seu hash mudaria e ela ficaria "perdida" na posição antiga. Por isso \`{[1, 2]: "x"}\` dá \`TypeError: unhashable type: 'list'\`; use uma tupla.
+        **Por que chaves hashable?** Se uma lista mudasse depois de inserida, seu hash mudaria e ela ficaria "perdida" na posição antiga. Por isso \`{[1, 2]: "x"}\` dá \`TypeError: unhashable type: 'list'\`; use uma tupla cujos elementos também sejam hashable. Um objeto mutável pode ser chave se sua igualdade e seu hash respeitarem um contrato estável.
       `),
       warn('O(1) é o caso **médio**. Com uma função hash ruim (ou um atacante que força colisões), tudo cai na mesma posição e a busca vira O(n). Por isso o Python randomiza o hash de strings a cada execução (*hash randomization*).'),
     ],
@@ -458,7 +458,7 @@ const hash = lesson({
       },
     ],
     projeto: [md('**Projeto 3 — Sistema de cadastro** (começa aqui): um cadastro de alunos em memória, com busca por matrícula em O(1) (dict), busca por nome e relatórios. Ele vai ganhar arquivos, testes e, mais adiante, um banco de dados.'), { type: 'project', projectId: 'p3-cadastro' }],
-    revisao: [md('- hash(chave) % m → posição.\n- Colisões: encadeamento ou endereçamento aberto.\n- O(1) em média; O(n) no pior caso.\n- Chaves precisam ser imutáveis (hashable).')],
+    revisao: [md('- hash(chave) % m → posição.\n- Colisões: encadeamento ou endereçamento aberto.\n- O(1) em média; O(n) no pior caso.\n- Chaves precisam ser hashable: hash estável e hashes iguais para chaves iguais.')],
   },
   review: [
     ['Como uma tabela hash encontra a posição de uma chave?', 'Calcula hash(chave) % número_de_buckets.'],
@@ -490,7 +490,7 @@ const arvores = lesson({
     conceito: [md('Uma **{{árvore|tree}}** organiza dados de forma **hierárquica**: pastas do computador, o DOM de uma página HTML, a estrutura de um JSON, um organograma. Cada **{{nó|node}}** tem filhos; o do topo é a **{{raiz|root}}**; os sem filhos são **{{folhas|leaves}}**.')],
     explicacao: [
       md(`
-        Em uma **{{árvore binária de busca|binary search tree}}** (BST), cada nó tem no máximo dois filhos e vale a regra: **tudo à esquerda é menor, tudo à direita é maior**. Para buscar, você compara com o nó e desce para um lado — descartando metade da árvore a cada passo (se ela estiver balanceada).
+        Em uma **{{árvore binária de busca|binary search tree}}** (BST), cada nó tem no máximo dois filhos e vale a regra: **tudo à esquerda é menor, tudo à direita é maior**. Para buscar, você compara com o nó e desce para um lado — descartando uma subárvore a cada passo. O balanceamento limita a altura e, portanto, o comprimento do caminho.
 
         - Busca/inserção: **O(h)**, onde *h* é a altura. Balanceada: h ≈ log₂ n. Degenerada (inserir já ordenado!): h = n.
         - **Percursos**: em ordem (*in-order*: esquerda, nó, direita — em uma BST, sai **ordenado**), pré-ordem (nó primeiro) e pós-ordem (nó por último).

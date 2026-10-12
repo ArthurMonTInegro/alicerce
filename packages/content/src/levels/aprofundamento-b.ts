@@ -37,7 +37,7 @@ export const cripto = lesson({
       md(`
         | Ferramenta | Chave | Garante | Exemplo de uso |
         |---|---|---|---|
-        | Hash (SHA-256) | nenhuma | integridade contra erro acidental | conferir download |
+        | Hash (SHA-256) | nenhuma | integridade contra erro acidental | conferir download contra um resumo obtido de fonte confiável |
         | HMAC | secreta compartilhada | integridade + autenticidade | webhooks, cookies assinados |
         | Cifra simétrica autenticada (AES-GCM, ChaCha20-Poly1305) | secreta compartilhada | sigilo + integridade | dados no HTTPS, arquivos |
         | Cifra assimétrica (RSA, ECIES) | par pública/privada | sigilo sem segredo prévio | cifrar uma chave para alguém |
@@ -88,7 +88,7 @@ export const cripto = lesson({
 
         assinatura = pow(mensagem, d, n)    # assinar = usar a chave privada
         print("assinatura confere?", pow(assinatura, e, n) == mensagem)
-      `, { caption: 'A segurança real vem de n ter mais de 600 dígitos: fatorar n para achar p e q fica inviável.' }),
+      `, { caption: 'Demonstração apenas da aritmética RSA. Aumentar os números não torna este esquema seguro: aplicações reais exigem bibliotecas, parâmetros adequados e esquemas como OAEP ou PSS.' }),
       deep('O RSA "de livro" acima é inseguro mesmo com números grandes: é determinístico e maleável. Na prática se usa preenchimento (OAEP para cifrar, PSS para assinar) e, cada vez mais, curvas elípticas (X25519 para troca de chaves, Ed25519 para assinaturas), com chaves menores e operações mais rápidas.'),
       english('Read carefully: *"encrypt-then-MAC"*, *"authenticated encryption with associated data (AEAD)"*, *"don\'t roll your own crypto"*, *"constant-time comparison"*, *"key rotation"*, *"forward secrecy"* (a leaked long-term key does not reveal past sessions).'),
     ],
@@ -106,7 +106,7 @@ export const cripto = lesson({
           options: [
             { text: 'Publicar o SHA-256 do arquivo no mesmo site', feedback: 'Se o atacante troca o arquivo, troca o hash também. Hash sozinho não autentica.' },
             { text: 'HMAC com uma chave secreta', feedback: 'Para verificar, todos precisariam da chave, e então poderiam forjar.' },
-            { text: 'Assinatura digital com a chave privada da empresa', correct: true, feedback: 'Isso: verificável por qualquer um, forjável por ninguém.' },
+            { text: 'Assinatura digital com a chave privada da empresa', correct: true, feedback: 'Isso: qualquer pessoa pode verificar usando uma chave pública autêntica. A resistência à falsificação depende do esquema, dos parâmetros e da proteção da chave privada.' },
             { text: 'Cifrar o arquivo com AES', feedback: 'Cifrar dá sigilo, e o arquivo é público.' },
           ],
         },

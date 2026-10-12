@@ -573,18 +573,18 @@ export const memoria = lesson({
         - **número da página** = endereço // 4096
         - **deslocamento (offset)** = endereço % 4096
 
-        A **tabela de páginas** diz em qual **quadro físico** cada página está. Endereço físico = quadro × 4096 + deslocamento. Se a página não está mapeada na RAM, acontece uma **falta de página**: o SO busca a página no disco (lento!) ou encerra o processo se o acesso for inválido (*segmentation fault*).
+        A **tabela de páginas** diz em qual **quadro físico** cada página está. Endereço físico = quadro × 4096 + deslocamento. Se a página não está mapeada na RAM, acontece uma **falta de página**: o SO pode alocar uma página zerada, realizar uma cópia sob escrita ou carregar dados do armazenamento. Um acesso inválido pode encerrar o processo. Nem toda falta de página exige leitura de disco.
 
         Consultar a tabela a cada acesso seria lento, então a CPU guarda as traduções recentes num cache chamado **TLB**.
 
         ### Pilha × heap
 
         - **Pilha (stack)**: cada chamada de função empilha um *frame* com parâmetros e variáveis locais; ao retornar, ele é descartado. Rápida e automática, mas limitada: recursão sem fim dá *stack overflow* (em Python, \`RecursionError\`).
-        - **Heap**: dados criados dinamicamente. Em C você chama \`malloc\` e \`free\`; esquecer o \`free\` é um **vazamento**, liberar duas vezes corrompe a memória. Python, Java e JavaScript usam **coleta de lixo** (*garbage collection*): o objeto é liberado quando ninguém mais o referencia.
+        - **Heap**: dados criados dinamicamente. Em C você chama \`malloc\` e \`free\`; esquecer o \`free\` é um **vazamento**, liberar duas vezes corrompe a memória. Python, Java e JavaScript usam **coleta de lixo** (*garbage collection*): objetos que não são mais alcançáveis pelo programa podem ter sua memória recuperada. O mecanismo e o momento da coleta variam; ciclos exigem tratamento próprio.
 
         ### Sistemas de arquivos
 
-        Um arquivo é um **inode** (metadados + lista de blocos) e um nome numa **entrada de diretório** que aponta para o inode. Por isso existem *hard links*: dois nomes para o mesmo inode. **Journaling** registra a intenção da mudança antes de fazê-la, para o sistema se recuperar de uma queda de energia sem corromper o disco.
+        Um arquivo é um **inode** (metadados + lista de blocos) e um nome numa **entrada de diretório** que aponta para o inode. Por isso existem *hard links*: dois nomes para o mesmo inode. **Journaling** registra a intenção da mudança antes de fazê-la, para ajudar a recuperar a consistência após uma interrupção. As garantias dependem do sistema de arquivos e da configuração; isso não substitui backups nem assegura persistência de toda escrita.
       `),
       code('text', `
         Endereço virtual 0x3A7F (= 14975)
@@ -739,7 +739,7 @@ export const memoria = lesson({
     revisao: [
       md(`
         - Endereço virtual = página + deslocamento; a tabela de páginas leva ao quadro físico; o TLB acelera.
-        - Falta de página: buscar no disco ou encerrar (segfault).
+        - Falta de página: resolver alocação, cópia ou leitura de armazenamento; rejeitar acessos inválidos.
         - Pilha: chamadas e locais, automática. Heap: objetos dinâmicos; GC ou free manual.
         - Arquivo = inode + entrada de diretório; journaling protege contra quedas.
       `),

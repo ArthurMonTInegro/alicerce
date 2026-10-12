@@ -199,7 +199,7 @@ const js = lesson({
     t('laço de eventos', 'event loop', 'Mecanismo que executa callbacks quando a pilha de chamadas fica vazia.'),
   ],
   stages: {
-    conceito: [md('**JavaScript** é a única linguagem que os navegadores executam nativamente. Você já sabe programar: variáveis, condicionais, loops e funções existem aqui também, com outra sintaxe. A novidade é o **{{DOM|DOM}}** (a página como árvore de objetos) e a programação **orientada a eventos** e **assíncrona**.')],
+    conceito: [md('**JavaScript** é a linguagem usada para controlar o DOM e a interação nesta trilha. Navegadores também executam WebAssembly. Você já sabe programar: variáveis, condicionais, loops e funções existem aqui também, com outra sintaxe. A novidade é o **{{DOM|DOM}}** (a página como árvore de objetos) e a programação **orientada a eventos** e **assíncrona**.')],
     explicacao: [
       { type: 'table', head: ['Python', 'JavaScript'], rows: [
         ['x = 10', 'let x = 10;  const PI = 3.14;'],

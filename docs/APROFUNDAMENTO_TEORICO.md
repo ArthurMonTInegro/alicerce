@@ -2,6 +2,8 @@
 
 Data editorial: 10/10/2026, America/Fortaleza. Base: v5, commit 295823d286fecbc656fec930af62e15846632c71.
 
+> Registro histórico da v6. A continuação com os 76 suplementos restantes está em [APROFUNDAMENTO_TEORICO_V7.md](APROFUNDAMENTO_TEORICO_V7.md).
+
 ## Objetivo e alcance
 
 Pedido de Arthur: pesquisar para tornar as trilhas mais explicativas e teóricas, mantendo o foco em autodidatas.

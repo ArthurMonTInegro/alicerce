@@ -314,7 +314,7 @@ const dicionarios = lesson({
     explicacao: [
       md(`
         **dict**: \`d[chave]\` lê (dá \`KeyError\` se não existir); \`d.get(chave, padrao)\` lê com valor padrão; \`d[chave] = valor\` cria/atualiza; \`for k, v in d.items():\` percorre.
-        Chaves precisam ser **imutáveis** (str, int, tuple).
+        Chaves precisam ser **hashable**: seu hash deve permanecer estável e chaves iguais devem ter hashes iguais. Strings e inteiros atendem a esse contrato; uma tupla só atende se todos os seus elementos também forem hashable.
 
         **set**: \`{1, 2, 3}\`; \`add\`, \`remove\`; operações de conjuntos: \`|\` união, \`&\` interseção, \`-\` diferença. Testar \`x in s\` é muito rápido.
 
@@ -423,7 +423,7 @@ const dicionarios = lesson({
   review: [
     ['Como ler uma chave de dict sem risco de KeyError?', 'd.get(chave, valor_padrao).'],
     ['Quando usar um set?', 'Para elementos únicos e testes de pertencimento rápidos.'],
-    ['O que pode ser chave de dict?', 'Valores imutáveis (hashable): str, int, float, tuple de imutáveis.'],
+    ['O que pode ser chave de dict?', 'Objetos hashable: str, int, float e tuplas cujos elementos sejam todos hashable. Imutabilidade sozinha não define o contrato.'],
   ],
   references: ['python-tutorial', 'python-docs'],
 });
