@@ -103,7 +103,7 @@ Toda mutação exige o cabeçalho `x-alicerce: 1` (defesa contra CSRF somada ao 
 
 `/` início · `/trilha` mapa dos 15 níveis · `/nivel/:id` · `/modulo/:id` · `/licao/:id?etapa=` as 8 etapas · `/revisao` cartões para hoje · `/diagnostico` · `/laboratorio` editor livre (com link compartilhável) · `/projetos` e `/projetos/:id` · `/carreira` · `/glossario` · `/visualizacoes?v=` · `/progresso` · `/conta` · `/metodologia` · `/referencias` · `/sobre` · `/privacidade` · `/planos` preço do premium, só informativo.
 
-Cada rota é pré-renderizada no build (191 páginas), com título, descrição, canonical e Open Graph próprios, e o React hidrata por cima. Sem JavaScript, o conteúdo das lições continua legível.
+Cada rota é pré-renderizada no build (211 páginas), com título, descrição, canonical e Open Graph próprios, e o React hidrata por cima. Sem JavaScript, o conteúdo das lições continua legível.
 
 ## Fluxo de um exercício de código
 
