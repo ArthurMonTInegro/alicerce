@@ -17,7 +17,7 @@ A plataforma foi desenhada para quem nunca programou e precisa chegar a um níve
 
 ## Tipos de exercício
 
-Múltipla escolha com explicação por alternativa, prever a saída, completar lacunas, escrever código com testes, problemas de Parsons (ordenar linhas), corrigir código com bug, SQL comparado com a consulta de referência, além dos simuladores de terminal. Hoje são 364 exercícios: 139 de código, 127 de múltipla escolha, 45 de previsão, 24 de correção, 15 de Parsons, 8 de lacunas e 6 de SQL.
+Múltipla escolha com explicação por alternativa, prever a saída, completar lacunas, escrever código com testes, problemas de Parsons (ordenar linhas), corrigir código com bug, SQL comparado com a consulta de referência, além dos simuladores de terminal. Hoje são 484 exercícios: 178 de código, 159 de múltipla escolha, 63 de previsão, 33 de correção, 18 de Parsons, 17 de lacunas e 16 de SQL.
 
 Cada exercício tem dificuldade (fácil, intermediário, avançado, desafio), dicas progressivas, explicação da solução e as habilidades que exercita. Revelar a solução é permitido, mas conta como evidência fraca de domínio.
 

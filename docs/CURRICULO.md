@@ -2,7 +2,7 @@
 
 <!-- gerado por scripts/gen-docs.ts a partir de packages/content; não edite à mão -->
 
-15 níveis, 59 módulos, 91 lições e 364 exercícios. A seta indica pré-requisitos.
+15 níveis, 59 módulos, 111 lições e 484 exercícios. A seta indica pré-requisitos.
 
 ## Nível 0: Introdução à Computação (Introduction to Computing)
 
@@ -141,12 +141,20 @@ Modelar, consultar e manter dados com consistência e desempenho.
 
 - **m7-1 Modelo relacional e SQL** (Relational model and SQL) ← m2-2
   - Modelo relacional e SQL
+  - Tabelas com regras: restrições, INSERT, UPDATE e DELETE
+  - SQL no Python: consultas parametrizadas, cursores e paginação
 - **m7-2 Relacionamentos e JOINs** (Relationships and JOINs) ← m7-1
   - Relacionamentos e JOINs
+  - NULL e a lógica de três valores
+  - Subconsultas: IN, EXISTS e tabelas derivadas
 - **m7-3 Normalização, índices e transações** (Normalization, indexes and transactions) ← m7-2
   - Normalização, índices e transações
+  - Transações concorrentes e níveis de isolamento
+  - Otimização de consultas: índices compostos e EXPLAIN
 - **m7-4 NoSQL e dados em escala** (NoSQL and data at scale) ← m7-3
   - NoSQL, replicação, particionamento e CAP
+  - Modelando para o acesso: documentos e chave-valor
+  - Replicação a fundo: atraso, quóruns e conflitos
 
 ## Nível 8: Sistemas Operacionais (Operating Systems)
 
@@ -154,10 +162,16 @@ Entender processos, threads, memória, arquivos e concorrência — o que aconte
 
 - **m8-1 Processos, threads e escalonamento** (Processes, threads and scheduling) ← m0-2, m2-5
   - Processos, threads e escalonamento
+  - Criando processos: fork, exec, wait e a árvore de processos
+  - Prioridades, MLFQ e o custo da troca de contexto
 - **m8-2 Memória e sistemas de arquivos** (Memory and file systems) ← m8-1
   - Memória virtual, pilha × heap e sistemas de arquivos
+  - Ponteiros e o heap em C: endereços, malloc, free e os bugs clássicos
+  - Sistemas de arquivos por dentro: inodes, diretórios, links e journaling
 - **m8-3 Concorrência e sincronização** (Concurrency and synchronization) ← m8-1
   - Concorrência, condições de corrida e sincronização
+  - Esperar sem desperdiçar: semáforos, variáveis de condição e o produtor-consumidor
+  - async/await, threads ou processos: escolhendo o modelo de concorrência
 
 ## Nível 9: Redes de Computadores (Computer Networks)
 
@@ -165,10 +179,16 @@ Explicar como os dados atravessam a internet, camada por camada, e programar com
 
 - **m9-1 Camadas, IP, TCP e UDP** (Layers, IP, TCP and UDP) ← m0-3
   - Camadas, IP, TCP e UDP
+  - IP por dentro: sub-redes, roteamento pelo prefixo mais longo e NAT
+  - TCP por dentro: sequência, retransmissão, janelas e congestionamento (e o que o QUIC muda)
 - **m9-2 DNS, HTTP(S) e TLS** (DNS, HTTP(S) and TLS) ← m9-1
   - DNS, HTTP(S) e TLS
+  - HTTP por dentro: as mensagens do 1.1, os quadros do HTTP/2 e o HTTP/3
+  - TLS 1.3 e certificados: o handshake, a cadeia de confiança e os erros de HTTPS
 - **m9-3 Sockets e arquitetura cliente-servidor** (Sockets and client-server architecture) ← m9-2, m2-5
   - Sockets, protocolos de aplicação e servidores concorrentes
+  - WebSockets: do HTTP a um canal bidirecional em tempo real
+  - Proxies reversos e balanceamento de carga: um endereço, muitos servidores
 
 ## Nível 10: Engenharia de Software (Software Engineering)
 

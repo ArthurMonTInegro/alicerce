@@ -393,8 +393,8 @@ const transacoes = lesson({
           prompt: 'Com `sqlite3`, escreva `transferir(con, origem, destino, valor)` que move o valor entre contas **atomicamente**: se a origem não tiver saldo suficiente (ou o valor for <= 0), lance `ValueError` e **nada** pode mudar no banco. A tabela é `contas(id, saldo)`.',
           difficulty: 'desafio',
           skills: ['bd-modelagem'],
-          hints: ['`with con:` abre uma transação: commit no fim, rollback se houver exceção dentro.', 'Leia o saldo da origem dentro da transação antes de debitar.'],
-          explanation: 'Fazer a verificação e as duas atualizações dentro do mesmo bloco transacional garante atomicidade: ou as duas atualizações acontecem, ou nenhuma.',
+          hints: ['`with con:` abre uma transação: commit no fim, rollback se houver exceção dentro.', 'Confira o saldo da origem dentro do bloco `with`, antes de debitar.'],
+          explanation: 'As duas atualizações dentro do mesmo `with con:` são atômicas: ou as duas acontecem, ou nenhuma. Um detalhe do módulo `sqlite3` (no modo padrão): ele só abre a transação (`BEGIN`) antes do primeiro INSERT, UPDATE, DELETE ou REPLACE, então o SELECT do saldo roda fora dela. Com uma conexão só, como aqui, isso não muda o resultado. Com vários acessos ao mesmo tempo, a leitura e o débito precisam ficar na mesma transação (ou o débito vira `UPDATE ... WHERE saldo >= ?`); a lição sobre transações concorrentes do módulo mostra como.',
           starter: dedent(`
             import sqlite3
 

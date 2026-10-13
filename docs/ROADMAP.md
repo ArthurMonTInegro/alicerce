@@ -17,9 +17,11 @@ Notas de 1 a 5 (impacto · esforço · risco · valor educacional · valor comer
 
 Feito no ciclo 2 (07/10/2026): 22 lições novas nos níveis 3 e 4 (todo módulo com 3 lições), métrica de aprendizado retido em 30 dias, exercícios "Para refazer" para quem viu a solução, páginas e textos carregados sob demanda.
 
+Feito no ciclo 3 (08 a 13/10/2026): identidade visual com verde militar e cimento queimado ([guia](IDENTIDADE-VISUAL.md)); 20 lições novas nos níveis 7, 8 e 9 (todo módulo com 3 lições), com 120 exercícios, cada módulo revisado por alguém que rodou soluções erradas contra os testes; análise dos planos e promoções da Alura, fora do repositório.
+
 Preço do premium decidido por Arthur em 07/10/2026: R$ 19,90 por mês ou R$ 149 por ano (`PLANS.premium.price` em `packages/engine/src/plans.ts`). A página `/planos` mostra o preço só para informar: o premium não está à venda até existir pelo menos um recurso pago pronto e um provedor de pagamento (`PREMIUM_FOR_SALE`). No mesmo dia Arthur decidiu o que fica gratuito para sempre: trilha, exercícios e revisão, laboratório e tutor com pistas (`FOREVER_FREE`). O tutor com IA e a sincronização, que têm custo por pessoa, ficaram de fora do compromisso.
 
-1. **Mais lições nos níveis 5 a 14** (1): 5 · 4 · 1 · 5 · 4. Mesmo processo do ciclo 2 (uma pessoa escreve, outra revisa tentando passar soluções erradas pelos testes), começando por banco de dados (7), sistemas operacionais (8) e redes (9), base de quem vai trabalhar com back-end.
+1. **Mais lições nos níveis 5, 6 e 10 a 14** (1): 5 · 4 · 1 · 5 · 4. Mesmo processo dos ciclos 2 e 3 (uma pessoa escreve, outra revisa tentando passar soluções erradas pelos testes). Próximos: orientação a objetos (5) e engenharia de software (10), que hoje têm 3 e 4 lições.
 2. **Revisão humana dos níveis 0 a 4** (13): 4 · 3 · 1 · 5 · 3. A revisão por máquina pega soluções erradas; texto e múltipla escolha ainda precisam de leitura humana.
 3. **Painel de métricas**: 3 · 2 · 1 · 3 · 3. Hoje as métricas saem por `node apps/api/scripts/metricas.ts`; um painel para quem administra a instância.
 4. **Editor e visualizações carregados só onde são usados** (2): 3 · 2 · 1 · 2 · 2.
