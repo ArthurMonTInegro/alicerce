@@ -150,7 +150,7 @@ const ponteiros = lesson({
         55779d66c000-55779d68d000 rw-p 00000000 00:00 0        [heap]
         7fe271c28000-7fe271db1000 r-xp 00028000 fe:00 211544   /usr/lib/x86_64-linux-gnu/libc.so.6
         7ffebe777000-7ffebe79a000 rw-p 00000000 00:00 0        [stack]
-      `, 'No Linux, /proc/<pid>/maps lista as regiões de um processo: faixa de endereços, permissões (r ler, w escrever, x executar, p privada), deslocamento no arquivo, dispositivo, inode e arquivo de origem. O código tem r-x, os dados têm rw-, e entre o [heap] (0x5577...) e a pilha (0x7ffe...) há um buraco de dezenas de terabytes. Rode duas vezes e os endereços mudam: é o ASLR.'),
+      `, 'No Linux, /proc/<pid>/maps lista as regiões de um processo: faixa de endereços, permissões (r ler, w escrever, x executar, p privada), deslocamento no arquivo, dispositivo, inode e arquivo de origem. O código tem r-x, os dados têm rw-, e entre o [heap] (0x5577...) e a libc (0x7fe2...), já perto da pilha (0x7ffe...), há um buraco de dezenas de terabytes. Rode duas vezes e os endereços mudam: é o ASLR.'),
       deep(`
         Se a tabela de páginas da lição anterior fosse um vetor simples, com uma entrada por página, um espaço de 2⁴⁸ bytes (256 TiB, o espaço virtual de um x86-64 com 4 níveis de tabela) em páginas de 4 KiB teria 2³⁶ entradas: com 8 bytes cada, 512 GiB **por processo**. A saída é uma tabela em **vários níveis**, como o índice de um livro com capítulos e seções. No x86-64, os 48 bits do endereço viram quatro índices de 9 bits (um por nível) e 12 bits de deslocamento. Cada tabela ocupa exatamente uma página (512 entradas de 8 bytes) e só existe se alguma página abaixo dela estiver mapeada.
 
@@ -247,7 +247,7 @@ const ponteiros = lesson({
         Alocadores reais combinam essas ideias com outras. A glibc separa os blocos livres em listas por faixa de tamanho, mantém um cache por thread (o *tcache*) que entrega primeiro o último bloco liberado de cada tamanho e atende pedidos grandes (a partir de 128 KiB por padrão, limite que ela ajusta durante a execução) com \`mmap\`, direto do SO. Alternativas conhecidas são o jemalloc, o tcmalloc e o mimalloc. O heap cresce pedindo memória ao SO (com \`brk\` ou \`mmap\`), e um \`free\` nem sempre devolve essa memória ao SO: é normal o uso de memória de um processo não cair logo depois de ele liberar muita coisa.
       `),
       deep(`
-        Um \`malloc\` de 1 GB costuma voltar na hora, mesmo numa máquina com pouca RAM livre. O SO só reservou **endereços**: as páginas físicas aparecem uma a uma, na primeira vez que cada página é tocada, por meio de faltas de página que o SO atende entregando um quadro zerado (a paginação sob demanda da lição anterior). Com a configuração padrão de *overcommit* do Linux, o SO pode prometer mais memória do que tem; se todo mundo resolver usar a promessa ao mesmo tempo, o *OOM killer* escolhe um processo e o encerra. Num servidor, "o malloc não devolveu NULL" não quer dizer "a memória existe".
+        Um \`malloc\` de 1 GB costuma voltar na hora, mesmo numa máquina com pouca RAM livre. O SO só reservou **endereços**: as páginas físicas aparecem uma a uma, na primeira vez que cada página é tocada, por meio de faltas de página que o SO atende entregando um quadro zerado (as faltas de página da lição anterior, agora usadas de propósito: é a *paginação sob demanda*). Com a configuração padrão de *overcommit* do Linux, o SO pode prometer mais memória do que tem; se todo mundo resolver usar a promessa ao mesmo tempo, o *OOM killer* escolhe um processo e o encerra. Num servidor, "o malloc não devolveu NULL" não quer dizer "a memória existe".
       `, 'O malloc que nunca falha'),
       md(`
         ### Os bugs clássicos
@@ -262,7 +262,7 @@ const ponteiros = lesson({
           ['vazamento (memory leak)', 'malloc sem free, ou o último ponteiro para o bloco sobrescrito', 'a memória do processo só cresce; num servidor que roda por semanas, acaba no OOM killer', 'Valgrind ("definitely lost"), LeakSanitizer'],
           ['double free', 'free(p); ... free(p);', 'corrompe as listas do alocador; a glibc costuma abortar com "free(): double free detected in tcache 2"', 'a própria glibc (nem sempre), ASan ("attempting double-free")'],
           ['use-after-free', 'free(p); e depois p->saldo = 0;', 'o bloco pode já ter sido entregue a outro malloc: você lê ou altera dados de outro objeto', 'ASan ("heap-use-after-free"), Valgrind ("Invalid read"), gcc -Wall em casos simples'],
-          ['estouro de buffer', 'char nome[8]; strcpy(nome, "Maria Aparecida");', 'escreve 16 bytes num espaço de 8 e sobrescreve os vizinhos', 'ASan ("stack-buffer-overflow"), proteção de pilha ("*** stack smashing detected ***")'],
+          ['estouro de buffer', 'char nome[8]; strcpy(nome, "Maria Aparecida");', 'escreve 16 bytes num espaço de 8 e sobrescreve os vizinhos', 'ASan ("stack-buffer-overflow"), proteção de pilha ("*** stack smashing detected ***"), o próprio gcc em casos simples ("writing 16 bytes into a region of size 8")'],
           ['ponteiro para local que morreu', 'int *f(void) { int x = 5; return &x; }', 'o frame de f foi descartado; a próxima chamada reaproveita aquele pedaço da pilha', 'gcc -Wall ("function returns address of local variable")'],
           ['leitura não inicializada', 'usar um bloco de malloc antes de escrever nele', 'lixo do uso anterior; resultados que mudam de uma execução para outra', 'Valgrind ("uninitialised value"), MemorySanitizer'],
         ],
@@ -486,7 +486,7 @@ const ponteiros = lesson({
             precos = ___;
           `),
           blanks: [
-            ['sizeof *precos', 'sizeof(*precos)', 'sizeof (*precos)', 'sizeof(double)', 'sizeof (double)'],
+            ['sizeof *precos', 'sizeof(*precos)', 'sizeof (*precos)'],
             ['=='],
             ['free'],
             ['NULL'],
@@ -1030,7 +1030,7 @@ const arquivos = lesson({
       md(`
         O disco não sabe o que é um arquivo. Para ele só existem {{blocos|blocks}} numerados, de tamanho fixo, normalmente 4 KiB. Nomes, pastas, permissões e tamanhos são uma estrutura de dados que o **sistema de arquivos** (ext4, XFS, Btrfs, NTFS, APFS) monta em cima desses blocos. Ela precisa ser rápida para arquivos de 1 KB e de 100 GB, e precisa sobreviver a uma queda de energia no meio de uma gravação.
 
-        A lição anterior resumiu tudo em uma frase: arquivo = inode + entrada de diretório, e o journaling protege contra quedas. Agora vamos abrir cada peça. Como um inode com espaço para 15 números de bloco localiza os milhões de blocos de um vídeo? Como \`/home/ana/notas.txt\` vira um número de inode? Por que apagar um log de 50 GB às vezes não libera espaço nenhum? E o que acontece no milissegundo em que a luz acaba enquanto o sistema da loja grava uma nota fiscal?
+        A primeira lição deste módulo resumiu tudo em uma frase: arquivo = inode + entrada de diretório, e o journaling protege contra quedas. Agora vamos abrir cada peça. Como um inode com espaço para 15 números de bloco localiza os milhões de blocos de um vídeo? Como \`/home/ana/notas.txt\` vira um número de inode? Por que apagar um log de 50 GB às vezes não libera espaço nenhum? E o que acontece no milissegundo em que a luz acaba enquanto o sistema da loja grava uma nota fiscal?
       `),
     ],
     explicacao: [
@@ -1201,7 +1201,7 @@ const arquivos = lesson({
     ],
     exemplo: [
       md(`
-        Um pedaço de um disco ext4, com cada diretório mostrado como a sua tabela nome → inode:
+        Um pedaço de um disco ext3 (ponteiros diretos e indiretos, como na explicação; num ext4 com extents, o inode guardaria um extent em vez dos ponteiros), com cada diretório mostrado como a sua tabela nome → inode:
       `),
       {
         type: 'table',
@@ -1217,7 +1217,7 @@ const arquivos = lesson({
       md(`
         **Resolvendo /home/ana/notas.txt.** Começa no inode 2; em 2, \`home\` → 12; em 12, \`ana\` → 1500; em 1500, \`notas.txt\` → 1679531. Três diretórios lidos e quatro inodes consultados; com o dcache aquecido, quase nada disso vai ao disco. O caminho relativo \`../ana/fotos\`, com diretório de trabalho \`/home/ana\` (1500): \`..\` → 12, \`ana\` → 1500, \`fotos\` → 1600.
 
-        **Contagens de link dos diretórios.** O 1500 tem 3: a entrada \`ana\` em 12, o próprio \`.\` e o \`..\` de \`fotos\`. O 12 também tem 3 (\`home\` na raiz, o seu \`.\` e o \`..\` de \`ana\`). A raiz tem 4: \`.\`, \`..\` e os \`..\` de \`home\` e de \`tmp\`.
+        **Contagens de links dos diretórios.** O 1500 tem 3: a entrada \`ana\` em 12, o próprio \`.\` e o \`..\` de \`fotos\`. O 12 também tem 3 (\`home\` na raiz, o seu \`.\` e o \`..\` de \`ana\`). A raiz tem 4: \`.\`, \`..\` e os \`..\` de \`home\` e de \`tmp\`.
 
         **Onde está o byte 5 000 000 de um arquivo grande?** Bloco lógico 5 000 000 // 4096 = 1220. Não é direto (1220 ≥ 12); descontando 12 sobram 1208, que não cabem no indireto simples (1208 ≥ 1024); descontando 1024 sobram 184: indireto duplo, entrada 184 // 1024 = 0 do primeiro nível e 184 % 1024 = 184 do segundo. Sem cache, são três leituras até o dado: o bloco do indireto duplo, o bloco de ponteiros que ele indica e, por fim, o bloco de dados.
 
@@ -1235,7 +1235,7 @@ const arquivos = lesson({
         ],
       },
       md(`
-        **Uma queda com o diário pela metade.** O ext4, montado com \`data=journal\`, estava acrescentando um bloco a \`notas.txt\` e criando \`relatorio.pdf\` quando a energia acabou. O diário ficou assim:
+        **Uma queda com o diário pela metade.** O ext3, montado com \`data=journal\`, estava acrescentando um bloco a \`notas.txt\` e criando \`relatorio.pdf\` quando a energia acabou. O diário ficou assim:
       `),
       code('text', `
         T41: início | inode 1679531 (tamanho 9 216, ponteiro direto 2 = bloco 88 215)
@@ -1331,7 +1331,7 @@ const arquivos = lesson({
             'Em qual estrutura fica o nome de um arquivo: no inode, nos blocos de dados ou em outro lugar?',
             'Se os 2 GB precisassem ser copiados, o comando seria instantâneo?',
           ],
-          explanation: 'O nome mora na **entrada de diretório**, não no inode. Renomear na mesma pasta (ou dentro do mesmo sistema de arquivos) é a chamada `rename`: troca o nome na entrada e pronto. O inode, o número dele e os blocos de dados continuam iguais, e o custo não depende do tamanho do arquivo. Já um `mv` para **outro** sistema de arquivos (um pendrive, outra partição) não pode só mexer em entradas, porque números de inode só valem dentro do seu sistema de arquivos: aí o mv copia os dados e apaga o original.',
+          explanation: 'O nome mora na **entrada de diretório**, não no inode. Renomear na mesma pasta (ou dentro do mesmo sistema de arquivos) é a chamada `rename`: troca o nome na entrada e pronto. O inode, o número dele e os blocos de dados continuam os mesmos (no inode, no máximo o `ctime` é atualizado), e o custo não depende do tamanho do arquivo. Já um `mv` para **outro** sistema de arquivos (um pendrive, outra partição) não pode só mexer em entradas, porque números de inode só valem dentro do seu sistema de arquivos: aí o mv copia os dados e apaga o original.',
           options: [
             { text: 'Só a entrada no diretório: o inode e os blocos de dados continuam os mesmos', correct: true, feedback: 'Isso. O nome está no diretório; o rename troca o nome da entrada, sem tocar nos 2 GB.' },
             { text: 'O campo de nome dentro do inode foi reescrito', feedback: 'O inode não tem campo de nome. É justamente por isso que um arquivo pode ter vários nomes (hard links).' },

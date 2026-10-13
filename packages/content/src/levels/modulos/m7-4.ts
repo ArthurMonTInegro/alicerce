@@ -647,6 +647,13 @@ const documentos = lesson({
                 t = r.ttl("cupom:9:1", 63)
                 assert t != -1, "a chave cupom:9:1 já existia sem prazo e continuou sem prazo depois da sua tentativa. Dar prazo só quando o incr devolve 1 não conserta esse caso"
                 assert 0 < t <= 60, f"o prazo deveria ser de até 60 segundos; veio {t}"
+
+                r = MiniRedis()
+                for s in range(6):
+                    r.incr("cupom:8:1", 60 + s)   # chave já acima do limite e sem prazo
+                assert permitir(r, 8, 70) is False, "esta é a 7ª tentativa da janela: passou do limite de 5"
+                t = r.ttl("cupom:8:1", 70)
+                assert t != -1, "a chave cupom:8:1 já estava acima do limite e sem prazo, e continuou sem prazo: o cliente 8 ficaria bloqueado para sempre. Garanta o prazo também nas tentativas recusadas"
               `),
             },
             {
@@ -668,6 +675,11 @@ const documentos = lesson({
                     permitir(r, 3, t)
                 assert r.chamadas["get"] == 0 and r.chamadas["set"] == 0, f"permitir usou get {r.chamadas['get']} vez(es) e set {r.chamadas['set']} vez(es): com dois servidores, ler e depois gravar perde tentativas. Use incr"
                 assert r.chamadas["incr"] == 8, f"cada tentativa deve fazer exatamente um incr, inclusive as recusadas; foram {r.chamadas['incr']} em 8 tentativas"
+                import types
+                for _nome, _f in list(globals().items()):
+                    if isinstance(_f, types.FunctionType) and not _nome.startswith("_"):
+                        _usa = {"dados", "prazo"} & set(_f.__code__.co_names)
+                        assert not _usa, f"a função {_nome} mexe direto em r.{sorted(_usa)[0]}: no Redis de verdade não há esse atalho, só comandos. Use incr e expire"
               `),
             },
           ],
@@ -772,6 +784,8 @@ const documentos = lesson({
                     ({"cliente.cidade": "Recife"}, ["P1", "P3"], "desça pelo subdocumento cliente até cidade"),
                     ({"cliente.uf": "PE"}, [], "campo ausente não gera candidato"),
                     ({"cliente.cidade.rua": "Aurora"}, [], "cidade é um texto: o caminho não continua dentro dele, e isso não pode levantar erro"),
+                    ({"cliente.nome.na": "x"}, [], "nome é o texto 'Ana', que contém 'na': mesmo assim o caminho não continua dentro de um texto"),
+                    ({"total.valor": 39}, [], "total é um número: o caminho não continua dentro dele, e isso não pode levantar erro"),
                     ({"cliente": "Ana"}, [], "cliente é um dict, que não é igual ao texto Ana"),
                 ])
               `),

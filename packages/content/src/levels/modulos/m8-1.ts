@@ -179,7 +179,7 @@ const criacao = lesson({
           ['PID', 'o mesmo de antes', 'um número novo'],
           ['PPID', 'o mesmo de antes', 'o PID do pai'],
           ['memória', 'a original', 'uma cópia: mudar uma variável num processo não muda no outro'],
-          ['descritores abertos', 'os mesmos', 'cópias que apontam para os mesmos arquivos abertos, inclusive com a mesma posição de leitura e escrita'],
+          ['descritores abertos', 'os mesmos', 'cópias que apontam para os mesmos arquivos abertos e compartilham com o pai a posição de leitura e escrita: se um lê 10 bytes, o outro continua do byte 10'],
         ],
       },
       md(`
@@ -195,8 +195,8 @@ const criacao = lesson({
         A chamada de sistema é \`execve(caminho, argumentos, ambiente)\`; \`execvp\`, \`execl\` e companhia são variações da biblioteca que procuram o programa no PATH ou recebem os argumentos de outro jeito. O kernel descarta o código, os dados, o heap e a pilha do programa atual, carrega o executável do disco e começa a rodá-lo do início.
 
         - **Muda**: o programa inteiro, isto é, o código e a memória.
-        - **Fica**: PID, PPID, diretório atual, usuário e os descritores abertos, exceto os marcados para fechar no exec (*close-on-exec*). No Python, os arquivos que você abre já vêm marcados assim (PEP 446); os descritores 0, 1 e 2, não.
-        - Se o exec dá certo, ele **não retorna**: o código que o chamou não existe mais. Se retornou, falhou (programa inexistente, sem permissão de execução). O shell então mostra *command not found* e o filho termina com código 127.
+        - **Fica**: PID, PPID, diretório atual, usuário (salvo nos programas *setuid*, como o \`sudo\`, que rodam com o usuário dono do arquivo) e os descritores abertos, exceto os marcados para fechar no exec (*close-on-exec*). No Python, os arquivos que você abre já vêm marcados assim (PEP 446); os descritores 0, 1 e 2, não.
+        - Se o exec dá certo, ele **não retorna**: o código que o chamou não existe mais. Se retornou, falhou. Quando o programa não existe, o bash mostra *command not found* e o filho termina com código 127; quando existe, mas não tem permissão de execução, mostra *Permission denied* e o código é 126.
 
         ### wait: recolher o filho
         \`waitpid(pid, &status, 0)\` bloqueia o pai até o filho \`pid\` terminar; \`wait(&status)\` espera qualquer filho. As duas devolvem o PID de quem terminou e preenchem \`status\`, que codifica como ele terminou. Em C você lê com macros (\`WIFEXITED\`, \`WEXITSTATUS\`); no Python, com \`os.waitstatus_to_exitcode(status)\`. Se o pai não tem nenhum filho, a chamada falha na hora com o erro \`ECHILD\`.
@@ -210,6 +210,7 @@ const criacao = lesson({
           ['`exit(0)`, ou `return 0` no `main`', '0'],
           ['`exit(3)`', '3'],
           ['comando não encontrado (o exec falhou)', '127'],
+          ['arquivo sem permissão de execução (o exec falhou)', '126'],
           ['Ctrl+C (sinal SIGINT, número 2)', '130'],
           ['`kill -9` (sinal SIGKILL, número 9)', '137'],
           ['falha de segmentação (sinal SIGSEGV, número 11)', '139'],
@@ -563,7 +564,7 @@ const criacao = lesson({
           prompt: dedent(`
             Este mini-shell simula o fork com \`copy.deepcopy\`: cada comando roda numa **cópia** do estado do shell (diretório atual e variáveis de ambiente), como um processo filho. \`NOME=valor comando\` define uma variável só para aquele comando, como no bash.
 
-            O problema: \`cd /tmp\` seguido de \`pwd\` continua mostrando o diretório antigo, e \`export\` não tem efeito. Corrija \`rodar\` para que \`cd\` e \`export\` funcionem como no bash, sem estragar o resto: os outros comandos continuam rodando numa cópia, e \`LANG=C printenv LANG\` não pode mudar o \`LANG\` do shell.
+            O problema: \`cd /tmp\` seguido de \`pwd\` continua mostrando o diretório antigo, e \`export\` não tem efeito. Corrija \`rodar\` para que \`cd\` e \`export\` funcionem como no bash, sem estragar o resto: os outros comandos continuam rodando numa cópia, e \`LANG=C printenv LANG\` não pode mudar o \`LANG\` do shell. Vale o mesmo para um comando interno: \`LANG=C cd /tmp\` muda o diretório do shell, mas não o \`LANG\` dele.
           `),
           difficulty: 'intermediario',
           skills: ['so-processos'],
@@ -608,20 +609,22 @@ const criacao = lesson({
                 """Executa uma linha no mini-shell e devolve a saída (str).
                 shell = {"cwd": diretório atual, "env": dict de variáveis de ambiente}"""
                 palavras = linha.split()
+                # NOME=valor antes do comando vale só para aquele comando
+                temporarias = []
+                while "=" in palavras[0]:
+                    temporarias.append(palavras.pop(0).split("=", 1))
+                comando, args = palavras[0], palavras[1:]
                 # comandos internos: mudam o estado do próprio shell, então rodam sem fork
-                if palavras[0] == "cd":
-                    shell["cwd"] = palavras[1]
+                if comando == "cd":
+                    shell["cwd"] = args[0]
                     return ""
-                if palavras[0] == "export":
-                    nome, valor = palavras[1].split("=", 1)
+                if comando == "export":
+                    nome, valor = args[0].split("=", 1)
                     shell["env"][nome] = valor
                     return ""
                 filho = copy.deepcopy(shell)          # fork(): o filho começa como uma cópia do shell
-                # NOME=valor antes do comando vale só para aquele comando
-                while "=" in palavras[0]:
-                    nome, valor = palavras.pop(0).split("=", 1)
+                for nome, valor in temporarias:
                     filho["env"][nome] = valor
-                comando, args = palavras[0], palavras[1:]
                 # daqui para baixo, é o programa que o filho roda depois do exec
                 if comando == "pwd":
                     return filho["cwd"]
@@ -667,6 +670,17 @@ const criacao = lesson({
                 rodar(sh, "pwd")
                 rodar(sh, "ls -l")
                 assert sh == _novo(), "pwd e programas externos não podem alterar o estado do shell"
+              `),
+            },
+            {
+              name: 'NOME=valor antes de um comando interno também é temporário',
+              code: dedent(`
+                sh = {"cwd": "/home/ana", "env": {"LANG": "pt_BR.UTF-8", "HOME": "/home/ana"}}
+                assert rodar(sh, "LANG=C cd /tmp") == "", "cd não imprime nada, mesmo com NOME=valor na frente"
+                r = rodar(sh, "pwd")
+                assert r == "/tmp", f"'LANG=C cd /tmp' ainda é um cd: o diretório do shell deveria virar /tmp, mas pwd mostrou {r!r}"
+                r = rodar(sh, "printenv LANG")
+                assert r == "pt_BR.UTF-8", f"no bash, 'LANG=C cd /tmp' muda o diretório, mas o LANG=C vale só durante o cd: depois dele, LANG continua pt_BR.UTF-8, e veio {r!r}. O shell não pode copiar para si tudo o que o filho mudou"
               `),
             },
             {
@@ -788,6 +802,7 @@ const criacao = lesson({
                 _confere_kernel([("fork", 1), ("fork", 2), ("exit", 2, 0), ("exit", 3, 5)], "o 3 foi adotado pelo init, então o init o recolhe quando ele termina")
                 _confere_kernel([("fork", 1), ("fork", 2), ("fork", 2), ("exit", 4, 9), ("exit", 2, 1)], "o zumbi 4 é adotado e recolhido pelo init antes de o próprio 2 ser recolhido")
                 _confere_kernel([("fork", 1), ("fork", 2), ("fork", 3), ("wait", 3), ("exit", 2, 0)], "o 3 está bloqueado esperando o 4; ao ser adotado pelo init, continua bloqueado")
+                _confere_kernel([("fork", 1), ("fork", 2), ("fork", 2), ("fork", 2), ("exit", 5, 5), ("exit", 3, 3), ("exit", 2, 2)], "o 2 termina com dois filhos zumbis (3 e 5) e um vivo (4): o init recolhe o 3, depois o 5 (ordem crescente de PID), e por último o próprio 2; o 4 fica órfão, com PPID 1")
               `),
             },
             {
@@ -961,7 +976,7 @@ const prioridades = lesson({
   stages: {
     conceito: [
       md(`
-        FCFS, SJF e Round Robin, da lição anterior, ou supõem que todo processo é igual, ou supõem que o sistema sabe quanto cada um vai durar. No seu computador, nenhuma das duas coisas é verdade: enquanto um \`npm install\` ou o treino de um modelo consome CPU por minutos, você digita num editor que precisa responder em milissegundos, e o sistema não sabe de antemão quem é quem.
+        FCFS, SJF e Round Robin, da primeira lição deste módulo, ou supõem que todo processo é igual, ou supõem que o sistema sabe quanto cada um vai durar. No seu computador, nenhuma das duas coisas é verdade: enquanto um \`npm install\` ou o treino de um modelo consome CPU por minutos, você digita num editor que precisa responder em milissegundos, e o sistema não sabe de antemão quem é quem.
 
         A resposta dos sistemas reais é a **prioridade**: alguns processos passam na frente. Ela pode ser dada por alguém (o \`nice\` do Linux) ou aprendida pelo sistema, observando o comportamento: quem usa a fatia de CPU inteira parece um trabalho longo e desce; quem larga a CPU cedo para esperar o teclado parece interativo e fica no alto. Essa é a ideia da {{fila multinível com realimentação|multi-level feedback queue (MLFQ)}}.
 
@@ -971,7 +986,7 @@ const prioridades = lesson({
     explicacao: [
       md(`
         ### Duas réguas: retorno e resposta
-        Para comparar escalonadores, a lição anterior usou o tempo de espera. Duas outras medidas dizem mais sobre o que o usuário sente:
+        Para comparar escalonadores, a primeira lição deste módulo usou o tempo de espera. Duas outras medidas dizem mais sobre o que o usuário sente:
 
         - {{tempo de retorno|turnaround time}} = término − chegada. É o que importa num trabalho em lote: o relatório, a compilação, o backup.
         - {{tempo de resposta|response time}} = primeira execução − chegada. É o que importa num programa interativo: o clique precisa dar sinal de vida logo, mesmo que o trabalho todo demore.
@@ -998,7 +1013,7 @@ const prioridades = lesson({
         Qual número é "mais prioritário" depende do sistema. No Linux, um \`nice\` **menor** é mais prioritário (−20 é o mais favorecido), e muitos livros também tratam 0 como a prioridade mais alta. No Windows é o contrário: 31 é a mais alta. Antes de ler um número de prioridade, descubra a convenção. Nesta lição, **menor número = mais prioridade**.
       `, 'Número maior, prioridade maior?'),
       md(`
-        O risco é a {{inanição|starvation}}: com um fluxo constante de processos mais prioritários, um processo de baixa prioridade pode nunca rodar. Uma história famosa dos livros de sistemas operacionais conta que, quando desligaram o IBM 7094 do MIT em 1973, encontraram um processo de baixa prioridade enviado em 1967 que ainda não tinha rodado.
+        O risco é a {{inanição|starvation}}: com um fluxo constante de processos mais prioritários, um processo de baixa prioridade pode nunca rodar. Um boato famoso, registrado no livro de sistemas operacionais de Silberschatz, conta que, quando desligaram o IBM 7094 do MIT em 1973, encontraram um processo de baixa prioridade enviado em 1967 que ainda não tinha rodado.
 
         O remédio clássico é o {{envelhecimento|aging}}: quanto mais tempo um processo espera, mais a prioridade dele sobe, até ele passar na frente de todo mundo. Uma regra simples: prioridade efetiva = prioridade − (tempo esperando) // k. Com k = 10, um processo de prioridade 20 que espera há 100 unidades fica tão urgente quanto um de prioridade 10 que acabou de chegar.
 
@@ -1591,7 +1606,7 @@ const prioridades = lesson({
     ['Qual é a diferença entre troca de contexto voluntária e involuntária?', 'Voluntária: o processo bloqueou (E/S, sleep, wait). Involuntária: o kernel tirou a CPU dele, no fim do quantum ou porque ficou pronto alguém mais prioritário.'],
     ['Que fração da CPU se perde com quantum q e troca de custo s?', 's / (q + s), supondo que cada processo use o quantum inteiro.'],
     ['Por que trocar entre threads do mesmo processo é mais barato que entre processos?', 'O espaço de endereçamento é o mesmo: não há tabela de páginas para trocar, e as traduções da TLB continuam valendo.'],
-    ['No Linux, nice −20 ou nice 19: qual tem mais prioridade?', 'nice −20. Quanto menor o nice, maior a prioridade; o padrão é 0.'],
+    ['No Linux, qual é a faixa do valor nice, qual é o padrão e que ponta dá mais prioridade?', 'De −20 a 19, com padrão 0. Quanto menor o nice, maior a prioridade: −20 é o mais favorecido.'],
   ],
   references: ['ostep', 'tanenbaum-so', 'linux-man'],
 });

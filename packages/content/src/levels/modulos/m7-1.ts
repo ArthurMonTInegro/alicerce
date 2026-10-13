@@ -16,7 +16,8 @@ const SETUP_MERCADINHO = dedent(`
     (5, 'Arroz 5 kg', 'mercearia', 2899),
     (6, 'Sal 1 kg', 'mercearia', 349),
     (7, 'Limão taiti (kg)', 'hortifruti', 500),
-    (8, 'Cebola (kg)', 'hortifruti', 479);
+    (8, 'Cebola (kg)', 'hortifruti', 479),
+    (9, 'Batata inglesa (kg)', 'hortifruti', 600);
 `);
 
 /** Ferramentas dos testes do esquema da operadora: banco novo a cada teste, com chaves estrangeiras ligadas. */
@@ -153,7 +154,7 @@ const restricoes = lesson({
           qtd       INTEGER NOT NULL CHECK (qtd > 0),
           PRIMARY KEY (pedido_id, sku)                -- chave composta
         );
-      `, 'O esquema da loja usado no resto da lição.'),
+      `, 'O esquema da loja usado no resto da lição. Os exemplos de UPDATE mais abaixo usam também uma tabela produtos (sku, nome, categoria, preco_centavos, ativo).'),
       {
         type: 'table',
         head: ['Restrição', 'O que o banco recusa', 'Cuidado'],
@@ -243,7 +244,7 @@ const restricoes = lesson({
       `),
       md(`
         - **INSERT com lista de colunas.** \`INSERT INTO clientes VALUES (...)\`, sem a lista, depende da ordem das colunas no CREATE TABLE e quebra no dia em que alguém acrescentar uma coluna. \`INSERT INTO destino (...) SELECT ...\` copia o resultado de uma consulta para outra tabela.
-        - **O SET vê a linha antiga.** Todas as expressões do SET usam os valores de antes da mudança: \`SET a = b, b = a\` troca os dois valores no SQLite e no PostgreSQL. (O MySQL avalia as atribuições da esquerda para a direita, e lá isso não troca nada.)
+        - **O SET vê a linha antiga.** Todas as expressões do SET usam os valores de antes da mudança: \`SET a = b, b = a\` troca os dois valores no SQLite e no PostgreSQL. (O MySQL avalia as atribuições da esquerda para a direita, e lá as duas colunas terminam com o valor antigo de \`b\`.)
         - **Um comando é tudo ou nada.** Se um UPDATE que mexe em 1 000 linhas violar uma restrição na 900ª, as 899 anteriores são desfeitas e o comando inteiro falha. No SQLite, esse é o comportamento padrão diante de uma violação (ABORT). Juntar **vários** comandos num bloco tudo ou nada é assunto do módulo de transações.
 
         ### O ritual: conferir, mudar, conferir
@@ -264,7 +265,7 @@ const restricoes = lesson({
       `),
       md(`
         ### UPSERT: inserir ou atualizar
-        Importações vivem de "se o produto é novo, insere; se já existe, atualiza o preço". Fazer isso com um SELECT seguido de INSERT ou UPDATE reabre a corrida do começo da lição. O {{UPSERT|upsert}} faz tudo num comando:
+        Importações vivem de "se o produto é novo, insere; se já existe, atualiza o preço". Fazer isso com um SELECT seguido de INSERT ou UPDATE reabre a corrida do começo da lição. O UPSERT ({{inserir ou atualizar|upsert}}) faz tudo num comando:
       `),
       code('sql', `
         INSERT INTO produtos (sku, nome, preco_centavos) VALUES ('CAFE500', 'Café 500 g', 1990)
@@ -552,7 +553,7 @@ const restricoes = lesson({
             'R$ 6,00 em centavos é quanto? "Menos de" inclui o próprio valor?',
             'O preço novo é uma expressão calculada no SELECT, com um apelido (AS). Que função arredonda?',
           ],
-          explanation: "SELECT id, nome, preco_centavos, ROUND(preco_centavos * 1.10) AS novo FROM produtos WHERE categoria = 'hortifruti' AND preco_centavos < 600 ORDER BY id; — a conferência usa exatamente o WHERE do UPDATE e mostra o antes e o depois de cada linha. Sem ROUND, 299 × 1,10 daria 328.90000000000003; sem o filtro de categoria, o sal (349) entraria por engano; com <= 600, nada muda aqui, mas um produto de exatamente R$ 6,00 entraria sem dever.",
+          explanation: "SELECT id, nome, preco_centavos, ROUND(preco_centavos * 1.10) AS novo FROM produtos WHERE categoria = 'hortifruti' AND preco_centavos < 600 ORDER BY id; — a conferência usa exatamente o WHERE do UPDATE e mostra o antes e o depois de cada linha. Sem ROUND, 299 × 1,10 daria 328.90000000000003; sem o filtro de categoria, o sal (349) entraria por engano; com <= 600, a batata, que custa exatamente R$ 6,00, entraria sem dever.",
           setup: SETUP_MERCADINHO,
           starter: "SELECT id, nome, preco_centavos FROM produtos WHERE categoria = 'hortifruti';",
           solution: "SELECT id, nome, preco_centavos, ROUND(preco_centavos * 1.10) AS novo FROM produtos WHERE categoria = 'hortifruti' AND preco_centavos < 600 ORDER BY id;",
@@ -684,6 +685,7 @@ const restricoes = lesson({
                 _recusa(con, _ASSINANTE, ("01234567890", "Ana", "01310-100", pid), "um CEP com hífen (9 caracteres)")
                 _recusa(con, _ASSINANTE, ("01234567890", "Ana", "0131010", pid), "um CEP com 7 caracteres")
                 _recusa(con, _ASSINANTE_ATIVO, ("01234567890", "Ana", "01310100", pid, 2), "ativo = 2")
+                _recusa(con, _ASSINANTE_ATIVO, ("01234567890", "Ana", "01310100", pid, -1), "ativo = -1", "Só 0 e 1 valem: confira os dois lados da faixa.")
               `),
             },
             {
@@ -695,6 +697,10 @@ const restricoes = lesson({
                 _recusa(con, _ASSINANTE, ("01234567890", "Ana", "01310100", 999), "um assinante do plano 999, que não existe")
                 _aceita(con, _ASSINANTE, ("01234567890", "Ana", "01310100", p1), "um assinante válido")
                 _recusa(con, "DELETE FROM planos WHERE id = ?", (p1,), "apagar um plano que ainda tem assinantes", "Qual ação de ON DELETE recusa apagar a mãe que tem filhas? (CASCADE apagaria os assinantes junto.)")
+                try:
+                    con.execute("DELETE FROM planos WHERE id = ?", (p1,))
+                except sqlite3.IntegrityError as e:
+                    assert "FOREIGN KEY" in str(e), f"apagar o plano foi recusado, mas pela regra errada ({e}): quem deve recusar é a chave estrangeira. Com SET NULL, o banco tenta pôr NULL em plano_id e esbarra no NOT NULL; use a ação que recusa apagar a mãe"
                 n = con.execute("SELECT COUNT(*) FROM assinantes").fetchone()[0]
                 assert n == 1, f"depois da tentativa de apagar o plano, sobraram {n} assinantes; deveria continuar 1"
                 _aceita(con, "DELETE FROM planos WHERE id = ?", (p2,), "apagar um plano sem assinantes")
@@ -830,6 +836,18 @@ const restricoes = lesson({
                 r = sincronizar(con, [("CAFE500", "Café Tradicional 500 g", 1890)])
                 assert r == {"inseridos": 0, "atualizados": 1, "desativados": 0, "removidos": 0}, f"o nome mudou e o preço não: esperado 1 atualizado, veio {r}"
                 assert _estado(con) == [("CAFE500", "Café Tradicional 500 g", 1890, 1)], f"a tabela ficou {_estado(con)}"
+              `),
+            },
+            {
+              name: 'preço 0 é válido',
+              code: CATALOGO_AJUDA + '\n' + dedent(`
+                con = _banco_loja([("CAFE500", "Café 500 g", 1890, 1)])
+                try:
+                    r = sincronizar(con, [("CAFE500", "Café 500 g", 1890), ("BRINDE1", "Colher medidora (brinde)", 0)])
+                except ValueError as e:
+                    raise AssertionError(f"um item de preço 0 (brinde) foi recusado com ValueError({e}); só preço negativo é inválido")
+                assert r == {"inseridos": 1, "atualizados": 0, "desativados": 0, "removidos": 0}, f"esperado 1 inserido, veio {r}"
+                assert ("BRINDE1", "Colher medidora (brinde)", 0, 1) in _estado(con), f"a tabela ficou {_estado(con)}"
               `),
             },
             {
@@ -1024,9 +1042,7 @@ const CIDADES_AJUDA = ESPIAO + '\n' + dedent(`
       return con
 `);
 
-const ORDENS_AJUDA = dedent(`
-  import sqlite3
-
+const ORDENS_AJUDA = ESPIAO + '\n' + dedent(`
   def _banco():
       con = sqlite3.connect(":memory:")
       con.execute("CREATE TABLE produtos (id INTEGER PRIMARY KEY, nome TEXT NOT NULL, preco_centavos INTEGER NOT NULL)")
@@ -1063,6 +1079,8 @@ const BUSCA_AJUDA = ESPIAO + '\n' + dedent(`
       con = sqlite3.connect(":memory:")
       con.execute("CREATE TABLE produtos (id INTEGER PRIMARY KEY, nome TEXT NOT NULL, categoria TEXT NOT NULL, preco_centavos INTEGER NOT NULL)")
       con.executemany("INSERT INTO produtos (nome, categoria, preco_centavos) VALUES (?, ?, ?)", _PRODUTOS)
+      # como num banco de verdade, há um índice; com ele, empates no ORDER BY podem sair fora da ordem de id
+      con.execute("CREATE INDEX produtos_preco_nome ON produtos (preco_centavos, nome)")
       return con
 
   def _asc(s):
@@ -1125,7 +1143,7 @@ const parametrizadas = lesson({
     explicacao: [
       md(`
         ### Do Python ao banco e de volta
-        O módulo \`sqlite3\` da biblioteca padrão segue a especificação DB-API 2.0 (PEP 249), a mesma de praticamente todos os drivers de banco do Python: trocar de SQLite para PostgreSQL muda a conexão e o estilo do marcador, e quase nada mais. O roteiro é sempre este:
+        O módulo \`sqlite3\` da biblioteca padrão segue a especificação DB-API 2.0 (PEP 249), a mesma de praticamente todos os drivers de banco do Python: trocar de SQLite para PostgreSQL muda, no código Python, a conexão e o estilo do marcador, e quase nada mais (o SQL em si pode ter diferenças de dialeto). O roteiro é sempre este:
       `),
       code('python', `
         import sqlite3
@@ -1327,7 +1345,7 @@ const parametrizadas = lesson({
       md(`
         Isso dá um teste simples para qualquer código seu: imprima o \`sql\` e procure nele qualquer coisa que o usuário digitou. Se achar, há um buraco. Os exercícios desta lição fazem exatamente essa conferência, com uma conexão "espiã" que anota o texto de cada comando executado.
 
-        E se a mesma busca viesse com \`ordem=-preco&pagina=2\`? A ordem passa pela lista branca (\`ORDENS["-preco"]\` vira \`preco_centavos DESC, id\` no texto), e a página vira mais dois parâmetros no fim: \`LIMIT ? OFFSET ?\` com \`(por_pagina, por_pagina)\`. O mesmo \`where\` e a mesma lista de parâmetros, sem o LIMIT, servem para o \`SELECT COUNT(*)\` que calcula o total.
+        E se a mesma busca viesse com \`ordem=-preco&pagina=2\`? A ordem passa pela lista branca (\`ORDENS["-preco"]\` vira \`preco_centavos DESC, id\` no texto), e a página vira mais dois parâmetros no fim: \`LIMIT ? OFFSET ?\` com \`por_pagina\` e \`(2 - 1) * por_pagina\`, ou seja, pula exatamente uma página. O mesmo \`where\` e a mesma lista de parâmetros, sem o LIMIT, servem para o \`SELECT COUNT(*)\` que calcula o total.
       `),
     ],
     codigo: [
@@ -1484,7 +1502,8 @@ const parametrizadas = lesson({
             Escreva \`clientes_das_cidades(con, cidades)\`, que devolve a lista com o **nome** dos clientes cuja cidade está na lista \`cidades\`, em ordem alfabética. A tabela é \`clientes(id, nome, cidade)\`.
 
             - \`cidades\` pode ter de 0 a centenas de nomes, inclusive com apóstrofo (Santa Bárbara d'Oeste, Olho d'Água das Flores).
-            - Lista vazia devolve \`[]\`, sem erro.
+            - O filtro é feito no banco, com **uma** consulta que usa \`IN\`.
+            - Lista vazia devolve \`[]\` sem consultar o banco (o \`IN ()\` vazio não funciona em todo banco).
             - Nenhum valor de \`cidades\` pode aparecer dentro do texto do SQL: os testes conferem o texto de cada comando que você executa.
           `),
           difficulty: 'intermediario',
@@ -1537,9 +1556,10 @@ const parametrizadas = lesson({
             {
               name: 'lista vazia',
               code: CIDADES_AJUDA + '\n' + dedent(`
-                con = _banco()
-                r = clientes_das_cidades(con, [])
+                espiao = _Espiao(_banco())
+                r = clientes_das_cidades(espiao, [])
                 assert r == [], f"com a lista vazia, esperado [], veio {r!r}"
+                assert espiao.sqls == [], f"com a lista vazia, nenhuma consulta deveria ir ao banco, mas foi executado {espiao.sqls}. Trate a lista vazia antes: o IN () é recusado pelo PostgreSQL"
               `),
             },
             {
@@ -1561,6 +1581,10 @@ const parametrizadas = lesson({
                 r = clientes_das_cidades(espiao, cidades)
                 assert r == ["Eva", "Fábio", "Joana"], f"com {cidades}, veio {r!r}"
                 _sem_valores_no_sql(espiao, cidades)
+                assert len(espiao.sqls) == 1, f"esperada uma única consulta, mas foram executadas {len(espiao.sqls)}: {espiao.sqls}"
+                sql = espiao.sqls[0]
+                assert " in " in sql.lower().replace("(", " ("), f"a consulta deveria filtrar no banco com IN: {sql!r}"
+                assert sql.count("?") == len(cidades), f"com {len(cidades)} cidades, o IN precisa de {len(cidades)} marcadores, mas o SQL tem {sql.count('?')}: {sql!r}"
               `),
             },
             {
@@ -1589,6 +1613,7 @@ const parametrizadas = lesson({
             - \`"-preco"\`: do mais caro ao mais barato;
             - em empate de preço, por nome (de A a Z);
             - qualquer outro valor de \`ordem\` lança \`ValueError\`, sem executar nada no banco.
+            - a ordenação continua sendo feita pelo banco, com ORDER BY.
 
             A tabela é \`produtos(id, nome, preco_centavos)\`, e a função devolve a lista de nomes.
           `),
@@ -1662,6 +1687,15 @@ const parametrizadas = lesson({
                 assert n == 6, "a tabela produtos perdeu linhas"
               `),
             },
+            {
+              name: 'quem ordena é o banco',
+              code: ORDENS_AJUDA + '\n' + dedent(`
+                for ordem in ["nome", "preco", "-preco"]:
+                    espiao = _Espiao(_banco())
+                    listar_produtos(espiao, ordem)
+                    assert any("order by" in sql.lower() for sql in espiao.sqls), f"com ordem={ordem!r}, nenhuma consulta usou ORDER BY: a ordenação deve ser feita pelo banco, com um trecho da lista branca, e não em Python"
+              `),
+            },
           ],
         },
       },
@@ -1676,7 +1710,7 @@ const parametrizadas = lesson({
           prompt: dedent(`
             Escreva a busca da vitrine de um mercado online: \`buscar_produtos(con, termo="", categorias=None, ordem="nome", pagina=1, por_pagina=10)\`, sobre a tabela \`produtos(id, nome, categoria, preco_centavos)\`. Ela devolve \`{"total": t, "itens": [(id, nome, preco_centavos), ...]}\`, em que \`total\` conta **todos** os produtos que satisfazem a busca, e \`itens\` traz só os da página pedida.
 
-            - \`termo\`: produtos cujo nome **contém** o termo, ignorando maiúsculas e minúsculas nas letras ASCII (o comportamento do LIKE do SQLite). \`%\` e \`_\` no termo são caracteres comuns: quem busca \`100%\` não quer "1000 ml". Termo vazio não filtra.
+            - \`termo\`: produtos cujo nome **contém** o termo, ignorando maiúsculas e minúsculas nas letras ASCII (o comportamento do LIKE do SQLite). \`%\`, \`_\` e \`\\\` no termo são caracteres comuns: quem busca \`100%\` não quer "1000 ml". Termo vazio não filtra.
             - \`categorias\`: \`None\` não filtra; uma lista restringe às categorias dela; a lista vazia não encontra nada (\`{"total": 0, "itens": []}\`).
             - \`ordem\`: \`"nome"\` (A a Z), \`"preco"\` (mais barato primeiro) ou \`"-preco"\` (mais caro primeiro); em qualquer empate, o menor \`id\` primeiro. Outro valor: \`ValueError\`.
             - \`pagina\` começa em 1, e \`por_pagina\` vai de 1 a 50; fora disso, \`ValueError\`. Uma página além da última devolve \`itens\` vazio, com o \`total\` certo.
@@ -1741,7 +1775,7 @@ const parametrizadas = lesson({
               `),
             },
             {
-              name: '% e _ no termo são caracteres comuns',
+              name: '%, _ e a barra no termo são caracteres comuns',
               code: BUSCA_AJUDA + '\n' + dedent(`
                 con = _banco()
                 r = buscar_produtos(con, "100%")
@@ -1750,6 +1784,10 @@ const parametrizadas = lesson({
                 assert r["total"] == 0, f"buscar 'c_ju' não deveria achar caju: o _ do termo é um caractere comum, não um curinga; veio {r}"
                 _confere(con, "%", None, "nome", 1, 10)
                 _confere(con, "_", None, "nome", 1, 10)
+                barra = chr(92)
+                for termo in [barra, "1" + barra + "0", "0" + barra]:
+                    r = buscar_produtos(con, termo)
+                    assert r["total"] == 0, f"nenhum nome contém {termo!r}, mas veio {r}: a barra do termo também é um caractere comum. Se ela é o seu caractere de escape, escape-a primeiro"
               `),
             },
             {
@@ -1782,6 +1820,9 @@ const parametrizadas = lesson({
                 con = _banco()
                 for ordem in ["nome", "preco", "-preco"]:
                     _confere(con, "", None, ordem, 1, 50)
+                r = buscar_produtos(con, "", None, "preco", 1, 50)["itens"]
+                empate = [x for x in r if x[2] == 899]
+                assert empate == sorted(empate), f"Suco de laranja (id 2) e Caju (id 11) custam o mesmo (899); em empate, o menor id vem primeiro, mas veio {empate}. Sem um desempate explícito no ORDER BY, a ordem dos empatados depende do plano de execução (aqui, de um índice)"
               `),
             },
             {

@@ -9,15 +9,19 @@ import { SETUP_ESCOLA } from '../../sql-setup.ts';
 
 /** Escola com valores ausentes: aluno sem curso, disciplina sem matrícula e notas não lançadas. */
 const ESCOLA_NULL = SETUP_ESCOLA + '\n' + dedent(`
-  INSERT INTO alunos VALUES (6, 'Fábio', NULL, 2);
+  INSERT INTO alunos VALUES (6, 'Abel', NULL, 2);
   INSERT INTO disciplinas VALUES (5, 'Sistemas Operacionais', 4);
   INSERT INTO matriculas VALUES (2, 3, NULL), (6, 1, NULL), (6, 2, 7.0);
 `);
 
-/** Escola com mensalidades pagas; o pagamento 5 é um Pix sem identificação do aluno. */
+/**
+ * Escola com mensalidades pagas; o pagamento 5 é um Pix sem identificação do aluno,
+ * e o 3 foi lançado sem a forma de pagamento (forma NULL num par de verdade: um
+ * anti-join que testa p.forma IS NULL erra).
+ */
 const ESCOLA_PAGAMENTOS = SETUP_ESCOLA + '\n' + dedent(`
   CREATE TABLE pagamentos (id INTEGER PRIMARY KEY, aluno_id INTEGER REFERENCES alunos(id), valor REAL NOT NULL, forma TEXT);
-  INSERT INTO pagamentos VALUES (1, 1, 450.0, 'pix'), (2, 1, 450.0, 'boleto'), (3, 2, 380.0, 'pix'), (4, 3, 450.0, 'pix'), (5, NULL, 380.0, 'pix'), (6, 5, 450.0, 'cartao');
+  INSERT INTO pagamentos VALUES (1, 1, 450.0, 'pix'), (2, 1, 450.0, 'boleto'), (3, 2, 380.0, NULL), (4, 3, 450.0, 'pix'), (5, NULL, 380.0, 'pix'), (6, 5, 450.0, 'cartao');
 `);
 
 /** Monta, nos testes, um banco da escola em memória a partir de listas Python. */
@@ -37,7 +41,7 @@ const BANCO_TESTE = dedent(`
       con.commit()
       return con
 
-  _ESCOLA_ALUNOS = [(1, "Ana"), (2, "Bia"), (3, "Caio"), (4, "Davi"), (5, "Eva"), (6, "Fábio")]
+  _ESCOLA_ALUNOS = [(1, "Ana"), (2, "Bia"), (3, "Caio"), (4, "Davi"), (5, "Eva"), (6, "Abel")]
   _ESCOLA_DISCIPLINAS = [(1, "Algoritmos"), (2, "Banco de Dados"), (3, "Redes"), (4, "Cálculo"), (5, "Sistemas Operacionais")]
   _ESCOLA_MATRICULAS = [(1, 1, 9.0), (1, 2, 8.5), (2, 2, 7.0), (3, 1, 6.0), (3, 3, 8.0), (4, 2, 5.5), (1, 4, 7.5)]
   _ESCOLA_PENDENTES = [(2, 3, None), (6, 1, None), (6, 2, 7.0)]
@@ -120,7 +124,7 @@ const nulos = lesson({
     t('desconhecido', 'UNKNOWN', 'O terceiro valor-verdade do SQL. WHERE, HAVING e ON descartam as linhas em que a condição dá UNKNOWN; no SQLite ele aparece como NULL.'),
     t('predicado', 'predicate', 'Expressão que resulta num valor-verdade, como nota >= 7 ou curso IS NULL.', 'Rows for which the WHERE predicate is not true are filtered out.'),
     t('comparação segura para nulos', 'null-safe comparison', 'Comparação que trata dois NULL como iguais e nunca dá UNKNOWN: IS [NOT] DISTINCT FROM no padrão SQL e no PostgreSQL, IS e IS NOT no SQLite, <=> no MySQL.', 'Use IS DISTINCT FROM for a null-safe comparison.'),
-    t('valor padrão', 'default value', 'Valor posto no lugar de NULL numa consulta, em geral com COALESCE, como em COALESCE(SUM(valor), 0).'),
+    t('valor padrão', 'default value', 'Valor posto no lugar de NULL numa consulta, em geral com COALESCE, como em COALESCE(SUM(valor), 0). Não confundir com a cláusula DEFAULT da coluna, que só age no INSERT.', 'COALESCE is often used to substitute a default value for null values when data is retrieved for display.'),
     t('tabela preservada', 'preserved table', 'Num LEFT JOIN, a tabela da esquerda: todas as linhas dela aparecem no resultado, com ou sem par.'),
     t('relacionamento opcional', 'optional relationship', 'Relacionamento em que a chave estrangeira pode ser NULL: a linha existe sem par do outro lado.', 'The foreign key is nullable, so the relationship is optional.'),
   ],
@@ -284,7 +288,7 @@ const nulos = lesson({
     ],
     exemplo: [
       md(`
-        Vamos usar o banco da escola com três novidades, que também aparecem nos exercícios: Fábio (id 6), ainda sem curso definido (curso NULL); a disciplina Sistemas Operacionais (id 5), sem ninguém matriculado; e três matrículas novas, duas com nota ainda não lançada (Bia em Redes e Fábio em Algoritmos). São 10 matrículas. Veja o que três condições fazem com cada uma:
+        Vamos usar o banco da escola com três novidades, que também aparecem nos exercícios: Abel (id 6), ainda sem curso definido (curso NULL); a disciplina Sistemas Operacionais (id 5), sem ninguém matriculado; e três matrículas novas, duas com nota ainda não lançada (Bia em Redes e Abel em Algoritmos). São 10 matrículas. Veja o que três condições fazem com cada uma:
       `),
       {
         type: 'table',
@@ -298,8 +302,8 @@ const nulos = lesson({
           ['Davi, Banco de Dados', '5.5', 'FALSE', 'TRUE', 'FALSE'],
           ['Ana, Cálculo', '7.5', 'TRUE', 'FALSE', 'TRUE'],
           ['Bia, Redes', 'NULL', 'UNKNOWN', 'UNKNOWN', 'TRUE (UNKNOWN OR TRUE)'],
-          ['Fábio, Algoritmos', 'NULL', 'UNKNOWN', 'UNKNOWN', 'TRUE (UNKNOWN OR TRUE)'],
-          ['Fábio, Banco de Dados', '7.0', 'TRUE', 'FALSE', 'TRUE'],
+          ['Abel, Algoritmos', 'NULL', 'UNKNOWN', 'UNKNOWN', 'TRUE (UNKNOWN OR TRUE)'],
+          ['Abel, Banco de Dados', '7.0', 'TRUE', 'FALSE', 'TRUE'],
         ],
         caption: 'WHERE nota >= 7 traz 6 linhas, e WHERE NOT (nota >= 7) traz 2: somadas, 8 das 10. As duas pendentes só aparecem quando você pergunta por elas.',
       },
@@ -324,12 +328,12 @@ const nulos = lesson({
         type: 'table',
         head: ['nome', 'filtro no WHERE', 'filtro no ON'],
         rows: [
+          ['Abel', '7.0', '7.0'],
           ['Ana', '8.5', '8.5'],
           ['Bia', '7.0', '7.0'],
           ['Caio', '(some)', 'NULL'],
           ['Davi', '5.5', '5.5'],
           ['Eva', '(some)', 'NULL'],
-          ['Fábio', '7.0', '7.0'],
         ],
         caption: 'Caio tem matrículas, mas em outras disciplinas: com o filtro no WHERE, as linhas dele dão FALSE. Eva não tem matrícula nenhuma: a linha de NULL dela dá UNKNOWN. Os dois somem.',
       },
@@ -345,7 +349,7 @@ const nulos = lesson({
         CREATE TABLE alunos (id INTEGER PRIMARY KEY, nome TEXT, curso TEXT);
         CREATE TABLE matriculas (aluno_id INTEGER, disciplina_id INTEGER, nota REAL);
         INSERT INTO alunos VALUES (1, 'Ana', 'CC'), (2, 'Bia', 'SI'), (3, 'Caio', 'CC'),
-                                  (4, 'Eva', 'CC'), (5, 'Fábio', NULL);
+                                  (4, 'Eva', 'CC'), (5, 'Abel', NULL);
         INSERT INTO matriculas VALUES (1, 2, 8.5), (2, 2, 7.0), (2, 3, NULL),
                                       (3, 1, 6.0), (5, 2, NULL);
         """)
@@ -373,7 +377,7 @@ const nulos = lesson({
             LEFT JOIN matriculas m ON m.aluno_id = a.id
             GROUP BY a.id, a.nome
             ORDER BY a.nome""")
-      `, { caption: 'Com o filtro no ON, Caio e Eva aparecem com None. Fábio aparece com None nas duas versões, mas por outro motivo: ele cursa BD e a nota ainda não foi lançada. Um None no resultado de um LEFT JOIN não diz, sozinho, se faltou o par ou se faltou o valor.' }),
+      `, { caption: 'Com o filtro no ON, Caio e Eva aparecem com None. Abel aparece com None nas duas versões, mas por outro motivo: ele cursa BD e a nota ainda não foi lançada. Um None no resultado de um LEFT JOIN não diz, sozinho, se faltou o par ou se faltou o valor.' }),
     ],
     exercicio: [
       {
@@ -402,15 +406,15 @@ const nulos = lesson({
         exercise: {
           id: 'e7-null-2',
           kind: 'sql',
-          prompt: "Neste banco, Fábio ainda não tem curso definido (curso NULL). Liste o **nome** de todos os alunos que **não** são do curso CC, inclusive quem não tem curso, em ordem alfabética.",
+          prompt: "Neste banco, Abel ainda não tem curso definido (curso NULL). Liste o **nome** de todos os alunos que **não** são do curso CC, inclusive quem não tem curso, em ordem alfabética.",
           difficulty: 'facil',
           skills: ['bd-joins', 'bd-sql'],
           hints: [
             'Rode a consulta inicial e olhe a coluna curso. Quem não tem curso?',
-            "Para Fábio, quanto vale `curso <> 'CC'`? O WHERE fica com essa linha?",
+            "Para Abel, quanto vale `curso <> 'CC'`? O WHERE fica com essa linha?",
             'Você pode pedir as linhas sem curso explicitamente, com um segundo predicado ligado por OR.',
           ],
-          explanation: "SELECT nome FROM alunos WHERE curso <> 'CC' OR curso IS NULL ORDER BY nome; Para Fábio, `curso <> 'CC'` dá UNKNOWN e `curso IS NULL` dá TRUE; UNKNOWN OR TRUE é TRUE, e ele fica. Só com `<>`, Fábio some sem aviso. No SQLite, `WHERE curso IS NOT 'CC'` faz o mesmo numa comparação só (no padrão SQL e no PostgreSQL, `curso IS DISTINCT FROM 'CC'`).",
+          explanation: "SELECT nome FROM alunos WHERE curso <> 'CC' OR curso IS NULL ORDER BY nome; Para Abel, `curso <> 'CC'` dá UNKNOWN e `curso IS NULL` dá TRUE; UNKNOWN OR TRUE é TRUE, e ele fica. Só com `<>`, Abel some sem aviso. No SQLite, `WHERE curso IS NOT 'CC'` faz o mesmo numa comparação só (no padrão SQL e no PostgreSQL, `curso IS DISTINCT FROM 'CC'`).",
           setup: ESCOLA_NULL,
           starter: 'SELECT nome, curso FROM alunos ORDER BY nome;',
           solution: "SELECT nome FROM alunos WHERE curso <> 'CC' OR curso IS NULL ORDER BY nome;",
@@ -811,7 +815,7 @@ const subconsultas = lesson({
     ],
     explicacao: [
       md(`
-        Nesta lição o banco da escola ganha a tabela \`pagamentos(id, aluno_id, valor, forma)\`, com as mensalidades pagas. Um dos pagamentos é um Pix que chegou **sem identificação** do aluno, com \`aluno_id\` NULL.
+        Nesta lição o banco da escola ganha a tabela \`pagamentos(id, aluno_id, valor, forma)\`, com as mensalidades pagas. Um dos pagamentos é um Pix que chegou **sem identificação** do aluno, com \`aluno_id\` NULL, e outro foi lançado pela secretaria sem a forma de pagamento (\`forma\` NULL).
 
         ### Onde uma subconsulta pode aparecer
       `),
@@ -1071,7 +1075,8 @@ const subconsultas = lesson({
             LEFT JOIN matriculas m ON m.aluno_id = a.id
             LEFT JOIN disciplinas d ON d.id = m.disciplina_id
             LEFT JOIN pagamentos p ON p.aluno_id = a.id
-            GROUP BY a.id, a.nome""")
+            GROUP BY a.id, a.nome
+            ORDER BY a.nome""")
         mostra("agregando antes:", """
             WITH cred AS (
                 SELECT m.aluno_id, SUM(d.creditos) AS creditos
@@ -1082,7 +1087,8 @@ const subconsultas = lesson({
             )
             SELECT a.nome, COALESCE(c.creditos, 0), COALESCE(p.pago, 0) FROM alunos a
             LEFT JOIN cred c ON c.aluno_id = a.id
-            LEFT JOIN pago p ON p.aluno_id = a.id""")
+            LEFT JOIN pago p ON p.aluno_id = a.id
+            ORDER BY a.nome""")
       `, { caption: 'Troque o NOT IN por NOT IN (SELECT aluno_id FROM pagamentos WHERE aluno_id IS NOT NULL) e veja Davi aparecer. Depois apague o pagamento 5 do INSERT e rode de novo: o NOT IN original volta a funcionar, o que mostra por que o bug passa nos testes.' }),
     ],
     exercicio: [
@@ -1160,7 +1166,7 @@ const subconsultas = lesson({
             'Para Davi, NOT IN vira uma série de <> ligados por AND. Quanto vale o pedaço `4 <> NULL`?',
             'Que forma de anti-join pergunta "existe algum pagamento deste aluno?" e não se abala com um NULL na tabela de dentro?',
           ],
-          explanation: 'SELECT a.nome FROM alunos a WHERE NOT EXISTS (SELECT 1 FROM pagamentos p WHERE p.aluno_id = a.id); O Pix sem identificação (aluno_id NULL) põe um NULL na lista do NOT IN, e aí `id NOT IN (...)` nunca dá TRUE: para Davi, termina em `4 <> NULL`, UNKNOWN. Com NOT EXISTS, a linha anônima só não forma par com ninguém. Também servem o LEFT JOIN com `WHERE p.id IS NULL` e o NOT IN com `WHERE aluno_id IS NOT NULL` dentro da subconsulta, mas este último depende de alguém lembrar do filtro em toda consulta.',
+          explanation: 'SELECT a.nome FROM alunos a WHERE NOT EXISTS (SELECT 1 FROM pagamentos p WHERE p.aluno_id = a.id); O Pix sem identificação (aluno_id NULL) põe um NULL na lista do NOT IN, e aí `id NOT IN (...)` nunca dá TRUE: para Davi, termina em `4 <> NULL`, UNKNOWN. Com NOT EXISTS, a linha anônima só não forma par com ninguém. Também servem o LEFT JOIN com `WHERE p.id IS NULL` (testando uma coluna que nunca é NULL num par: `p.forma IS NULL` traria também Bia, cujo pagamento está sem a forma registrada) e o NOT IN com `WHERE aluno_id IS NOT NULL` dentro da subconsulta, mas este último depende de alguém lembrar do filtro em toda consulta.',
           setup: ESCOLA_PAGAMENTOS,
           starter: 'SELECT nome FROM alunos\nWHERE id NOT IN (SELECT aluno_id FROM pagamentos);',
           solution: 'SELECT a.nome FROM alunos a WHERE NOT EXISTS (SELECT 1 FROM pagamentos p WHERE p.aluno_id = a.id);',
@@ -1172,7 +1178,7 @@ const subconsultas = lesson({
         exercise: {
           id: 'e7-subq-4',
           kind: 'sql',
-          prompt: 'Para **cada aluno**, mostre `nome`, `creditos` (soma dos créditos das disciplinas em que está matriculado) e `pago` (soma dos pagamentos dele), com 0 onde não houver nada, em ordem de nome. A consulta inicial junta tudo de uma vez: rode-a, confira os números de Ana e de Caio contra as tabelas e corrija.',
+          prompt: 'Para **cada aluno**, mostre `nome`, `creditos` (soma dos créditos das disciplinas em que está matriculado) e `pago` (soma dos pagamentos dele), com 0 onde não houver nada, do maior total pago para o menor; em empate, por nome. A consulta inicial junta tudo de uma vez: rode-a, confira os números de Ana e de Caio contra as tabelas e corrija.',
           difficulty: 'avancado',
           skills: ['bd-joins', 'bd-sql'],
           hints: [
@@ -1181,10 +1187,10 @@ const subconsultas = lesson({
             'Some os créditos por aluno numa subconsulta, some os pagamentos por aluno em outra (com WITH ou no FROM) e só então junte com alunos.',
             'Quem não tem matrícula ou pagamento fica com NULL depois do LEFT JOIN. Como trocar por 0?',
           ],
-          explanation: 'WITH cred AS (SELECT m.aluno_id, SUM(d.creditos) AS creditos FROM matriculas m JOIN disciplinas d ON d.id = m.disciplina_id GROUP BY m.aluno_id), pago AS (SELECT aluno_id, SUM(valor) AS pago FROM pagamentos GROUP BY aluno_id) SELECT a.nome, COALESCE(c.creditos, 0) AS creditos, COALESCE(p.pago, 0) AS pago FROM alunos a LEFT JOIN cred c ON c.aluno_id = a.id LEFT JOIN pago p ON p.aluno_id = a.id ORDER BY a.nome; Juntando as duas tabelas 1:N de uma vez, cada matrícula se combina com cada pagamento: Ana fica com 3 × 2 = 6 linhas (32 créditos e R$ 2.700), e Caio, com 2 matrículas e 1 pagamento, com 2 linhas (R$ 900 em vez de R$ 450). Agregando antes, cada lado tem no máximo uma linha por aluno, e nada se multiplica. Subconsultas escalares correlacionadas no SELECT também resolvem.',
+          explanation: 'WITH cred AS (SELECT m.aluno_id, SUM(d.creditos) AS creditos FROM matriculas m JOIN disciplinas d ON d.id = m.disciplina_id GROUP BY m.aluno_id), pago AS (SELECT aluno_id, SUM(valor) AS pago FROM pagamentos GROUP BY aluno_id) SELECT a.nome, COALESCE(c.creditos, 0) AS creditos, COALESCE(p.pago, 0) AS pago FROM alunos a LEFT JOIN cred c ON c.aluno_id = a.id LEFT JOIN pago p ON p.aluno_id = a.id ORDER BY pago DESC, a.nome; Juntando as duas tabelas 1:N de uma vez, cada matrícula se combina com cada pagamento: Ana fica com 3 × 2 = 6 linhas (32 créditos e R$ 2.700), e Caio, com 2 matrículas e 1 pagamento, com 2 linhas (R$ 900 em vez de R$ 450). Agregando antes, cada lado tem no máximo uma linha por aluno, e nada se multiplica. Subconsultas escalares correlacionadas no SELECT também resolvem.',
           setup: ESCOLA_PAGAMENTOS,
-          starter: 'SELECT a.nome, COALESCE(SUM(d.creditos), 0) AS creditos, COALESCE(SUM(p.valor), 0) AS pago\nFROM alunos a\nLEFT JOIN matriculas m ON m.aluno_id = a.id\nLEFT JOIN disciplinas d ON d.id = m.disciplina_id\nLEFT JOIN pagamentos p ON p.aluno_id = a.id\nGROUP BY a.id, a.nome\nORDER BY a.nome;',
-          solution: 'WITH cred AS (SELECT m.aluno_id, SUM(d.creditos) AS creditos FROM matriculas m JOIN disciplinas d ON d.id = m.disciplina_id GROUP BY m.aluno_id), pago AS (SELECT aluno_id, SUM(valor) AS pago FROM pagamentos GROUP BY aluno_id) SELECT a.nome, COALESCE(c.creditos, 0) AS creditos, COALESCE(p.pago, 0) AS pago FROM alunos a LEFT JOIN cred c ON c.aluno_id = a.id LEFT JOIN pago p ON p.aluno_id = a.id ORDER BY a.nome;',
+          starter: 'SELECT a.nome, COALESCE(SUM(d.creditos), 0) AS creditos, COALESCE(SUM(p.valor), 0) AS pago\nFROM alunos a\nLEFT JOIN matriculas m ON m.aluno_id = a.id\nLEFT JOIN disciplinas d ON d.id = m.disciplina_id\nLEFT JOIN pagamentos p ON p.aluno_id = a.id\nGROUP BY a.id, a.nome\nORDER BY pago DESC, a.nome;',
+          solution: 'WITH cred AS (SELECT m.aluno_id, SUM(d.creditos) AS creditos FROM matriculas m JOIN disciplinas d ON d.id = m.disciplina_id GROUP BY m.aluno_id), pago AS (SELECT aluno_id, SUM(valor) AS pago FROM pagamentos GROUP BY aluno_id) SELECT a.nome, COALESCE(c.creditos, 0) AS creditos, COALESCE(p.pago, 0) AS pago FROM alunos a LEFT JOIN cred c ON c.aluno_id = a.id LEFT JOIN pago p ON p.aluno_id = a.id ORDER BY pago DESC, a.nome;',
           ordered: true,
         },
       },

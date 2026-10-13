@@ -10,7 +10,7 @@ import { code, dedent, deep, english, lesson, md, py, t, tip, trace, warn } from
 const SETUP_VERSOES = dedent(`
   CREATE TABLE transacoes (id INTEGER PRIMARY KEY, status TEXT NOT NULL CHECK (status IN ('ativa', 'confirmada', 'abortada')), confirmada_em INTEGER);
   CREATE TABLE versoes (conta INTEGER NOT NULL, saldo INTEGER NOT NULL, criada_por INTEGER NOT NULL REFERENCES transacoes(id), apagada_por INTEGER REFERENCES transacoes(id));
-  INSERT INTO transacoes VALUES (1, 'confirmada', 10), (2, 'confirmada', 30), (3, 'abortada', NULL), (4, 'confirmada', 60), (5, 'ativa', NULL), (6, 'confirmada', 45), (7, 'confirmada', 55), (8, 'confirmada', 40);
+  INSERT INTO transacoes VALUES (1, 'confirmada', 10), (2, 'confirmada', 30), (3, 'abortada', NULL), (4, 'confirmada', 60), (5, 'ativa', NULL), (6, 'confirmada', 50), (7, 'confirmada', 55), (8, 'confirmada', 50);
   INSERT INTO versoes VALUES (1, 100, 1, 2), (1, 70, 2, NULL), (2, 200, 1, 3), (2, 999, 3, NULL), (3, 300, 1, 4), (3, 250, 4, NULL), (4, 400, 1, 5), (4, 0, 5, NULL), (5, 500, 6, NULL), (6, 600, 7, NULL), (7, 700, 1, 8);
 `);
 
@@ -19,31 +19,64 @@ const SETUP_PEDIDOS = dedent(`
   CREATE TABLE clientes (id INTEGER PRIMARY KEY, nome TEXT NOT NULL, cidade TEXT);
   CREATE TABLE pedidos (id INTEGER PRIMARY KEY, cliente_id INTEGER NOT NULL REFERENCES clientes(id), valor_centavos INTEGER NOT NULL, feito_em TEXT NOT NULL);
   INSERT INTO clientes VALUES (1, 'Padaria Pão Quente', 'Recife'), (2, 'Mercadinho Bom Preço', 'Salvador'), (3, 'Oficina do Zé', 'Belém'), (4, 'Livraria Saber', 'Curitiba'), (5, 'Farmácia Vida', 'Manaus');
-  INSERT INTO pedidos VALUES (1, 1, 15000, '2025-01-10'), (2, 1, 8000, '2025-02-03'), (3, 2, 23050, '2025-01-22'), (4, 3, 5000, '2024-12-30'), (5, 1, 12000, '2024-11-15'), (6, 4, 9990, '2025-03-01'), (7, 2, 1000, '2025-03-05'), (8, 4, 500, '2025-03-09');
+  INSERT INTO pedidos VALUES (1, 1, 15000, '2025-01-10'), (2, 1, 8000, '2025-02-03'), (3, 2, 23050, '2025-01-22'), (4, 3, 5000, '2024-12-30'), (5, 1, 12000, '2024-11-15'), (6, 4, 9990, '2025-03-01'), (7, 2, 1000, '2025-03-05'), (8, 4, 500, '2025-03-09'), (9, 2, 4500, '2025-01-01');
 `);
 
-/** Conexão de teste em que outro caixa eletrônico debita da conta 1 entre o 1º e o 2º comando do aluno. */
+/**
+ * Conexão de teste que imita outro caixa eletrônico: depois de uma leitura do aluno feita FORA de
+ * transação, antes do próximo comando de escrita dele (UPDATE, INSERT, DELETE, REPLACE ou BEGIN),
+ * o outro caixa debita da conta 1 com um UPDATE condicional e confirma. Leituras feitas dentro de
+ * uma transação já aberta (BEGIN IMMEDIATE, por exemplo) ficam protegidas: o outro caixa teria de esperar.
+ * Vale também para cursores criados com con.cursor().
+ */
 const CAIXA_VIZINHO = dedent(`
   import sqlite3 as _sqlite3
 
+  class _CursorVizinho:
+      def __init__(self, dono):
+          self._dono = dono
+          self._cur = dono._con.cursor()
+
+      def execute(self, sql, params=()):
+          self._dono._antes(sql)
+          self._cur.execute(sql, params)
+          return self
+
+      def __iter__(self):
+          return iter(self._cur)
+
+      def __getattr__(self, nome):
+          return getattr(self._cur, nome)
+
   class _CaixaVizinho:
+      _ESCRITAS = ("UPDATE", "INSERT", "DELETE", "REPLACE", "BEGIN")
+
       def __init__(self, saldo_inicial, debito_vizinho=30):
           self._con = _sqlite3.connect(":memory:")
           self._con.execute("CREATE TABLE contas (id INTEGER PRIMARY KEY, saldo INTEGER NOT NULL)")
           self._con.execute("INSERT INTO contas VALUES (1, ?)", (saldo_inicial,))
           self._con.commit()
-          self._comandos = 0
           self._vizinho = debito_vizinho
+          self._leu_fora = False
           self.vizinho_debitou = 0
 
-      def execute(self, sql, params=()):
-          if self._comandos == 1 and self._vizinho:
+      def _antes(self, sql):
+          palavra = (sql.split() or [""])[0].upper()
+          if palavra in self._ESCRITAS and self._leu_fora and self._vizinho and not self._con.in_transaction:
               cur = self._con.execute("UPDATE contas SET saldo = saldo - ? WHERE id = 1 AND saldo >= ?", (self._vizinho, self._vizinho))
+              self._con.commit()
               if cur.rowcount == 1:
                   self.vizinho_debitou = self._vizinho
               self._vizinho = 0
-          self._comandos += 1
+          if palavra in ("SELECT", "WITH") and not self._con.in_transaction:
+              self._leu_fora = True
+
+      def execute(self, sql, params=()):
+          self._antes(sql)
           return self._con.execute(sql, params)
+
+      def cursor(self):
+          return _CursorVizinho(self)
 
       def __enter__(self):
           self._con.__enter__()
@@ -54,6 +87,12 @@ const CAIXA_VIZINHO = dedent(`
 
       def __getattr__(self, nome):
           return getattr(self._con, nome)
+
+      def __setattr__(self, nome, valor):
+          if nome.startswith("_") or nome == "vizinho_debitou":
+              object.__setattr__(self, nome, valor)
+          else:
+              setattr(self._con, nome, valor)
 
       def saldo(self):
           return self._con.execute("SELECT saldo FROM contas WHERE id = 1").fetchone()[0]
@@ -420,7 +459,7 @@ const isolamento = lesson({
             - confirma a mudança (commit) antes de devolver;
             - o saldo nunca pode ficar negativo, e nenhum débito pode se perder.
 
-            A tabela é \`contas(id, saldo)\`. Os testes usam uma conexão especial: entre o seu 1º e o seu 2º comando, **outro caixa eletrônico debita R$ 30 da conta 1** (com um UPDATE condicional) e confirma.
+            A tabela é \`contas(id, saldo)\`. Os testes usam uma conexão especial: se você ler a conta fora de uma transação, **outro caixa eletrônico debita R$ 30 da conta 1** (com um UPDATE condicional) e confirma antes do seu próximo comando de escrita, como aconteceria num servidor com vários clientes.
           `),
           difficulty: 'intermediario',
           skills: ['bd-modelagem', 'bd-sql'],
@@ -430,7 +469,7 @@ const isolamento = lesson({
             'Depois de um UPDATE, como o Python diz quantas linhas ele mudou?',
             'Se quiser manter o SELECT, a gravação precisa falhar quando o saldo mudou desde a leitura. E o que você faz quando ela falha?',
           ],
-          explanation: 'O UPDATE condicional `UPDATE contas SET saldo = saldo - ? WHERE id = ? AND saldo >= ?` junta leitura, verificação e escrita num comando só, que o banco executa de forma atômica, e `cur.rowcount` diz se a linha mudou (1) ou não (0: saldo insuficiente ou conta inexistente). Não sobra intervalo entre ler e gravar para outro cliente entrar. A versão otimista (SELECT, depois UPDATE com `AND saldo = ?` igual ao valor lido, repetindo quando mudar 0 linhas) também passa, só que é mais longa. Conferir com SELECT e depois gravar `saldo = saldo - ?` não basta: a conferência fica velha, e o saldo pode ficar negativo.',
+          explanation: 'O UPDATE condicional `UPDATE contas SET saldo = saldo - ? WHERE id = ? AND saldo >= ?` junta leitura, verificação e escrita num comando só, que o banco executa de forma atômica, e `cur.rowcount` diz se a linha mudou (1) ou não (0: saldo insuficiente ou conta inexistente). Não sobra intervalo entre ler e gravar para outro cliente entrar. A versão otimista (SELECT, depois UPDATE com `AND saldo = ?` igual ao valor lido, repetindo quando mudar 0 linhas) também passa, só que é mais longa; abrir a transação antes de ler (`BEGIN IMMEDIATE`, como no aviso da explicação) também. Conferir com SELECT e depois gravar `saldo = saldo - ?` não basta: a conferência fica velha, e o saldo pode ficar negativo. E pôr o SELECT dentro de `with con:` não muda nada: no modo legado do `sqlite3`, ele roda fora da transação.',
           starter: dedent(`
             def debitar(con, conta_id, valor):
                 # condição de corrida: entre este SELECT e o UPDATE, outro cliente pode debitar
@@ -512,6 +551,11 @@ const isolamento = lesson({
                 except ValueError:
                     pass
                 assert con.saldo() == 100, f"depois do ValueError, o saldo deveria continuar 100, mas ficou {con.saldo()}"
+                try:
+                    debitar(con, 1, 0)
+                    assert False, "debitar(con, 1, 0) deveria lançar ValueError: um débito precisa ser maior que zero"
+                except ValueError:
+                    pass
               `),
             },
             {
@@ -581,7 +625,7 @@ const isolamento = lesson({
             'Escreva a condição "a versão continua viva" do lado de quem apagou e teste-a com a linha toda NULL: quanto vale uma comparação com NULL?',
             'Outra saída: NOT EXISTS de uma transação confirmada até 50 que apagou a versão.',
           ],
-          explanation: "SELECT v.conta, v.saldo FROM versoes v JOIN transacoes c ON c.id = v.criada_por LEFT JOIN transacoes a ON a.id = v.apagada_por WHERE c.status = 'confirmada' AND c.confirmada_em <= 50 AND (a.id IS NULL OR a.status <> 'confirmada' OR a.confirmada_em > 50) ORDER BY v.conta; A transação que criou entra com JOIN e precisa estar confirmada até 50: isso esconde as versões de transações ativas (não há leitura suja), abortadas e confirmadas depois do instantâneo. A que apagou entra com LEFT JOIN, porque a maioria das versões nunca foi apagada; a versão continua visível se `a.id IS NULL` ou se quem apagou não estava confirmado no instante 50. Sem o `a.id IS NULL`, as comparações com NULL dão UNKNOWN e as versões vivas somem. O resultado tem uma versão por conta, cada uma do jeito que estava no instante 50. O PostgreSQL de verdade guarda essas duas informações em colunas ocultas de cada linha, `xmin` e `xmax`, e decide a visibilidade pela lista de transações em andamento no instantâneo, em vez de um relógio.",
+          explanation: "SELECT v.conta, v.saldo FROM versoes v JOIN transacoes c ON c.id = v.criada_por LEFT JOIN transacoes a ON a.id = v.apagada_por WHERE c.status = 'confirmada' AND c.confirmada_em <= 50 AND (a.id IS NULL OR a.status <> 'confirmada' OR a.confirmada_em > 50) ORDER BY v.conta; A transação que criou entra com JOIN e precisa estar confirmada até 50: isso esconde as versões de transações ativas (não há leitura suja), abortadas e confirmadas depois do instantâneo. A que apagou entra com LEFT JOIN, porque a maioria das versões nunca foi apagada; a versão continua visível se `a.id IS NULL` ou se quem apagou não estava confirmado no instante 50. Sem o `a.id IS NULL`, as comparações com NULL dão UNKNOWN e as versões vivas somem. O resultado tem no máximo uma versão por conta, do jeito que estava no instante 50: a conta 6 ainda não existia e a 7 já tinha sido apagada. Repare nas pontas: quem confirmou exatamente no instante 50 já conta como confirmado. O PostgreSQL de verdade guarda essas duas informações em colunas ocultas de cada linha, `xmin` e `xmax`, e decide a visibilidade pela lista de transações em andamento no instantâneo, em vez de um relógio.",
           setup: SETUP_VERSOES,
           starter: 'SELECT conta, saldo FROM versoes ORDER BY conta;',
           solution: "SELECT v.conta, v.saldo FROM versoes v JOIN transacoes c ON c.id = v.criada_por LEFT JOIN transacoes a ON a.id = v.apagada_por WHERE c.status = 'confirmada' AND c.confirmada_em <= 50 AND (a.id IS NULL OR a.status <> 'confirmada' OR a.confirmada_em > 50) ORDER BY v.conta;",
@@ -792,6 +836,19 @@ const isolamento = lesson({
               `),
             },
             {
+              name: 'conflito mesmo quando o valor volta ao que era',
+              code: ESPERA_ERRO + '\n' + dedent(`
+                b = BancoMVCC({"a": 0})
+                t1 = b.begin()
+                for valor in (5, 0):
+                    t = b.begin()
+                    b.escrever(t, "a", valor)
+                    b.commit(t)
+                b.escrever(t1, "a", 9)
+                _espera_erro(ConflitoDeEscrita, b.commit, t1, msg="depois do início de t1, outras transações confirmaram duas versões de a (5 e depois 0). O valor voltou a ser 0, mas a chave ganhou versões novas: o commit de t1 deveria lançar ConflitoDeEscrita. Compare instantes, não valores")
+              `),
+            },
+            {
               name: 'sem conflito com quem confirmou antes do begin',
               code: ESPERA_ERRO + '\n' + dedent(`
                 b = BancoMVCC({"a": 0})
@@ -851,6 +908,7 @@ const isolamento = lesson({
                 assert b.ler(b.begin(), "a") == 1, "rollback descarta as escritas: a continua 1"
                 _espera_erro(ValueError, b.ler, t1, "a", msg="t1 já terminou (rollback): ler(t1, ...) deveria lançar ValueError")
                 _espera_erro(ValueError, b.commit, t1, msg="t1 já terminou (rollback): commit(t1) deveria lançar ValueError")
+                _espera_erro(ValueError, b.rollback, t1, msg="t1 já terminou: um segundo rollback(t1) deveria lançar ValueError")
                 t2 = b.begin()
                 b.commit(t2)
                 _espera_erro(ValueError, b.commit, t2, msg="confirmar duas vezes a mesma transação deveria lançar ValueError")
@@ -869,7 +927,7 @@ const isolamento = lesson({
     ],
     revisao: [
       md(`
-        - Escalonamento serializável: o efeito é igual ao de alguma execução em série. É o ideal, e não é o padrão dos bancos.
+        - Escalonamento serializável: o efeito é igual ao de alguma execução em série. É o ideal, mas não é o padrão do PostgreSQL nem do MySQL.
         - Anomalias: leitura suja (dado não confirmado), leitura não repetível (a mesma linha muda), fantasma (o conjunto de linhas muda), atualização perdida (uma escrita apaga a outra) e write skew (escritas em linhas diferentes quebram juntas uma regra).
         - PostgreSQL: READ COMMITTED por padrão (instantâneo por comando); REPEATABLE READ é isolamento de instantâneo; SERIALIZABLE (SSI) aborta transações com SQLSTATE 40001, e a aplicação repete. MySQL/InnoDB: REPEATABLE READ por padrão. SQLite: um escritor por vez.
         - MVCC: UPDATE cria versão nova; cada transação lê do seu instantâneo; ler não bloqueia escrever.
@@ -1109,10 +1167,11 @@ const otimizacao = lesson({
             print("---", rotulo)
             for sql, params in consultas:
                 plano = [linha[3] for linha in con.execute("EXPLAIN QUERY PLAN " + sql, params)]
+                con.execute(sql, params).fetchall()  # aquecimento: a primeira execução prepara o comando
                 t0 = time.perf_counter()
-                for _ in range(100):
+                for _ in range(20):
                     con.execute(sql, params).fetchall()
-                micros = (time.perf_counter() - t0) / 100 * 1_000_000
+                micros = (time.perf_counter() - t0) / 20 * 1_000_000
                 print(f"{micros:8.1f} µs  {' + '.join(plano)}")
 
         medir("sem índice")
