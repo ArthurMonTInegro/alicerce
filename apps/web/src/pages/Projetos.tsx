@@ -1,3 +1,4 @@
+import {ProjectEvidence} from '../components/ProjectEvidence.tsx';
 import { moduleById, projectById, projects, skillById } from '../content.ts';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
@@ -144,12 +145,13 @@ export function Projeto({ id }: { id: string }) {
           </section>
         </div>
       </div>
+      {['p1-calculadora','p2-todo'].includes(pr.id)&&<ProjectEvidence id={pr.id}/>}
       <h2>Inglês do projeto</h2>
       <TermList terms={pr.english} />
       <aside className="callout tip">
         <p className="callout-title">Como entregar</p>
         <p>
-          Crie um repositório público no GitHub para o projeto, com README (o que é, como rodar, como testar, decisões), commits pequenos e frequentes e, a partir do Projeto 2, testes automatizados. Veja o <Link to="/carreira">guia de carreira</Link> para transformar o projeto em vitrine.
+          Guarde o projeto em um repositório Git; publique no GitHub se desejar, com README (o que é, como rodar, como testar, decisões), commits pequenos e frequentes e, a partir do Projeto 2, testes automatizados. Veja o <Link to="/carreira">guia de carreira</Link> para transformar o projeto em vitrine.
         </p>
       </aside>
     </div>

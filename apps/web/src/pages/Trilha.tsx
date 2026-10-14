@@ -1,6 +1,7 @@
+import {useAccessPlan} from '../lib/access.ts';
 import { useMemo, useState } from 'react';
 import { levels, moduleById, modules, type Module } from '../content.ts';
-import { ancestors } from '@alicerce/engine';
+import { ancestors,canAccessLevel } from '@alicerce/engine';
 import { useHead } from '../lib/head.tsx';
 import { Link, navigate } from '../lib/router.tsx';
 import { withBase } from '../lib/base.ts';
@@ -52,16 +53,17 @@ function splitTitle(t: string): [string, string] {
 export function Trilha() {
   useHead('Trilha', 'O mapa completo da formação: 15 níveis e seus módulos, com pré-requisitos, seu progresso e os próximos passos recomendados.');
   const d = useDerived();
+  const plan=useAccessPlan();
   const layout = useMemo(computeLayout, []);
   const [hl, setHl] = useState<Set<string>>(new Set());
   const [view, setView] = useState<'arvore' | 'lista'>('arvore');
-  const next = nextModules(d, 3);
+  const next = nextModules(d, 3, plan);
   const st = (m: Module) => moduleStatus(m, d);
 
   return (
     <div className="container">
       <p className="eyebrow">Sua trilha</p>
-      <h1>Mapa da formação</h1>
+      <h1>Mapa da formação</h1><p className="callout"><strong>Comece gratuitamente:</strong> níveis 0 e 1, com 15 lições e 54 exercícios. A partir do nível 2, continue com Premium. <Link to="/planos">Comparar os planos →</Link></p>
       <p className="lead">Cada caixa é um módulo; as linhas ligam um módulo aos seus pré-requisitos. Passe o mouse ou o foco sobre um módulo para ver tudo o que vem antes dele.</p>
 
       <section aria-labelledby="h-next">
@@ -70,16 +72,16 @@ export function Trilha() {
           <div className="grid">
             {next.map((m) => (
               <Link key={m.id} to={`/modulo/${m.id}`} className="card">
-                <span className={`badge ${STATUS_BADGE[st(m)]}`}>{STATUS_LABEL[st(m)]}</span>
+                <span className={`badge ${STATUS_BADGE[st(m)]}`}>{canAccessLevel(plan,levelNumber(m))?STATUS_LABEL[st(m)]:'Premium'}</span>
                 <h3 style={{ marginTop: '0.5rem' }}>{m.title}</h3>
                 <p className="small muted" style={{ margin: 0 }}>
-                  Nível {levelNumber(m)} · {m.lessons.length ? `${m.lessons.length} lição(ões)` : 'módulo-roteiro'}
+                  {canAccessLevel(plan,levelNumber(m))?'Incluído':'Premium'} · Nível {levelNumber(m)} · {m.lessons.length ? `${m.lessons.length} lição(ões)` : 'módulo-roteiro'}
                 </p>
               </Link>
             ))}
           </div>
         ) : (
-          <p className="notice">Parabéns, você concluiu toda a trilha! 🎉 Veja os projetos finais e a área de carreira.</p>
+          <p className="notice">Você chegou ao fim dos próximos passos disponíveis no seu acesso. Revise sua base e confira a continuidade em Planos.</p>
         )}
         {!Object.keys(d.testedOut).length && d.completedLessons.size === 0 && (
           <p className="small" style={{ marginTop: '0.75rem' }}>
@@ -151,7 +153,7 @@ export function Trilha() {
                   onMouseLeave={() => setHl(new Set())}
                   onFocus={() => setHl(new Set([m.id, ...ancestors(modules, m.id)]))}
                   onBlur={() => setHl(new Set())}
-                  aria-label={`${m.title}, nível ${levelNumber(m)}, ${STATUS_LABEL[s]}${m.prerequisites.length ? `. Pré-requisitos: ${m.prerequisites.map((x) => moduleById.get(x)!.title).join(', ')}` : ''}`}
+                  aria-label={`${m.title}, nível ${levelNumber(m)}, ${canAccessLevel(plan,levelNumber(m))?STATUS_LABEL[s]:'Premium'}${m.prerequisites.length ? `. Pré-requisitos: ${m.prerequisites.map((x) => moduleById.get(x)!.title).join(', ')}` : ''}`}
                 >
                   <g className={`node ${s}${hl.has(m.id) && hl.size > 1 ? ' hl' : ''}`} transform={`translate(${p.x},${p.y})`} opacity={hl.size && !hl.has(m.id) ? 0.35 : 1}>
                     <title>{m.title}</title>
@@ -167,7 +169,7 @@ export function Trilha() {
                     )}
                     <text x={8} y={NODE_H - 8} className="sub">
                       N{levelNumber(m)} · {m.id}
-                      {s === 'concluido' ? ' ✓' : s === 'bloqueado' ? ' 🔒' : ''}
+                      {!canAccessLevel(plan,levelNumber(m))?' · P':s === 'concluido' ? ' ✓' : s === 'bloqueado' ? ' 🔒' : ''}
                     </text>
                   </g>
                 </a>
@@ -194,7 +196,7 @@ export function Trilha() {
                       <span>
                         <span className="t">{m.title}</span> <span className="en">{m.titleEn}</span>
                       </span>
-                      <span className={`badge ${STATUS_BADGE[st(m)]}`}>{STATUS_LABEL[st(m)]}</span>
+                      <span className={`badge ${STATUS_BADGE[st(m)]}`}>{canAccessLevel(plan,levelNumber(m))?STATUS_LABEL[st(m)]:'Premium'}</span>
                     </Link>
                   </li>
                 ))}

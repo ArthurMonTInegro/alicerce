@@ -19,7 +19,7 @@ export const projects: Project[] = [
     skills: ['logica-variaveis', 'logica-entrada-saida', 'prog-condicionais', 'prog-loops', 'prog-funcoes'],
     requirements: [
       'Ler dois números e uma operação (+, -, *, /, //, %, **) com input().',
-      'Converter a entrada para número e avisar quando ela não for numérica.',
+      'Entrega inicial (níveis 0–1): converter entradas numéricas válidas. Tratar texto inválido fica para a extensão de Python.',
       'Tratar divisão por zero com uma mensagem clara, sem o programa quebrar.',
       'Repetir até o usuário digitar "sair".',
       'Organizar o cálculo em funções: somar, subtrair, multiplicar, dividir e calcular(a, op, b).',
@@ -35,10 +35,10 @@ export const projects: Project[] = [
     acceptance: [
       'calcular(6, "/", 3) devolve 2.0 e calcular(7, "//", 2) devolve 3.',
       'Dividir por zero mostra uma mensagem e o programa continua.',
-      'Digitar texto no lugar de número não derruba o programa.',
+      'Na entrega inicial, informar que as entradas devem ser numéricas; na extensão de Python, tratar texto inválido sem encerrar o programa.',
       'Nenhuma função imprime e calcula ao mesmo tempo (separação entre lógica e E/S).',
     ],
-    stretch: ['Histórico das últimas 5 contas.', 'Aceitar a expressão inteira em uma linha, como "3 * 4".', 'Escrever 5 testes com assert para calcular().'],
+    stretch: ['Após estudar exceções no nível 2, aceitar texto inválido sem encerrar o programa.', 'Histórico das últimas 5 contas.', 'Aceitar a expressão inteira em uma linha, como "3 * 4".', 'Escrever 5 testes com assert para calcular().'],
     english: [
       t('entrada do usuário', 'user input', 'Dados digitados por quem usa o programa.'),
       t('divisão por zero', 'division by zero', 'Operação indefinida; em Python gera ZeroDivisionError.'),

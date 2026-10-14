@@ -176,8 +176,16 @@ export interface LessonSection {
   blocks: Block[];
 }
 
+export interface AutonomyQuestion {
+  id: string; title: string; prompt: string; answer: string; explain: string; caseSensitive?: boolean;
+  review: string; wrong: {answer: string; feedback: string}[]; transfer: string;
+}
 export interface Lesson {
+  /** Avaliação suplementar; acompanha a autorização do corpo da aula. */
+  autonomy?: AutonomyQuestion[];
   id: string;
+  /** Metadado público; explicações e exemplos continuam nos blocos protegidos. */
+  theoryTitle?: string;
   moduleId: string;
   title: string;
   titleEn: string;

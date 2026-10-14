@@ -7,6 +7,7 @@
  * uma página precisa deles e guardados em memória. Assim o JavaScript inicial não
  * cresce junto com o currículo, o que importa muito em celulares modestos e redes lentas.
  */
+import { BASE, STATIC_SITE } from './lib/base.ts';
 import { useEffect, useState } from 'react';
 import type { Exercise, Flashcard, Lesson, Level as FullLevel, Module as FullModule, Skill, Stage, GlossaryEntry, Difficulty } from '@alicerce/content/lite';
 import catalogJson from './generated/catalog.json';
@@ -20,7 +21,7 @@ export interface ExerciseMeta {
   skills: string[];
   stage: Stage;
 }
-export type LessonMeta = Omit<Lesson, 'sections' | 'terms' | 'objectives' | 'cards'> & { stages: Stage[]; exercises: ExerciseMeta[]; cardCount: number };
+export type LessonMeta = Omit<Lesson, 'sections' | 'terms' | 'objectives' | 'cards' | 'autonomy'> & { stages: Stage[]; exercises: ExerciseMeta[]; cardCount: number };
 export type Module = Omit<FullModule, 'lessons'> & { lessons: LessonMeta[] };
 export type Level = Omit<FullLevel, 'modules'> & { modules: Module[] };
 export interface ExerciseRef {
@@ -67,7 +68,14 @@ export async function loadLesson(id: string): Promise<Lesson | undefined> {
   const have = loaded.get(id);
   if (have) return have;
   const load = loaders[`./generated/lessons/${id}.json`];
-  if (!load) return undefined;
+  if (!load) {
+    if(STATIC_SITE || !lessonById.has(id))return undefined;
+    const response=await fetch(`${BASE}/api/content/lessons/${encodeURIComponent(id)}`,{credentials:'same-origin',cache:'no-store'});
+    if(!response.ok)throw new Error('Conteúdo requer assinatura ativa.');
+    const lesson=await response.json() as Lesson;
+    // Private content is not kept in the global public cache.
+    return lesson;
+  }
   const lesson = await load();
   loaded.set(id, lesson);
   return lesson;
@@ -81,6 +89,7 @@ export function findExercise(lesson: Lesson | undefined, id: string): Exercise |
 
 /** Lição completa para um componente: baixa na primeira vez e permite tentar de novo se a rede falhar. */
 export function useLesson(id: string | undefined): { lesson: Lesson | undefined; failed: boolean; retry: () => void } {
+  const [privateLesson,setPrivateLesson] = useState<Lesson|undefined>();
   const [attempt, setAttempt] = useState(0);
   const [, setLoadedTick] = useState(0);
   const [failedId, setFailedId] = useState<string | null>(null);
@@ -89,14 +98,14 @@ export function useLesson(id: string | undefined): { lesson: Lesson | undefined;
     let alive = true;
     setFailedId(null);
     loadLesson(id).then(
-      () => alive && setLoadedTick((n) => n + 1),
+      (value) => {if(alive){setPrivateLesson(value);setLoadedTick(n=>n+1);}},
       () => alive && setFailedId(id),
     );
     return () => {
       alive = false;
     };
   }, [id, attempt]);
-  return { lesson: id ? loaded.get(id) : undefined, failed: !!id && failedId === id && !loaded.has(id), retry: () => setAttempt((n) => n + 1) };
+  return { lesson: id ? loaded.get(id) ?? (privateLesson?.id===id?privateLesson:undefined) : undefined, failed: !!id && failedId === id && !loaded.has(id), retry: () => setAttempt((n) => n + 1) };
 }
 
 /* ---------- cartões e glossário, sob demanda ---------- */

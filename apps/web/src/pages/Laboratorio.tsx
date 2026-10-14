@@ -10,7 +10,7 @@ import { ErrorBox } from '../features/runner/ErrorBox.tsx';
 import { RunnerBadge } from '../features/runner/RunnerBadge.tsx';
 import { traduzir } from '../features/runner/errors.ts';
 import { Tracer } from '../features/tracer/Tracer.tsx';
-import { setTutorContext } from '../features/tutor/context.ts';
+import { setTutorContext, resetTutorContext } from '../features/tutor/context.ts';
 import { loadDraft, saveDraft } from '../state/store.ts';
 
 type Lang = 'python' | 'javascript' | 'sql';
@@ -49,6 +49,7 @@ function decodeShare(s: string): { lang: Lang; code: string } | null {
 }
 
 export function Laboratorio() {
+  useEffect(()=>{resetTutorContext();return ()=>resetTutorContext();},[]);
   useHead('Laboratório', 'Escreva e execute Python, JavaScript e SQL direto no navegador, com execução passo a passo e explicação dos erros em português.');
   const [lang, setLang] = useState<Lang>('python');
   const [code, setCode] = useState(EXAMPLES.python[0]!.code);
@@ -100,7 +101,7 @@ export function Laboratorio() {
         const r = await runPython(code, { stdin });
         setOut(r.stdout);
         setErr(r.error);
-        setTutorContext({ code, error: r.error ? `${r.error.type}: ${r.error.message}` : undefined, exerciseId: undefined });
+        setTutorContext({ lessonId:undefined, code, error: r.error ? `${r.error.type}: ${r.error.message}` : undefined, exerciseId: undefined });
       } else if (lang === 'javascript') {
         const r = await runJavaScript(code);
         setOut(r.stdout);

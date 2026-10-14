@@ -1,3 +1,5 @@
+> Atualização da cópia autodidata: progresso e rascunhos têm namespaces por perfil; reinícios usam tombstones. O cliente informa expectedUserId na sincronização; divergências de sessão são rejeitadas. A publicação Sites continua estática.
+
 # Arquitetura
 
 ## Visão geral
@@ -140,7 +142,7 @@ Resultado: o JavaScript inicial caiu de 1,09 MB (344 KB com gzip) para 427 KB (1
 
 ## Planos e direitos de uso
 
-`packages/engine/src/plans.ts` é a única tabela do que cada plano pode fazer. O código pergunta `can(entitlements, 'tutor-ia')`, nunca "é premium?". Recursos com status `planejado` aparecem na página de planos (`/planos`) marcados como em construção e não são concedidos. Um plano vencido volta a `free` sem perder progresso. O preço também mora lá (`price`, em centavos, para não somar dinheiro com ponto flutuante), junto com `formatBRL` e `yearlyDeal`; `PREMIUM_FOR_SALE` só vira `true` quando houver provedor de pagamento e algum recurso pago pronto, e um teste impede ligá-lo enquanto nenhum recurso pago estiver pronto. `FOREVER_FREE` lista o que é gratuito para sempre, prometido em público em `/planos`; um teste exige que todo plano tenha esses recursos.
+`packages/engine/src/plans.ts` é a única tabela do que cada plano pode fazer. O código pergunta `can(entitlements, 'tutor-ia')`, nunca "é premium?". Recursos com status `planejado` aparecem na página de planos (`/planos`) marcados como em construção e não são concedidos. Um plano vencido volta a `free` sem perder progresso. O preço também mora lá (`price`, em centavos, para não somar dinheiro com ponto flutuante), junto com `formatBRL` e `yearlyDeal`; `PREMIUM_FOR_SALE` só vira `true` quando houver provedor de pagamento e algum recurso pago pronto, e um teste impede ligá-lo enquanto nenhum recurso pago estiver pronto. `FREE_FEATURES` define os recursos da iniciação gratuita. Corpos das aulas Premium são entregues apenas pela API autenticada, nunca nos assets públicos. Veja ESTRATEGIA_ASSINATURA.md.
 
 No servidor, `apps/api/src/plans.ts` lê e muda o plano (`setPlan` grava também em `plan_changes`). Não há provedor de pagamento: quando houver, o webhook dele chama `setPlan`, e nenhum dado de cartão passa pelo Alicerce. Para testes e cortesias: `node apps/api/scripts/plano.ts <email> <free|premium> [dias]`.
 

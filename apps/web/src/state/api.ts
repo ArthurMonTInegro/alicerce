@@ -3,7 +3,7 @@
  * pelo servidor) e um cabeçalho fixo que a API exige em requisições que alteram
  * estado — junto com SameSite=Lax, isso bloqueia CSRF sem token extra.
  */
-import type { Entitlements, ProgressState } from '@alicerce/engine';
+import type { Entitlements, ProgressState, CoachMode } from '@alicerce/engine';
 import { BASE, STATIC_SITE } from '../lib/base.ts';
 
 export interface User {
@@ -18,6 +18,7 @@ type AuthReply = { user: User | null; entitlements?: Entitlements | null };
 const withEnt = (r: AuthReply): User | null => (r.user ? { ...r.user, ...(r.entitlements ? { entitlements: r.entitlements } : {}) } : null);
 
 export interface TutorRequest {
+  mode?: CoachMode;
   message: string;
   history: Array<{ role: 'user' | 'tutor'; text: string }>;
   context: {
@@ -32,6 +33,7 @@ export interface TutorRequest {
 export interface TutorReply {
   reply: string;
   mode: 'ia' | 'offline';
+  reason?: 'not_configured' | 'login_required' | 'daily_limit' | 'monthly_limit' | 'premium_required' | 'provider_unavailable';
 }
 
 export class ApiError extends Error {
@@ -42,10 +44,11 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function call<T>(method: string, path: string, body?: unknown, signal?:AbortSignal): Promise<T> {
   if (STATIC_SITE) throw new ApiError(503, 'Esta é a versão de demonstração, sem servidor: contas e sincronização não estão disponíveis.');
   const res = await fetch(`${BASE}/api${path}`, {
     method,
+    signal,
     credentials: 'same-origin',
     headers: body === undefined ? { 'x-alicerce': '1' } : { 'content-type': 'application/json', 'x-alicerce': '1' },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -69,7 +72,7 @@ export const api = {
   login: async (email: string, password: string) => withEnt(await call<AuthReply>('POST', '/auth/login', { email, password }))!,
   register: async (email: string, password: string, name: string) => withEnt(await call<AuthReply>('POST', '/auth/register', { email, password, name }))!,
   logout: () => call<void>('POST', '/auth/logout'),
-  putProgress: async (p: ProgressState) => (await call<{ progress: ProgressState }>('PUT', '/progress', { progress: p })).progress,
+  putProgress: async (p: ProgressState, expectedUserId:string) => (await call<{ progress: ProgressState }>('PUT', '/progress', { progress: p, expectedUserId })).progress,
   deleteAccount: () => call<void>('DELETE', '/auth/me'),
-  tutor: (req: TutorRequest) => call<TutorReply>('POST', '/tutor', req),
+  tutor: (req: TutorRequest, signal?:AbortSignal) => call<TutorReply>('POST', '/tutor', req, signal),
 };

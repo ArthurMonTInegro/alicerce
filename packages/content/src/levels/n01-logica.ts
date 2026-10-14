@@ -6,7 +6,7 @@ const algoritmos = lesson({
   moduleId: 'm1-1',
   title: 'Algoritmos e pensamento computacional',
   titleEn: 'Algorithms and computational thinking',
-  summary: 'Decomposição, padrões, abstração e algoritmos: as quatro ferramentas para resolver qualquer problema com computação.',
+  summary: 'Decomposição, padrões, abstração e algoritmos: ferramentas para formular e resolver problemas computacionais.',
   minutes: 25,
   objectives: [
     'Definir algoritmo e reconhecer suas propriedades (finito, preciso, com entrada e saída)',
@@ -41,7 +41,7 @@ const algoritmos = lesson({
         3. **{{Abstração|abstraction}}**: descartar o que não importa (a cor da camisa do aluno não importa para a média).
         4. **Algoritmo**: escrever os passos.
       `),
-      deep('George Pólya, em *How to Solve It* (1945), propôs quatro fases que continuam valendo para programação: **entender o problema**, **criar um plano**, **executar o plano** e **revisar**. A maioria dos erros de iniciantes vem de pular a primeira fase e começar a digitar código.', 'Pólya: como resolver problemas'),
+      deep('George Pólya, em *How to Solve It* (1945), propôs quatro fases úteis também em programação: **entender o problema**, **criar um plano**, **executar o plano** e **revisar**. Antes de digitar código, escreva entradas, saídas e um caso limite: isso ajuda a encontrar ambiguidades no que será resolvido.', 'Pólya: como resolver problemas'),
     ],
     exemplo: [
       md(`

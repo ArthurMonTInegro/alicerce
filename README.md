@@ -1,8 +1,12 @@
+> Estratégia vigente: [Acesso e planos v3](docs/ESTRATEGIA_ASSINATURA.md). Níveis 0–1 gratuitos; 2–14 Premium. Cobrança ainda não ativa.
+
 # Alicerce
+
+A demonstração publicada é estática: não possui contas de aluno, sincronização ou IA conectada. Acompanhe entregas em `/evolucao`.
 
 Plataforma interativa de formação em computação, do zero ao avançado, em português com o inglês técnico ao lado de cada termo (**variável → variable**).
 
-São 15 níveis (0 a 14), 59 módulos, 111 lições e 484 exercícios corrigidos automaticamente. O código roda no próprio navegador: Python via Pyodide (WebAssembly), JavaScript num worker isolado e SQL num SQLite em memória. Há árvore de habilidades com pré-requisitos, teste diagnóstico, revisão espaçada (FSRS), visualizações interativas, tutor que dá pistas e nunca entrega a resposta, área de carreira e referências verificadas.
+São 15 níveis (0 a 14), 59 módulos, 111 lições e 484 exercícios corrigidos automaticamente. O código roda no próprio navegador: Python via Pyodide (WebAssembly), JavaScript num worker e SQL num SQLite em memória. Há árvore de habilidades com pré-requisitos, teste diagnóstico, revisão espaçada (FSRS), visualizações interativas, tutor guiado por pistas progressivas, área de carreira e referências verificadas.
 
 ## Rodando localmente
 
@@ -28,7 +32,7 @@ Todas são opcionais; veja `.env.example`.
 | `DATABASE_PATH` | `apps/api/data/alicerce.db` | Arquivo SQLite (contas e progresso) |
 | `ANTHROPIC_API_KEY` | vazio | Liga o tutor com IA. Sem ela, o tutor usa o modo offline de pistas guiadas |
 | `TUTOR_MODEL` | `claude-sonnet-5-5` | Modelo usado pelo tutor |
-| `TUTOR_DAILY_LIMIT` | `60` | Perguntas por dia, por conta, ao tutor com IA |
+| `TUTOR_DAILY_LIMIT` | `20` | Teto diário de IA Premium (não aumenta o máximo de 20); 200/mês calendário UTC. Gratuito: sem IA externa. |
 | `TRUST_PROXY` | `false` | Ative só atrás de um proxy reverso conhecido |
 | `COOKIE_SECURE` | ligado em produção | Cookie de sessão com atributo `Secure` (exige HTTPS) |
 | `SITE_URL` | vazio | Usado no build para canonical, sitemap e robots.txt |

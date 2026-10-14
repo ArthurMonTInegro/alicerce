@@ -1,3 +1,5 @@
+> Limite conhecido: workers herdados não equivalem a uma origem de segurança separada. A UP03 permanece pendente; não habilitar contas/serviços sensíveis no mesmo domínio de execução antes dessa revisão. Os limites de saída ajudam a conter volume, mas não limitam toda a memória de código arbitrário.
+
 # Segurança
 
 Modelo de ameaças resumido: a plataforma executa código escrito por estudantes, guarda contas e chama uma API paga. Os riscos principais são código do estudante escapando do isolamento, roubo de sessão, abuso de login, abuso de custo do tutor e entrada maliciosa no progresso sincronizado.

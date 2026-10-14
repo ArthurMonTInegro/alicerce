@@ -24,18 +24,27 @@ import {
 import { cardIds, lessonById, modules, type Exercise } from '../content.ts';
 import { api, type User } from './api.ts';
 
-const KEY = 'alicerce:progresso:v1';
+const LEGACY_KEY = 'alicerce:progresso:v1';
+let scope = 'guest';
+const key = () => `alicerce:progresso:v2:${scope}`;
+let generation = 0;
+const AUTH_CHANGE = 'alicerce:auth-change';
+type LocalSave = 'saved' | 'pending' | 'error';
+let localSave: LocalSave = 'saved';
+let lastSync: number | null = null;
+let logoutPending = false;
 const SERVER_SNAPSHOT = emptyProgress();
 
 let state: ProgressState = SERVER_SNAPSHOT;
 let loaded = false;
 const listeners = new Set<() => void>();
+const pendingDrafts = new Map<string,string>();
 
 function load() {
   if (loaded || typeof window === 'undefined') return;
   loaded = true;
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(key()) ?? (scope === 'guest' ? localStorage.getItem(LEGACY_KEY) : null);
     if (raw) state = sanitizeProgress(JSON.parse(raw));
     else state = emptyProgress();
   } catch {
@@ -44,14 +53,16 @@ function load() {
   window.addEventListener('pagehide', flush);
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush());
   window.addEventListener('storage', (e) => {
-    if (e.key !== KEY || !e.newValue) return;
+    if(e.key === AUTH_CHANGE){switchUser(null);void initAuth();return;}
+    if (e.key !== key() || !e.newValue) return;
     try {
-      state = sanitizeProgress(JSON.parse(e.newValue));
+      state = mergeProgress(state, sanitizeProgress(JSON.parse(e.newValue)));
       emit();
     } catch {
       /* ignora valor inválido de outra aba */
     }
   });
+  window.addEventListener('online', () => { if(unsaved) persist(); void syncNow(); });
 }
 
 function emit() {
@@ -62,12 +73,16 @@ function emit() {
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let unsaved = false;
 function persist() {
-  unsaved = false;
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    localStorage.setItem(key(), JSON.stringify(state));
+    for(const [draftKey,code] of pendingDrafts){localStorage.setItem(draftKey,code);pendingDrafts.delete(draftKey);}
+    unsaved = false;
+    localSave = 'saved';
   } catch {
-    /* armazenamento cheio ou bloqueado: o progresso continua na memória */
+    unsaved = true;
+    localSave = 'error';
   }
+  emitAuth();
   scheduleSync();
 }
 
@@ -77,6 +92,8 @@ function update(fn: (draft: ProgressState) => ProgressState) {
   emit();
   clearTimeout(saveTimer);
   unsaved = true;
+  localSave = 'pending';
+  emitAuth();
   saveTimer = setTimeout(persist, 150);
 }
 
@@ -154,6 +171,8 @@ export function useDerived(): Derived {
 /* ---------------- ações ---------------- */
 
 export interface Outcome {
+  id?: string;
+  durationMs?: number;
   correct: boolean;
   hintsUsed: number;
   wrongTries: number;
@@ -162,6 +181,9 @@ export interface Outcome {
 
 export function recordAttempt(ex: Exercise, o: Outcome) {
   const rec: AttemptRecord = {
+    id: o.id ?? crypto.randomUUID(),
+    durationMs: o.durationMs ?? 0,
+    contentVersion: 'alicerce-2026-10-07',
     exerciseId: ex.id,
     skills: ex.skills,
     difficulty: ex.difficulty,
@@ -172,7 +194,7 @@ export function recordAttempt(ex: Exercise, o: Outcome) {
     revealed: o.revealed,
     at: Date.now(),
   };
-  update((s) => ({ ...s, attempts: [...s.attempts, rec].slice(-5000) }));
+  update((s) => s.attempts.some(a=>a.id===rec.id) ? s : ({ ...s, attempts: [...s.attempts, rec].slice(-5000) }));
 }
 
 export function visitStage(lessonId: string, stage: string) {
@@ -219,7 +241,7 @@ export function reviewCard(cardId: string, grade: Grade) {
   update((s) => ({
     ...s,
     cards: { ...s.cards, [cardId]: review(s.cards[cardId] ?? newCard(now), grade, now) },
-    reviews: [...s.reviews, { cardId, grade, at: now }].slice(-5000),
+    reviews: [...s.reviews, { id:crypto.randomUUID(), cardId, grade, at: now }].slice(-5000),
   }));
 }
 
@@ -253,30 +275,41 @@ export function replaceProgress(p: ProgressState) {
   update(() => sanitizeProgress(p));
 }
 
-export function resetProgress() {
-  update(() => emptyProgress());
+export function resetProgress(clearDrafts = false) {
+  generation++;
+  update(s => ({...emptyProgress(),resetAt:Math.max(Date.now(),(s.resetAt??0)+1)}));
+  if(clearDrafts) {
+    for(const k of pendingDrafts.keys())if(k.startsWith(draftPrefix()))pendingDrafts.delete(k);
+    try { for(const k of Object.keys(localStorage)) if(k.startsWith(draftPrefix()) || (scope==='guest' && k.startsWith(DRAFT))) localStorage.removeItem(k); }
+    catch {localSave='error';emitAuth();}
+  }
 }
 
 /* ---------------- rascunhos de código (separados: não sincronizam) ---------------- */
 
 const DRAFT = 'alicerce:rascunho:';
+const draftPrefix = () => `alicerce:draft:v2:${scope}:`;
 export function loadDraft(id: string): string | null {
   try {
-    return localStorage.getItem(DRAFT + id);
+    return pendingDrafts.get(draftPrefix()+id) ?? localStorage.getItem(draftPrefix() + id) ?? (scope==='guest' ? localStorage.getItem(DRAFT+id) : null);
   } catch {
     return null;
   }
 }
 export function saveDraft(id: string, code: string) {
+  const k=draftPrefix()+id;
+  pendingDrafts.set(k,code);
   try {
-    localStorage.setItem(DRAFT + id, code);
+    localStorage.setItem(k, code);pendingDrafts.delete(k);
   } catch {
-    /* sem espaço: ignora */
+    unsaved=true;localSave='error';emitAuth();
   }
 }
 export function clearDraft(id: string) {
+  pendingDrafts.delete(draftPrefix()+id);
   try {
-    localStorage.removeItem(DRAFT + id);
+    localStorage.removeItem(draftPrefix() + id);
+    if(scope==='guest')localStorage.removeItem(DRAFT+id);
   } catch {
     /* ignora */
   }
@@ -288,9 +321,9 @@ type SyncStatus = 'offline' | 'idle' | 'syncing' | 'error';
 let user: User | null = null;
 let syncStatus: SyncStatus = 'offline';
 const authListeners = new Set<() => void>();
-let authSnapshot: { user: User | null; syncStatus: SyncStatus } = { user, syncStatus };
+let authSnapshot: {user:User|null;syncStatus:SyncStatus;localSave:LocalSave;lastSync:number|null;logoutPending:boolean} = { user, syncStatus, localSave, lastSync, logoutPending };
 function emitAuth() {
-  authSnapshot = { user, syncStatus };
+  authSnapshot = { user, syncStatus, localSave, lastSync, logoutPending };
   for (const l of authListeners) l();
 }
 
@@ -306,6 +339,18 @@ export function useAuth() {
 }
 
 let syncTimer: ReturnType<typeof setTimeout> | undefined;
+let retryDelay = 1500;
+let syncingGeneration: number | null = null;
+function switchUser(next:User|null){
+  flush();
+  clearTimeout(syncTimer);clearTimeout(saveTimer);
+  generation++;user=next;scope=next?`user:${next.id}`:'guest';
+  unsaved=false;localSave='saved';lastSync=null;
+  state=emptyProgress();
+  try{const raw=localStorage.getItem(key()) ?? (scope==='guest'?localStorage.getItem(LEGACY_KEY):null);if(raw)state=sanitizeProgress(JSON.parse(raw));}catch{localSave='error';}
+  syncStatus=next?'idle':'offline';emit();emitAuth();
+}
+function broadcastAuth(){try{localStorage.setItem(AUTH_CHANGE,crypto.randomUUID());}catch{/* sessão continua isolada nesta aba */}}
 function scheduleSync() {
   if (!user) return;
   clearTimeout(syncTimer);
@@ -313,47 +358,64 @@ function scheduleSync() {
 }
 
 export async function syncNow() {
-  if (!user) return;
+  if (!user || logoutPending) return;
+  const currentGeneration=generation;
+  if(syncingGeneration===currentGeneration)return;
+  syncingGeneration=currentGeneration;
   syncStatus = 'syncing';
   emitAuth();
   try {
-    const server = await api.putProgress(getProgress());
+    const server = await api.putProgress(getProgress(),user.id);
+    if(currentGeneration!==generation)return;
     const merged = mergeProgress(getProgress(), sanitizeProgress(server));
     state = merged;
     try {
-      localStorage.setItem(KEY, JSON.stringify(state));
+      localStorage.setItem(key(), JSON.stringify(state));
+      unsaved=false;localSave='saved';
     } catch {
-      /* ignora */
+      unsaved=true;localSave='error';
     }
     emit();
     syncStatus = 'idle';
+    retryDelay=1500;lastSync=Date.now();
   } catch {
+    if(currentGeneration!==generation)return;
     syncStatus = 'error';
+    clearTimeout(syncTimer);syncTimer=setTimeout(()=>void syncNow(),retryDelay);retryDelay=Math.min(60000,retryDelay*2);
+  } finally {
+    if(syncingGeneration===currentGeneration)syncingGeneration=null;
   }
   emitAuth();
 }
 
 export async function initAuth() {
+  if(logoutPending)return;
+  const currentGeneration=generation;
   try {
-    user = await api.me();
-    syncStatus = user ? 'idle' : 'offline';
+    const next = await api.me();
+    if(currentGeneration!==generation)return;
+    if(next?.id!==user?.id)switchUser(next);
   } catch {
-    user = null;
-    syncStatus = 'offline';
+    if(currentGeneration!==generation)return;
+    switchUser(null);
   }
   emitAuth();
   if (user) await syncNow();
 }
 
 export async function signIn(kind: 'login' | 'register', email: string, password: string, name?: string) {
-  user = kind === 'login' ? await api.login(email, password) : await api.register(email, password, name ?? '');
-  emitAuth();
+  const next = kind === 'login' ? await api.login(email, password) : await api.register(email, password, name ?? '');
+  logoutPending=false;
+  switchUser(next);broadcastAuth();
   await syncNow();
 }
 
 export async function signOut() {
-  await api.logout().catch(() => undefined);
-  user = null;
-  syncStatus = 'offline';
-  emitAuth();
+  logoutPending=true;
+  switchUser(null);
+  try{await api.logout();logoutPending=false;broadcastAuth();emitAuth();}
+  catch{emitAuth();throw new Error('A sessão no servidor ainda não foi encerrada. Tente sair novamente quando a conexão voltar.');}
 }
+
+export function retrySave(){persist();}
+export function getSaveStatus(){return authSnapshot;}

@@ -63,7 +63,16 @@ export function Progresso() {
   const importJson = async (file: File) => {
     try {
       if (file.size > 5_000_000) throw new Error('grande');
-      const incoming = sanitizeProgress(JSON.parse(await file.text()));
+      const raw = JSON.parse(await file.text());
+      if(!raw || raw.version!==1 || !Array.isArray(raw.attempts) || !raw.lessons || typeof raw.lessons!=='object')throw new Error('formato incompatível');
+      const incoming = sanitizeProgress(raw);
+      const knownExercises=new Set(exercises.map(x=>x.exercise.id));
+      const knownLessons=new Set(lessons.map(x=>x.id));
+      const checkpointIds=new Set(['checkpoint:logica-v1:budget','checkpoint:logica-v1:condition','checkpoint:logica-v1:trace']);
+      if(incoming.attempts.some(a=>!knownExercises.has(a.exerciseId)&&!checkpointIds.has(a.exerciseId)) || Object.keys(incoming.lessons).some(id=>!knownLessons.has(id)))throw new Error('conteúdo de outra versão');
+      // Importação é uma escolha explícita: restaura dados no ciclo atual sem trazer um tombstone externo.
+      delete incoming.resetAt;
+      if(getProgress().resetAt)incoming.resetAt=getProgress().resetAt;
       replaceProgress(mergeProgress(getProgress(), incoming));
       setMsg('Progresso importado e combinado com o que já estava aqui.');
     } catch {
@@ -71,9 +80,10 @@ export function Progresso() {
     }
   };
   const reset = () => {
-    if (window.confirm('Apagar todo o progresso salvo neste navegador? Isso não pode ser desfeito. Exporte antes se quiser guardar.')) {
-      resetProgress();
-      setMsg('Progresso apagado neste navegador.');
+    if (window.confirm(auth.user ? 'Reiniciar o progresso desta conta? O reinício será sincronizado e prevalecerá sobre cópias antigas. Exporte antes.' : 'Reiniciar o progresso de visitante neste navegador? Exporte antes se quiser guardar.')) {
+      const drafts=window.confirm('Deseja apagar também os rascunhos de código deste perfil? Cancelar mantém os rascunhos.');
+      resetProgress(drafts);
+      setMsg(auth.user?'Progresso reiniciado. Acompanhe a confirmação de sincronização.':'Progresso reiniciado neste navegador.');
     }
   };
 
@@ -81,6 +91,12 @@ export function Progresso() {
     <div className="container">
       <p className="eyebrow">Progresso · progress</p>
       <h1>Seu progresso</h1>
+      <section className="card" style={{marginBottom:'1.5rem'}} aria-labelledby="h-autonomia">
+        <h2 id="h-autonomia">Prática com e sem ajuda</h2>
+        <p><strong>{new Set(p.attempts.filter(a=>a.correct&&!a.revealed&&a.hintsUsed===0).map(a=>a.exerciseId)).size}</strong> exercícios com acerto sem dica registrada · <strong>{new Set(p.attempts.filter(a=>a.correct&&(a.revealed||a.hintsUsed>0)).map(a=>a.exerciseId)).size}</strong> com ajuda registrada.</p>
+        <p className="small muted">Um exercício pode aparecer nos dois grupos ao ser refeito. O aplicativo não monitora ajuda externa; esses dados orientam sua prática e não certificam domínio.</p>
+        <Link className="btn" to="/autonomia">Verificar minha base →</Link>
+      </section>
 
       <div className="grid" style={{ margin: '1rem 0 2rem' }}>
         <Stat n={now ? streak(activity, now, tz) : 0} label="dias seguidos de estudo" />

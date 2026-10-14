@@ -180,7 +180,7 @@ const owasp = lesson({
       md(`
         **SQL injection**: \`"SELECT * FROM usuarios WHERE nome = '" + nome + "'"\` com \`nome = "' OR '1'='1"\` vira uma consulta que devolve todos. **Defesa**: consultas **parametrizadas** — sempre.
 
-        **XSS**: um comentário \`<script>roubar(document.cookie)</script>\` inserido com \`innerHTML\` executa no navegador de quem lê. **Defesa**: escapar na saída (frameworks fazem por padrão; \`textContent\`), CSP, cookies \`HttpOnly\`.
+        **XSS**: HTML não confiável inserido com \`innerHTML\` pode executar código por vetores como atributos de evento. Elementos \`<script>\` inseridos dessa forma não executam diretamente, mas isso não torna a operação segura. **Defesa**: use \`textContent\` para texto; quando HTML for necessário, aplique sanitização adequada. CSP é defesa adicional; cookies \`HttpOnly\` dificultam a leitura do cookie, mas não impedem todas as ações de um XSS.
 
         **CSRF**: você está logado no banco; um site malicioso envia um formulário oculto para \`banco.com/transferir\`, e o navegador anexa seu cookie. **Defesa**: cookies \`SameSite=Lax/Strict\`, tokens anti-CSRF, verificar \`Origin\`.
 

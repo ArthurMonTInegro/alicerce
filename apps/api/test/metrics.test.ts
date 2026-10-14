@@ -14,6 +14,12 @@ const user = (createdAt: number, attempts: AttemptRecord[] = [], plan = 'free'):
 };
 
 describe('métricas', () => {
+  it('D7 exige retorno no dia 7 UTC e coorte com esse dia encerrado',()=>{
+    const origin=Date.UTC(2026,0,1,23,30),day0=Date.UTC(2026,0,1);
+    const yes=user(origin,[att('a',day0+7*DAY+1000)]),late=user(origin,[att('a',day0+40*DAY)]);
+    expect(computeMetrics([yes,late],day0+50*DAY).retention.d7).toEqual({eligible:2,rate:.5});
+    expect(computeMetrics([yes],day0+7*DAY+2000).retention.d7).toEqual({eligible:0,rate:0});
+  });
   it('ativos, retenção e funil', () => {
     const users = [
       user(NOW - 40 * DAY, [att('a', NOW - 40 * DAY), att('a', NOW - 2 * DAY)]), // voltou depois de 30 dias
@@ -23,8 +29,8 @@ describe('métricas', () => {
     const m = computeMetrics(users, NOW, 1);
     expect(m.users).toMatchObject({ total: 3, new7d: 1, new30d: 2, premium: 1 });
     expect(m.active).toEqual({ dau: 0, wau: 1, mau: 2 });
-    expect(m.retention.d7).toEqual({ eligible: 2, rate: 0.5 });
-    expect(m.retention.d30).toEqual({ eligible: 1, rate: 1 });
+    expect(m.retention.d7).toEqual({ eligible: 2, rate: 0 });
+    expect(m.retention.d30).toEqual({ eligible: 1, rate: 0 });
     expect(m.funnel.anyActivity).toBe(2);
   });
 
