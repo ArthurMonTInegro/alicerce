@@ -290,6 +290,8 @@ a.card:hover { border-color: var(--accent); transform: translateY(-2px); }
 
 .callout { border-left: 4px solid var(--info); background: var(--info-soft); padding: 0.85rem 1rem; border-radius: 0 var(--radius) var(--radius) 0; margin: 0 0 1.2rem; }
 .callout > :last-child { margin-bottom: 0; }
+.aviso-carencia { margin-top: 1rem; }
+.aviso-carencia > p { margin: 0 0 0.5rem; }
 .callout .callout-title { font-weight: 700; margin: 0 0 0.3rem; display: flex; gap: 0.4rem; align-items: center; }
 .callout.tip { border-color: var(--ok); background: var(--ok-soft); }
 .callout.warn { border-color: var(--warn); background: var(--warn-soft); }

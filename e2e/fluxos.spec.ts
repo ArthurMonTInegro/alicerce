@@ -124,11 +124,49 @@ test('planos: mostra o preço decidido, sem botão de compra, e o rodapé leva a
   await expect(premium).toContainText(/R\$\s149,00 por ano/);
   await expect(premium).toContainText(/R\$\s12,42 por mês/);
   await expect(premium).toContainText('ainda não está à venda');
-  await expect(main.getByRole('region', { name: 'Gratuito' }).getByText('grátis para sempre')).toHaveCount(4);
-  await expect(main).toContainText('ficam gratuitos para sempre, em qualquer plano');
+  // a promessa de "grátis para sempre" saiu; a seção explica a mudança e a carência
+  await expect(main.getByText('grátis para sempre')).toHaveCount(0);
+  await expect(main).not.toContainText('ficam gratuitos para sempre');
+  const muda = main.getByRole('region', { name: 'O que vai mudar' });
+  await expect(muda).toContainText('até 19/11/2026, todos os níveis continuam abertos');
+  await expect(muda).toContainText('A partir de 20/11/2026, os níveis 0 e 1 continuam gratuitos');
+  await expect(muda).toContainText('Ninguém foi cobrado');
+  await expect(muda).not.toContainText(/restam|últimos dias|corra|aproveite|assine já/i);
+  // o aviso único não aparece em /planos, que já tem a seção completa
+  await expect(page.getByRole('region', { name: 'O acesso gratuito vai mudar' })).toHaveCount(0);
   await expect(main.getByRole('button')).toHaveCount(0);
   await expect(main.getByRole('link', { name: /assin|compr|pagar|checkout/i })).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test('aviso da carência: aparece depois da hidratação, leva a /planos, fecha e não volta', async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto('/');
+  const aviso = page.getByRole('region', { name: 'O acesso gratuito vai mudar' });
+  await expect(aviso).toBeVisible();
+  await expect(aviso).toContainText('Até 19/11/2026, todos os níveis continuam abertos');
+  await expect(aviso.getByRole('link', { name: 'Exportar meu progresso' })).toHaveAttribute('href', /\/progresso#h-data$/);
+  await aviso.getByRole('button', { name: 'Fechar aviso' }).click();
+  await expect(aviso).toHaveCount(0);
+  await expect(page.locator('#conteudo')).toBeFocused();
+  await page.goto('/trilha');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'O acesso gratuito vai mudar' })).toHaveCount(0);
+  // o HTML pré-renderizado nunca traz o aviso
+  const html = await (await page.request.get('/')).text();
+  expect(html).not.toContain('O acesso gratuito vai mudar');
+  expect(errors).toEqual([]);
+});
+
+test('aviso da carência: "Entenda o que vai mudar" abre a seção em /planos e não volta depois', async ({ page }) => {
+  await page.goto('/sobre');
+  const aviso = page.getByRole('region', { name: 'O acesso gratuito vai mudar' });
+  await aviso.getByRole('link', { name: 'Entenda o que vai mudar' }).click();
+  await expect(page).toHaveURL(/\/planos#o-que-vai-mudar$/);
+  await expect(page.getByRole('heading', { level: 2, name: 'O que vai mudar' })).toBeVisible();
+  await page.goto('/');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'O acesso gratuito vai mudar' })).toHaveCount(0);
 });
 
 test('página inexistente devolve 404 com página amigável', async ({ page }) => {

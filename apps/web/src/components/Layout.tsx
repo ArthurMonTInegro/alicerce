@@ -4,6 +4,7 @@ import { Link, useLocation } from '../lib/router.tsx';
 import { useAuth, useProgress } from '../state/store.ts';
 import { openTutor, useTutor } from '../features/tutor/context.ts';
 import { TutorPanel } from '../features/tutor/TutorPanel.tsx';
+import { AvisoCarencia } from './AvisoCarencia.tsx';
 
 function Logo() {
   return (
@@ -90,6 +91,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main id="conteudo" tabIndex={-1}>
+        <AvisoCarencia />
         {children}
       </main>
       <footer className="site-footer">

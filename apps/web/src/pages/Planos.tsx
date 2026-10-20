@@ -1,7 +1,8 @@
-import { DEFAULT_TUTOR_DAILY_LIMIT, FEATURES, FOREVER_FREE, formatBRL, PLANS, PREMIUM_FOR_SALE, yearlyDeal, type Feature } from '@alicerce/engine';
+import { DEFAULT_TUTOR_DAILY_LIMIT, FEATURES, formatBRL, PLANS, PREMIUM_FOR_SALE, yearlyDeal, type Feature } from '@alicerce/engine';
 import { STATIC_SITE } from '../lib/base.ts';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
+import { CARENCIA, ID_O_QUE_VAI_MUDAR, OQueVaiMudar } from '../components/AvisoCarencia.tsx';
 
 const price = PLANS.premium.price!;
 const deal = yearlyDeal(price);
@@ -15,12 +16,6 @@ function FeatureItem({ f }: { f: Feature }) {
   return (
     <li>
       <strong>{info.title}</strong>
-      {FOREVER_FREE.includes(f) && (
-        <>
-          {' '}
-          <span className="badge ok">grátis para sempre</span>
-        </>
-      )}
       {info.status === 'planejado' && (
         <>
           {' '}
@@ -43,19 +38,17 @@ function FeatureItem({ f }: { f: Feature }) {
 export function Planos() {
   useHead(
     'Planos',
-    PREMIUM_FOR_SALE
-      ? `A trilha inteira da Alicerce é gratuita para sempre. O premium custa ${priceText}.`
-      : `Hoje tudo na Alicerce é gratuito, e a trilha fica gratuita para sempre. O premium ainda não está à venda; o preço previsto é ${priceText}.`,
+    `Até ${CARENCIA.abertoAte}, tudo na Alicerce continua gratuito. A partir de ${CARENCIA.corte}, os níveis 0 e 1 continuam gratuitos e os níveis 2 a 14 passam para o Premium, que ainda não está à venda; o preço previsto é ${priceText}.`,
   );
   return (
     <div className="container prose" style={{ maxWidth: '84ch' }}>
       <p className="eyebrow">Planos · pricing</p>
       <h1>Planos</h1>
       <p className="lead">
-        {PREMIUM_FOR_SALE
-          ? `A trilha inteira da Alicerce é gratuita para sempre. O premium custa ${priceText} e traz recursos que o plano gratuito não tem.`
-          : `Hoje, tudo o que existe na Alicerce é gratuito, e a trilha inteira fica gratuita para sempre. O premium ainda não está à venda. O preço previsto é ${priceText}, e ele vai trazer recursos que o plano gratuito não tem.`}
+        Hoje, tudo o que existe na Alicerce é gratuito, e continua assim até {CARENCIA.abertoAte}. A partir de {CARENCIA.corte}, os níveis 0 e 1 continuam gratuitos, e os níveis 2 a 14 passam a fazer parte do Premium. O Premium ainda não está à venda; o preço previsto é {priceText}.
       </p>
+
+      <OQueVaiMudar />
 
       <div className="grid two" style={{ margin: '1.5rem 0' }}>
         <section className="card" aria-labelledby="h-gratuito">
@@ -119,7 +112,7 @@ export function Planos() {
 
       <h2>Compromissos</h2>
       <ul>
-        <li>A trilha completa (níveis 0 a 14, com lições, visualizações e projetos), os exercícios, a revisão espaçada, o laboratório e o tutor com pistas guiadas ficam gratuitos para sempre, em qualquer plano.</li>
+        <li>Os níveis 0 e 1 (com lições, exercícios e revisão), o laboratório, o glossário, as visualizações, os roteiros de projetos e o tutor com pistas guiadas continuam gratuitos, em qualquer plano. Até {CARENCIA.abertoAte}, os níveis 2 a 14 também continuam abertos. Veja <a href={`#${ID_O_QUE_VAI_MUDAR}`}>O que vai mudar</a>.</li>
         <li>Cancelar vai ser simples, a partir da sua conta, sem etapas para dificultar. Quem assinar pode desistir em até 7 dias e recebe o valor de volta, como garante o Código de Defesa do Consumidor (art. 49). O que acontece com o plano anual depois desses 7 dias vai estar escrito antes da assinatura.</li>
         <li>Sem publicidade invasiva, sem contagem regressiva, sem falsa urgência e sem venda de dados.</li>
         <li>

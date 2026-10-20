@@ -113,8 +113,10 @@ export function yearlyDeal(price: PlanPrice) {
 }
 
 /**
- * Gratuitos para sempre, decisão do Arthur em 07/10/2026 e compromisso público em
- * /planos. Nenhum plano pode deixar de ter estes recursos (um teste cobra isso).
+ * Gratuitos em todos os planos, decisão do Arthur em 07/10/2026. A promessa pública
+ * de "gratuito para sempre" foi retirada de /planos em 20/10/2026, com carência até
+ * 19/11/2026 (veja apps/web/src/components/AvisoCarencia.tsx). Nenhum plano pode
+ * deixar de ter estes recursos enquanto este arquivo valer (um teste cobra isso).
  * O tutor com IA e a sincronização têm custo por pessoa e ficaram de fora.
  */
 export const FOREVER_FREE: readonly Feature[] = ['trilha-completa', 'exercicios-e-revisao', 'laboratorio', 'tutor-offline'];
