@@ -17,12 +17,12 @@ import { CHAVE_AVISO_FECHADO, datasDaTransicao, deveMostrarAviso, indiceDoCatalo
 export const ID_O_QUE_MUDOU = 'o-que-mudou';
 
 export function OQueMudou({ cfg = TRANSICAO_ACESSO }: { cfg?: ConfigTransicao }) {
-  const { promessa, decisao, corte } = datasDaTransicao(cfg);
+  const { promessa, decisao, corte, anuncio, abertoAte } = datasDaTransicao(cfg);
   return (
     <section className="card" aria-labelledby={ID_O_QUE_MUDOU} style={{ margin: '1.5rem 0' }}>
       <h2 id={ID_O_QUE_MUDOU}>O que mudou</h2>
       <p>
-        <strong>Esta página prometia a trilha inteira gratuita, e isso mudou.</strong> De {promessa} até {corte ?? 'esta atualização'}, ela dizia que a trilha completa, do nível 0 ao 14, ficaria gratuita para sempre, em qualquer plano. Essa promessa foi retirada, e a frase “A Alicerce é gratuita”, da página Sobre, também foi corrigida. A decisão foi confirmada em {decisao} e vale {corte ? `desde ${corte}` : 'a partir desta versão da página'}: os níveis 0 e 1 continuam gratuitos, e os níveis 2 a 14 passam a fazer parte da assinatura Premium.
+        <strong>Esta página prometia a trilha inteira gratuita, e isso mudou.</strong> De {promessa} até {anuncio ?? corte ?? 'esta atualização'}, ela dizia que a trilha completa, do nível 0 ao 14, ficaria gratuita para sempre, em qualquer plano. {anuncio && abertoAte ? `Em ${anuncio}, a mudança foi anunciada aqui, e os níveis 2 a 14 continuaram abertos até ${abertoAte}. ` : ''}Essa promessa foi retirada, e a frase “A Alicerce é gratuita”, da página Sobre, também foi corrigida. A decisão foi confirmada em {decisao} e vale {corte ? `desde ${corte}` : 'a partir desta versão da página'}: os níveis 0 e 1 continuam gratuitos, e os níveis 2 a 14 passam a fazer parte da assinatura Premium.
       </p>
       <p>
         A mesma página também anunciava o tutor com IA no plano gratuito, com até 60 perguntas por dia (300 no Premium), embora ele estivesse desligado na demonstração publicada. Agora o tutor com IA fica só no Premium, com até {PLANS.premium.tutorDailyLimit} perguntas por dia dentro de {PLANS.premium.tutorMonthlyLimit} por mês.
@@ -54,7 +54,7 @@ interface CaixaProps {
 
 /** A caixa do aviso, sem estado: o texto curto, dois links e o botão de fechar. Esc também fecha. */
 export function AvisoTransicaoCaixa({ cfg = TRANSICAO_ACESSO, onFechar, onEntender }: CaixaProps) {
-  const { promessa, corte } = datasDaTransicao(cfg);
+  const { promessa, corte, anuncio } = datasDaTransicao(cfg);
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Escape') {
       e.stopPropagation();
@@ -68,7 +68,7 @@ export function AvisoTransicaoCaixa({ cfg = TRANSICAO_ACESSO, onFechar, onEntend
           <strong>A regra de acesso gratuito mudou</strong>
         </p>
         <p>
-          De {promessa} até {corte ?? 'esta atualização'}, a página Planos dizia que a trilha inteira seria gratuita para sempre. Isso mudou: continuam gratuitos os níveis 0 e 1, o laboratório, o glossário e o tutor local; os níveis 2 a 14 passam para o Premium, que ainda não está à venda. Ninguém foi cobrado, e o seu progresso continua neste navegador.
+          De {promessa} até {anuncio ?? corte ?? 'esta atualização'}, a página Planos dizia que a trilha inteira seria gratuita para sempre. Isso mudou: continuam gratuitos os níveis 0 e 1, o laboratório, o glossário e o tutor local; os níveis 2 a 14 passam para o Premium, que ainda não está à venda. Ninguém foi cobrado, e o seu progresso continua neste navegador.
         </p>
         <p className="row">
           <Link to={`/planos#${ID_O_QUE_MUDOU}`} onClick={onEntender}>

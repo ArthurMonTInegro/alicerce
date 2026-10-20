@@ -78,8 +78,15 @@ describe('/planos: seção "O que mudou" (texto obrigatório)', () => {
     expect(t).toContain('Essa promessa foi retirada');
     // a página Sobre também dizia "A Alicerce é gratuita" na demo publicada
     expect(t).toContain('a frase “A Alicerce é gratuita”, da página Sobre, também foi corrigida');
-    expect(t).toContain('De 7 de outubro de 2026 até esta atualização');
+    // carência decidida em 20/10/2026: a promessa saiu do ar no anúncio, e os níveis ficaram abertos até a véspera do corte
+    expect(t).toContain('De 7 de outubro de 2026 até 20 de outubro de 2026, ela dizia');
+    expect(t).toContain('Em 20 de outubro de 2026, a mudança foi anunciada aqui, e os níveis 2 a 14 continuaram abertos até 19 de novembro de 2026.');
+    expect(t).toContain('vale desde 20 de novembro de 2026');
     expect(t).toContain('confirmada em 13 de outubro de 2026');
+    // sem data de corte, o texto não inventa uma
+    const semData = texto(renderToStaticMarkup(<OQueMudou cfg={{ ...TRANSICAO_ACESSO, corte: null }} />));
+    expect(semData).toContain('De 7 de outubro de 2026 até esta atualização');
+    expect(semData).not.toContain('foi anunciada');
   });
 
   it('também diz que o tutor com IA saiu do gratuito (a página publicada anunciava 60 perguntas por dia no gratuito)', () => {

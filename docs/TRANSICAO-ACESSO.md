@@ -1,6 +1,6 @@
 # Transição de acesso: da trilha inteira gratuita para níveis 0 e 1 gratuitos
 
-Situação em 14/10/2026: **preparado no branch `premium/transicao`, revisado duas vezes em `premium/transicao-rev` e integrado em `integracao-codex`; nada publicado.** O aviso está desligado, não há data de corte decidida, nenhuma cobrança foi ativada e a demonstração pública continua com o texto antigo. As decisões que faltam estão em [Para o Arthur decidir](#para-o-arthur-decidir).
+Situação em 20/10/2026: **o Arthur escolheu a carência de 30 dias** (opção 2 de [Para o Arthur decidir](#para-o-arthur-decidir)). Em 20/10/2026, a demonstração recebe só o aviso de que o acesso vai mudar e a seção "O que vai mudar" em `/planos`, com todos os níveis ainda abertos (branch `carencia/aviso`, sobre a `main` publicada). Esta versão, com os níveis 2 a 14 fechados, vai ao ar no corte, **20/11/2026**, pelo PR #1. A configuração já está em `TRANSICAO_ACESSO`: `anunciadaEm: '2026-10-20'`, `corte: '2026-11-20'` e `avisoLigado: true`. Nenhuma cobrança foi ativada.
 
 ## O que aconteceu
 
@@ -150,12 +150,12 @@ Vistos e mantidos:
 Cada opção, com a consequência em uma linha. As opções 2 e 3 podem ser somadas à 1.
 
 1. **Só o aviso e a seção "O que mudou".** Os níveis 2 a 14 fecham no dia da publicação: quem estudava fica sabendo da mudança depois que ela já aconteceu.
-2. **Período de carência na demo antes de fechar os níveis 2 a 14** (publicar a seção com a data futura, sem contagem regressiva, e fechar na data; os textos de hoje supõem que o corte é o dia da publicação, como em "vale desde <data>", e precisariam ser reescritos no futuro). Quem estudava tem tempo de terminar o que começou e exportar o progresso, mas o conteúdo pago fica mais tempo em arquivos públicos, e são necessárias duas publicações.
+2. **Escolhida em 20/10/2026, com 30 dias.** **Período de carência na demo antes de fechar os níveis 2 a 14** (publicar a seção com a data futura, sem contagem regressiva, e fechar na data; os textos de hoje supõem que o corte é o dia da publicação, como em "vale desde <data>", e precisariam ser reescritos no futuro). Quem estudava tem tempo de terminar o que começou e exportar o progresso, mas o conteúdo pago fica mais tempo em arquivos públicos, e são necessárias duas publicações.
 3. **Benefício para quem estudou na demo quando houver cobrança** (por exemplo, um período sem custo). No aparelho não dá para comprovar quem estudou, porque o progresso é dado do cliente e pode ser importado ou editado, e dado do cliente não autoriza nada. Na prática, o benefício vira autodeclarado (aberto a quem pedir) ou geral de lançamento.
 
+Decididos em 20/10/2026: a data de corte (20/11/2026) e quando ligar o aviso (no corte; antes dele, a demo mostra o aviso da carência, com outra chave de fechamento, `alicerce:aviso-carencia:fechado:v1`, para que quem fechou um veja o outro).
+
 Também falta decidir:
-- a data de corte;
-- quando ligar o aviso;
 - se o texto "sem prazo de expiração" fica em `/planos`;
 - se, quando houver servidor com contas, as afetadas recebem um e-mail;
 - se `/sobre` volta a ter um título sobre código aberto, o que depende de escolher uma licença para o código.

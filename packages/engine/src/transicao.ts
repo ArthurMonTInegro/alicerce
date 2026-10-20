@@ -15,7 +15,7 @@
  */
 import type { ProgressState } from './progress.ts';
 
-/** Configuração única da transição. A data de corte e o aviso só valem quando o Arthur decidir. */
+/** Configuração única da transição (data de corte, anúncio e aviso), como o Arthur decidiu. */
 export interface ConfigTransicao {
   /** Quando /planos passou a dizer que a trilha inteira ficaria gratuita para sempre (commit d46f468). */
   readonly promessaPublicadaEm: string;
@@ -30,6 +30,12 @@ export interface ConfigTransicao {
    * null = ainda não decidida.
    */
   readonly corte: string | null;
+  /**
+   * Quando a mudança foi anunciada no site, antes do corte (AAAA-MM-DD). Com a
+   * carência, a promessa antiga saiu do ar nessa data, e os níveis 2 a 14 ficaram
+   * abertos até a véspera do corte. null = anunciada no próprio dia do corte.
+   */
+  readonly anunciadaEm?: string | null;
   /** Liga o aviso único. Sem uma data de corte válida, o aviso continua desligado. */
   readonly avisoLigado: boolean;
 }
@@ -38,8 +44,11 @@ export const TRANSICAO_ACESSO: ConfigTransicao = {
   promessaPublicadaEm: '2026-10-07',
   estrategiaRegistradaEm: '2026-10-10',
   estrategiaConfirmadaEm: '2026-10-13',
-  corte: null,
-  avisoLigado: false,
+  // Carência de 30 dias, decidida pelo Arthur em 20/10/2026: o aviso de que ia mudar
+  // foi publicado em 20/10, e esta versão vai ao ar no corte, 20/11/2026.
+  anunciadaEm: '2026-10-20',
+  corte: '2026-11-20',
+  avisoLigado: true,
 };
 
 /** Níveis que a promessa antiga dizia gratuitos e que a estratégia nova põe na assinatura. */

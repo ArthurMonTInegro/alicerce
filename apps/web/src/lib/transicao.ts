@@ -135,11 +135,25 @@ export function dataPorExtenso(iso: string): string {
   return `${dia === 1 ? '1º' : dia} de ${mes} de ${m[1]}`;
 }
 
-/** Datas que os textos de /planos e do aviso mostram. `corte` é null enquanto não houver data decidida. */
+/** O dia anterior a uma data AAAA-MM-DD válida, no mesmo formato; senão null. */
+function vespera(iso: string | null | undefined): string | null {
+  const t = instanteDoCorte(iso);
+  return t === null ? null : new Date(t - 86_400_000 - 3 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Datas que os textos de /planos e do aviso mostram. `corte` é null enquanto não houver data
+ * decidida. Com carência, `anuncio` é quando a promessa saiu do ar e `abertoAte`, a véspera do corte.
+ */
 export function datasDaTransicao(cfg: ConfigTransicao = TRANSICAO_ACESSO) {
+  const corte = cfg.corte && instanteDoCorte(cfg.corte) !== null ? cfg.corte : null;
+  const anuncio = corte && cfg.anunciadaEm && instanteDoCorte(cfg.anunciadaEm) !== null && cfg.anunciadaEm < corte ? cfg.anunciadaEm : null;
+  const abertoAte = anuncio ? vespera(corte) : null;
   return {
     promessa: dataPorExtenso(cfg.promessaPublicadaEm),
     decisao: dataPorExtenso(cfg.estrategiaConfirmadaEm),
-    corte: cfg.corte && instanteDoCorte(cfg.corte) !== null ? dataPorExtenso(cfg.corte) : null,
+    corte: corte ? dataPorExtenso(corte) : null,
+    anuncio: anuncio ? dataPorExtenso(anuncio) : null,
+    abertoAte: abertoAte ? dataPorExtenso(abertoAte) : null,
   };
 }

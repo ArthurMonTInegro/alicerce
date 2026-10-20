@@ -32,10 +32,11 @@ function progresso(f: (p: ProgressState) => void): ProgressState {
 }
 
 describe('configuração da transição', () => {
-  it('vem desligada e sem data de corte: o aviso não aparece até o Arthur decidir', () => {
-    expect(TRANSICAO_ACESSO.avisoLigado).toBe(false);
-    expect(TRANSICAO_ACESSO.corte).toBeNull();
-    expect(avisoDeTransicaoAtivo(TRANSICAO_ACESSO)).toBe(false);
+  it('carência decidida em 20/10/2026: anúncio em 20/10, corte em 20/11 e aviso ligado', () => {
+    expect(TRANSICAO_ACESSO).toMatchObject({ anunciadaEm: '2026-10-20', corte: '2026-11-20', avisoLigado: true });
+    expect(avisoDeTransicaoAtivo(TRANSICAO_ACESSO)).toBe(true);
+    // o corte conta a partir de 00:00 em Brasília (03:00 UTC)
+    expect(instanteDoCorte(TRANSICAO_ACESSO.corte)).toBe(Date.UTC(2026, 10, 20, 3));
   });
 
   it('o aviso exige a chave ligada E uma data válida', () => {

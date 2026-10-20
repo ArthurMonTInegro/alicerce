@@ -92,11 +92,11 @@ describe('progressoDeVisitante', () => {
 describe('deveMostrarAviso', () => {
   const comAtividadePaga = () => memoria({ 'alicerce:progresso:v1': json((p) => p.attempts.push(tentativa(exPago, CORTE - 3 * DIA))) });
 
-  it('com a configuração padrão (desligada) nunca aparece, e nem lê o progresso', () => {
+  it('com o aviso desligado nunca aparece, e nem lê o progresso', () => {
     const arm = comAtividadePaga();
     const getItem = vi.fn(arm.getItem);
     const montarIndice = vi.fn(() => indice);
-    expect(deveMostrarAviso({ getItem }, montarIndice)).toBe(false);
+    expect(deveMostrarAviso({ getItem }, montarIndice, { ...TRANSICAO_ACESSO, avisoLigado: false })).toBe(false);
     expect(getItem).not.toHaveBeenCalled();
     expect(montarIndice).not.toHaveBeenCalled();
   });
@@ -164,7 +164,12 @@ describe('datas por extenso', () => {
   });
 
   it('sem corte decidido, o corte é null; com corte, vem por extenso', () => {
-    expect(datasDaTransicao()).toEqual({ promessa: '7 de outubro de 2026', decisao: '13 de outubro de 2026', corte: null });
+    expect(datasDaTransicao()).toEqual({ promessa: '7 de outubro de 2026', decisao: '13 de outubro de 2026', corte: '20 de novembro de 2026', anuncio: '20 de outubro de 2026', abertoAte: '19 de novembro de 2026' });
+    expect(datasDaTransicao({ ...TRANSICAO_ACESSO, corte: null })).toEqual({ promessa: '7 de outubro de 2026', decisao: '13 de outubro de 2026', corte: null, anuncio: null, abertoAte: null });
+    // anúncio no dia do corte (ou depois) não é carência
+    expect(datasDaTransicao({ ...TRANSICAO_ACESSO, anunciadaEm: '2026-11-20' })).toMatchObject({ anuncio: null, abertoAte: null });
+    // virada de mês e de ano na véspera
+    expect(datasDaTransicao({ ...TRANSICAO_ACESSO, anunciadaEm: '2026-12-01', corte: '2027-01-01' }).abertoAte).toBe('31 de dezembro de 2026');
     expect(datasDaTransicao(LIGADO).corte).toBe('20 de outubro de 2026');
     expect(datasDaTransicao({ ...LIGADO, corte: '2026-02-30' }).corte).toBeNull();
   });
