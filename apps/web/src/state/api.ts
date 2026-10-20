@@ -63,7 +63,8 @@ export const api = {
   async me(): Promise<User | null> {
     if (STATIC_SITE) return null;
     try {
-      return withEnt(await call<AuthReply>('GET', '/auth/me'));
+      // Com o servidor travado, a página não fica inerte para sempre (ver authChecked no store).
+      return withEnt(await call<AuthReply>('GET', '/auth/me', undefined, AbortSignal.timeout(10_000)));
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) return null;
       throw e;

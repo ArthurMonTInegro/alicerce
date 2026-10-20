@@ -53,9 +53,8 @@ const executar = (page: Page) => page.getByRole('button', { name: /Executar/ }).
 
 /**
  * Com a sessão no contexto, espera o site reconhecer a conta antes de mexer no laboratório.
- * Quando /api/auth/me responde, o Layout remonta a página (key = id da conta): o que foi
- * digitado ou executado antes disso se perde. Numa rodada da suíte inteira, sob carga, o clique
- * em "Executar" caiu antes da remontagem e a saída nunca apareceu.
+ * Quando /api/auth/me responde, o Layout remonta a página (key = id da conta). Até lá o conteúdo
+ * fica inerte (teste em fluxos.spec.ts), e um clique em "Executar" antes disso não chega ao botão.
  */
 async function contaReconhecida(page: Page) {
   const cookies = await page.context().cookies();

@@ -48,7 +48,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { path } = useLocation();
   const [menu, setMenu] = useState(false);
   const progress = useProgress();
-  const { user } = useAuth();
+  const { user, authChecked } = useAuth();
   const { open } = useTutor();
   const [now, setNow] = useState(0);
   useEffect(() => setNow(Date.now()), [progress]);
@@ -94,7 +94,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main id="conteudo" tabIndex={-1}>
         <AvisoTransicao />
         <SaveStatus />
-        <div key={user?.id ?? 'guest'}>{children}</div>
+        <div key={user?.id ?? 'guest'} inert={!authChecked} aria-busy={authChecked ? undefined : true}>{children}</div>
       </main>
       <footer className="site-footer">
         <div className="container">

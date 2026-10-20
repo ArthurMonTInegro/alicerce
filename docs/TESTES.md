@@ -7,7 +7,7 @@ Quatro camadas, todas rodando no CI (`.github/workflows/ci.yml`) a cada push e p
 | Tipos | `npm run typecheck` | Os 4 projetos (engine, content, api, web) compilam em modo estrito; com o privado, os tipos dele também | sem erros | sem erros |
 | Unidade | `npm test` | Motor, integridade do conteúdo, API, backup, contas, transição e limites da execução | 32 arquivos: 280 passaram, 3 pulados (só com o privado) | 282 passaram, 1 pulado (só sem o privado) |
 | Soluções | `npm run test:solutions` | A solução oficial passa nos testes, o código inicial não passa, e a resposta de cada "prever a saída" é a saída real | 27 exercícios executáveis (níveis 0 e 1), 0 problemas | 290, 0 problemas |
-| Ponta a ponta | `npm run test:e2e` | Fluxos reais num Chromium, em desktop e celular (Pixel 7) | 116 testes com `PAGES_DIST`: 86 passaram, 30 pulados (os só de desktop no celular, o de rolagem só no celular, e o JavaScript Premium, que precisa do privado), em 15/10/2026, já com a seção "Compromissos" de volta a `/planos` e os objetivos novos. Numa rodada anterior no mesmo dia, um teste de isolamento falhou porque clicou em "Executar" antes de o site reconhecer a conta; o teste passou a esperar por isso | `e2e/isolamento.spec.ts` no desktop: 20 passaram, 1 pulado (o caso sem o privado), inclusive o JavaScript Premium |
+| Ponta a ponta | `npm run test:e2e` | Fluxos reais num Chromium, em desktop e celular (Pixel 7) | 118 testes com `PAGES_DIST`: 88 passaram, 30 pulados (os só de desktop no celular, o de rolagem só no celular, e o JavaScript Premium, que precisa do privado), em 20/10/2026, com o conteúdo inerte até a conta ser reconhecida. Em 15/10/2026, um teste de isolamento tinha falhado porque clicou em "Executar" antes de o site reconhecer a conta, e a remontagem apagou a execução; agora a página não aceita o clique antes disso. No GitHub, o CI do PR #1 rodou a suíte inteira e passou em 20/10/2026 | `e2e/isolamento.spec.ts` no desktop: 20 passaram, 1 pulado (o caso sem o privado), inclusive o JavaScript Premium |
 
 ## Com e sem o repositório privado
 
@@ -31,7 +31,7 @@ O conteúdo das aulas dos níveis 2 a 14 fica num repositório privado (ver [PRE
 
 ## Ponta a ponta
 
-`e2e/fluxos.spec.ts`: navegação sem erros de console, as 8 etapas de uma lição com conclusão, Python executado de verdade no laboratório, erro traduzido e explicado, JavaScript na página de execução isolada, diagnóstico completo, cadastro com sincronização e saída, tutor recusando entregar a resposta (pedida de dentro de um exercício de código do nível 1: recusa, dá a próxima pista e nenhuma linha da solução oficial aparece), 404 amigável e HTML pré-renderizado legível sem JavaScript.
+`e2e/fluxos.spec.ts`: navegação sem erros de console, as 8 etapas de uma lição com conclusão, Python executado de verdade no laboratório, erro traduzido e explicado, JavaScript na página de execução isolada, diagnóstico completo, cadastro com sincronização e saída, conteúdo inerte até o site reconhecer a conta (com `/api/auth/me` segurado de propósito) e laboratório funcionando depois disso, tutor recusando entregar a resposta (pedida de dentro de um exercício de código do nível 1: recusa, dá a próxima pista e nenhuma linha da solução oficial aparece), 404 amigável e HTML pré-renderizado legível sem JavaScript.
 
 `e2e/a11y.spec.ts`: axe-core com regras WCAG 2.2 AA em 16 páginas e nas etapas Explicação, Exercícios e Desafio de todas as lições (lista lida do sitemap), contraste no tema escuro e ausência de rolagem horizontal no celular em todas as páginas principais.
 

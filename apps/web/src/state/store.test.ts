@@ -40,6 +40,25 @@ describe('UP02 / UP06 / UP08 / UP10',()=>{
   });
 });
 
+describe('conta conferida antes de liberar a página',()=>{
+  it('authChecked só vira true quando /api/auth/me responde, com conta, sem conta ou com erro',async()=>{
+    for(const resposta of [{id:'A'},null,new Error('offline')]){
+      vi.resetModules();const s=await import('./store.ts');let responder!:()=>void;
+      mock.me.mockImplementationOnce(()=>new Promise((ok,falha)=>{responder=()=>resposta instanceof Error?falha(resposta):ok(resposta);}));
+      expect(s.getSaveStatus().authChecked).toBe(false);
+      const p=s.initAuth();await vi.advanceTimersByTimeAsync(10);expect(s.getSaveStatus().authChecked).toBe(false);
+      responder();await p;expect(s.getSaveStatus().authChecked).toBe(true);
+      expect(s.getSaveStatus().user?.id).toBe(resposta instanceof Error||!resposta?undefined:'A');
+    }
+  });
+  it('entrar enquanto /api/auth/me ainda não respondeu: a resposta velha não troca a conta, mas libera a página',async()=>{
+    const s=await import('./store.ts');let responder!:(x:unknown)=>void;
+    mock.me.mockImplementationOnce(()=>new Promise(ok=>{responder=ok;}));mock.login.mockResolvedValue({id:'B'});
+    const p=s.initAuth();await s.signIn('login','b','p');responder(null);await p;
+    expect(s.getSaveStatus().user?.id).toBe('B');expect(s.getSaveStatus().authChecked).toBe(true);
+  });
+});
+
 describe('sair de todos os aparelhos e excluir a conta',()=>{
   const offline=()=>new TypeError('Failed to fetch');
   const status=(n:number,message='x')=>Object.assign(new Error(message),{status:n});

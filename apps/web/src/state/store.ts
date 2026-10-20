@@ -23,6 +23,7 @@ import {
 } from '@alicerce/engine';
 import { cardIds, lessonById, modules, type Exercise } from '../content.ts';
 import { api, ApiError, type User } from './api.ts';
+import { STATIC_SITE } from '../lib/base.ts';
 
 const LEGACY_KEY = 'alicerce:progresso:v1';
 let scope = 'guest';
@@ -321,9 +322,16 @@ type SyncStatus = 'offline' | 'idle' | 'syncing' | 'error';
 let user: User | null = null;
 let syncStatus: SyncStatus = 'offline';
 const authListeners = new Set<() => void>();
-let authSnapshot: {user:User|null;syncStatus:SyncStatus;localSave:LocalSave;lastSync:number|null;logoutPending:boolean} = { user, syncStatus, localSave, lastSync, logoutPending };
+// Até a primeira resposta de /api/auth/me não se sabe de quem é a página. Quando a conta chega,
+// o Layout remonta o conteúdo (key = id da conta), e o que o aluno tivesse feito antes se perderia.
+// Enquanto authChecked é false, o Layout deixa o conteúdo inerte. Na demonstração estática não há conta.
+let authChecked = STATIC_SITE;
+type AuthSnapshot = {user:User|null;syncStatus:SyncStatus;localSave:LocalSave;lastSync:number|null;logoutPending:boolean;authChecked:boolean};
+let authSnapshot: AuthSnapshot = { user, syncStatus, localSave, lastSync, logoutPending, authChecked };
+// Na pré-renderização e na hidratação a página sai interativa; a trava só vale depois que o JavaScript assume.
+const SERVER_AUTH: AuthSnapshot = { ...authSnapshot, authChecked: true };
 function emitAuth() {
-  authSnapshot = { user, syncStatus, localSave, lastSync, logoutPending };
+  authSnapshot = { user, syncStatus, localSave, lastSync, logoutPending, authChecked };
   for (const l of authListeners) l();
 }
 
@@ -334,7 +342,7 @@ export function useAuth() {
       return () => authListeners.delete(cb);
     },
     () => authSnapshot,
-    () => authSnapshot,
+    () => SERVER_AUTH,
   );
 }
 
@@ -392,18 +400,18 @@ export async function syncNow() {
 }
 
 export async function initAuth() {
-  if(logoutPending)return;
+  if(logoutPending){authChecked=true;emitAuth();return;}
   const currentGeneration=generation;
   try {
     const next = await api.me();
-    if(currentGeneration!==generation)return;
-    if(next?.id!==user?.id)switchUser(next);
+    if(currentGeneration===generation && next?.id!==user?.id)switchUser(next);
   } catch {
-    if(currentGeneration!==generation)return;
-    switchUser(null);
+    if(currentGeneration===generation)switchUser(null);
   }
+  // Se a geração mudou (entrou ou saiu no meio), quem decidiu a conta foi signIn/signOut.
+  authChecked=true;
   emitAuth();
-  if (user) await syncNow();
+  if (user && currentGeneration===generation) await syncNow();
 }
 
 export async function signIn(kind: 'login' | 'register', email: string, password: string, name?: string) {

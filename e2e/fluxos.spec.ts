@@ -101,6 +101,33 @@ test('conta: cadastro, sincronização e saída', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Entrar' })).toBeVisible();
 });
 
+test('com conta, a página só aceita interação depois que a conta é reconhecida', async ({ page }) => {
+  // Quando /api/auth/me responde, o conteúdo remonta para a conta (key = id). Antes disso ele fica
+  // inerte, para que nada do que o aluno fizer no laboratório se perca na remontagem.
+  const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2)}@exemplo.com`;
+  const reg = await page.request.post('/api/auth/register', { data: { email, password: 'uma frase bem longa', name: '' }, headers: { 'x-alicerce': '1' } });
+  expect(reg.ok()).toBe(true);
+  let liberar!: () => void;
+  const segurar = new Promise<void>((ok) => (liberar = ok));
+  await page.route('**/api/auth/me', async (route) => {
+    await segurar;
+    await route.continue();
+  });
+  await page.goto('/laboratorio');
+  const conteudo = page.locator('main#conteudo > div[aria-busy]');
+  await expect(conteudo).toHaveAttribute('inert', '');
+  liberar();
+  await expect(page.getByRole('link', { name: /^Conta de / })).toBeVisible();
+  await expect(page.locator('main#conteudo [inert]')).toHaveCount(0);
+  const ed = page.locator('.cm-content').first();
+  await ed.click();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('Delete');
+  await page.keyboard.insertText('print("depois da conta")');
+  await page.getByRole('button', { name: /Executar/ }).first().click();
+  await expect(page.locator('pre.output').first()).toContainText('depois da conta', { timeout: 45_000 });
+});
+
 test('tutor responde sem entregar a solução', async ({ page, request }) => {
   // Pedido de resposta feito de dentro de um exercício de código de uma lição gratuita (nível 1):
   // o tutor recebe o exercício como contexto, recusa a solução pronta e dá a próxima pista.
