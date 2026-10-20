@@ -10,6 +10,20 @@ import traceback
 
 USER_FILE = "main.py"
 MAX_TRACE_STEPS = 400
+MAX_OUTPUT_CHARS = 65536
+
+
+class OutputLimitError(Exception):
+    pass
+
+
+class _BoundedOutput(io.StringIO):
+    def write(self, text):
+        remaining = MAX_OUTPUT_CHARS - self.tell()
+        if len(text) > remaining:
+            super().write(text[:max(0, remaining)])
+            raise OutputLimitError("Saída limitada a 65536 caracteres. Reduza os prints e tente novamente.")
+        return super().write(text)
 
 _repr = reprlib.Repr()
 _repr.maxstring = 60
@@ -77,7 +91,7 @@ class _Input:
 
 def run(user_code, tests_json="[]", stdin_text="", trace=False):
     tests = json.loads(tests_json)
-    out = io.StringIO()
+    out = _BoundedOutput()
     ns = {"__name__": "__main__", "__builtins__": builtins}
     result = {"ok": True, "phase": "run", "stdout": "", "error": None, "tests": [], "steps": []}
     old_stdout, old_input = sys.stdout, builtins.input

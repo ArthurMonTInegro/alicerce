@@ -23,7 +23,7 @@ export function Glossario() {
   return (
     <div className="container">
       <p className="eyebrow">Glossário · glossary</p>
-      <h1>Glossário técnico</h1>
+      <h1>Glossário técnico</h1><p className="callout">Vá além das palavras: <Link to="/ingles">pratique inglês em situações reais →</Link></p>
       <p className="lead">Cada termo em português e em inglês, com definição curta, exemplo de uso real e pronúncia. Ler documentação em inglês começa por aqui.</p>
       <div className="row" style={{ marginBottom: '1rem' }}>
         <div className="field-group" style={{ flex: 1, minWidth: 220, margin: 0 }}>

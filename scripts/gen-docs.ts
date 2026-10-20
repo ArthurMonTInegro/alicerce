@@ -6,7 +6,7 @@ const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 const refById = new Map(references.map((r) => [r.id, r]));
 const out: string[] = [];
 out.push('# Pesquisa', '', '<!-- gerado por scripts/gen-docs.ts a partir de packages/content/src/research.ts e references.ts; não edite à mão -->', '');
-out.push('A pesquisa serviu para decidir **escopo, sequência e método**. Nenhum curso foi copiado: de cada fonte registramos o que ela ensina e a decisão concreta que tomamos. Todas as URLs foram abertas durante a pesquisa. Quando só encontramos uma fonte secundária confiável, a nota diz isso.', '');
+out.push('A pesquisa serviu para decidir **escopo, sequência e método**. Nenhum curso foi copiado: de cada fonte registramos o que ela ensina e a decisão concreta que tomamos. As URLs da pesquisa inicial foram abertas durante ela; as acrescentadas depois, com os aprofundamentos teóricos, não foram reconferidas uma a uma. Quando só encontramos uma fonte secundária confiável, ou quando a página não abriu, a nota diz isso.', '');
 out.push('## Currículos nacionais', '', '| Onde | Fonte | O que observamos | Decisão |', '|---|---|---|---|');
 for (const s of countryCurricula) out.push(`| ${cell(s.where)} | [${cell(s.title)}](${s.url}) | ${cell(s.finding)} | ${cell(s.decision)} |`);
 out.push('', '## Universidades fora dos EUA', '', '| Onde | Programa | O que observamos | Decisão |', '|---|---|---|---|');

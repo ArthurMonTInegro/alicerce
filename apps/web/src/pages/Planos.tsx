@@ -1,131 +1,15 @@
-import { DEFAULT_TUTOR_DAILY_LIMIT, FEATURES, FOREVER_FREE, formatBRL, PLANS, PREMIUM_FOR_SALE, yearlyDeal, type Feature } from '@alicerce/engine';
-import { STATIC_SITE } from '../lib/base.ts';
-import { useHead } from '../lib/head.tsx';
-import { Link } from '../lib/router.tsx';
-
-const price = PLANS.premium.price!;
-const deal = yearlyDeal(price);
-const paidOnly = PLANS.premium.features.filter((f) => !PLANS.free.features.includes(f));
-/** Recursos que precisam do servidor e por isso não funcionam na demonstração estática. */
-const NEEDS_SERVER: Feature[] = ['tutor-ia', 'sincronizacao'];
-const priceText = `${formatBRL(price.monthly)} por mês ou ${formatBRL(price.yearly)} por ano`;
-
-function FeatureItem({ f }: { f: Feature }) {
-  const info = FEATURES[f];
-  return (
-    <li>
-      <strong>{info.title}</strong>
-      {FOREVER_FREE.includes(f) && (
-        <>
-          {' '}
-          <span className="badge ok">grátis para sempre</span>
-        </>
-      )}
-      {info.status === 'planejado' && (
-        <>
-          {' '}
-          <span className="badge warn">em construção</span>
-        </>
-      )}
-      {STATIC_SITE && NEEDS_SERVER.includes(f) && (
-        <>
-          {' '}
-          <span className="badge">desligado nesta demonstração</span>
-        </>
-      )}
-      <span className="small muted" style={{ display: 'block' }}>
-        {info.description}
-      </span>
-    </li>
-  );
-}
-
-export function Planos() {
-  useHead(
-    'Planos',
-    PREMIUM_FOR_SALE
-      ? `A trilha inteira da Alicerce é gratuita para sempre. O premium custa ${priceText}.`
-      : `Hoje tudo na Alicerce é gratuito, e a trilha fica gratuita para sempre. O premium ainda não está à venda; o preço previsto é ${priceText}.`,
-  );
-  return (
-    <div className="container prose" style={{ maxWidth: '84ch' }}>
-      <p className="eyebrow">Planos · pricing</p>
-      <h1>Planos</h1>
-      <p className="lead">
-        {PREMIUM_FOR_SALE
-          ? `A trilha inteira da Alicerce é gratuita para sempre. O premium custa ${priceText} e traz recursos que o plano gratuito não tem.`
-          : `Hoje, tudo o que existe na Alicerce é gratuito, e a trilha inteira fica gratuita para sempre. O premium ainda não está à venda. O preço previsto é ${priceText}, e ele vai trazer recursos que o plano gratuito não tem.`}
-      </p>
-
-      <div className="grid two" style={{ margin: '1.5rem 0' }}>
-        <section className="card" aria-labelledby="h-gratuito">
-          <h2 id="h-gratuito">{PLANS.free.name}</h2>
-          <p style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.25rem 0 1rem' }}>R$ 0</p>
-          <ul>
-            {PLANS.free.features.map((f) => (
-              <FeatureItem key={f} f={f} />
-            ))}
-          </ul>
-          <p className="small muted">
-            {STATIC_SITE ? (
-              <>
-                Esta é a versão de demonstração, publicada sem servidor e sem contas: por enquanto, a sincronização e o tutor com IA ficam desligados, e o tutor funciona no modo de pistas guiadas. Veja <Link to="/conta">Conta</Link>.
-              </>
-            ) : (
-              `O tutor com IA pede uma conta gratuita e responde até ${DEFAULT_TUTOR_DAILY_LIMIT} perguntas por dia.`
-            )}
-          </p>
-        </section>
-
-        <section className="card" aria-labelledby="h-premium">
-          <h2 id="h-premium">
-            {PLANS.premium.name}
-            {!PREMIUM_FOR_SALE && (
-              <>
-                {' '}
-                <span className="badge info">ainda não está à venda</span>
-              </>
-            )}
-          </h2>
-          <p style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.25rem 0 0' }}>{formatBRL(price.monthly)} por mês</p>
-          <p style={{ margin: '0 0 1rem' }}>
-            ou <strong>{formatBRL(price.yearly)} por ano</strong>: equivale a {formatBRL(deal.perMonth)} por mês, {formatBRL(deal.savings)} ({deal.savingsPercent}%) a menos que 12 mensalidades.
-          </p>
-          <ul>
-            <li>
-              <strong>Tudo do plano gratuito</strong>
-            </li>
-            <li>
-              <strong>Tutor com IA com até {PLANS.premium.tutorDailyLimit} perguntas por dia</strong>
-              <span className="small muted" style={{ display: 'block' }}>
-                No gratuito, são {DEFAULT_TUTOR_DAILY_LIMIT}.
-              </span>
-            </li>
-            {paidOnly.map((f) => (
-              <FeatureItem key={f} f={f} />
-            ))}
-          </ul>
-        </section>
-      </div>
-
-      {!PREMIUM_FOR_SALE && (
-        <>
-          <h2>Quando o premium começa</h2>
-          <p>
-            Só quando pelo menos um dos recursos marcados como <em>em construção</em> estiver pronto e houver um provedor de pagamento para fazer a cobrança. Até lá, nada é cobrado, e os recursos em construção ainda não existem. Se o preço previsto mudar antes do lançamento, esta página muda antes de qualquer cobrança.
-          </p>
-        </>
-      )}
-
-      <h2>Compromissos</h2>
-      <ul>
-        <li>A trilha completa (níveis 0 a 14, com lições, visualizações e projetos), os exercícios, a revisão espaçada, o laboratório e o tutor com pistas guiadas ficam gratuitos para sempre, em qualquer plano.</li>
-        <li>Cancelar vai ser simples, a partir da sua conta, sem etapas para dificultar. Quem assinar pode desistir em até 7 dias e recebe o valor de volta, como garante o Código de Defesa do Consumidor (art. 49). O que acontece com o plano anual depois desses 7 dias vai estar escrito antes da assinatura.</li>
-        <li>Sem publicidade invasiva, sem contagem regressiva, sem falsa urgência e sem venda de dados.</li>
-        <li>
-          Quando houver cobrança, os dados do cartão vão ficar só com o provedor de pagamento, nunca na Alicerce. Sobre o plano, a Alicerce guarda qual é o plano da conta, até quando ele vale e o histórico de mudanças. Veja <Link to="/privacidade">Privacidade</Link>.
-        </li>
-      </ul>
-    </div>
-  );
+import {PLANS,formatBRL} from '@alicerce/engine';
+import {useHead} from '../lib/head.tsx';
+import {Link} from '../lib/router.tsx';
+import {OQueMudou} from '../components/TransicaoAcesso.tsx';
+export function Planos(){
+ useHead('Planos: comece grátis, continue com Premium','Aprenda computação e lógica gratuitamente. Continue do Python aos assuntos avançados com a assinatura Premium, em preparação.');
+ return <div className="container prose" style={{maxWidth:'90ch'}}><p className="eyebrow">UMA BASE GRATUITA. UM CAMINHO PARA CONTINUAR.</p><h1>Comece a programar.<br/>Continue evoluindo.</h1><p className="lead">Construa sua base sem pagar. Quando estiver pronto para aprender Python e novos assuntos, o Premium será o próximo passo.</p><p className="callout"><strong>Nova estratégia em preparação.</strong> O percurso gratuito já está disponível. O Premium ainda não está à venda: não há cobrança nem ativação de assinatura nesta demonstração.</p>
+ <OQueMudou/>
+ <div className="grid two" style={{margin:'2rem 0'}}><section className="card"><span className="badge">COMECE A PROGRAMAR</span><h2>Gratuito</h2><p className="stat">R$ 0</p><p>Uma trilha inicial completa, sem prazo de expiração.</p><ul><li>Nível 0: Introdução à Computação.</li><li>Nível 1: Lógica de Programação.</li><li>15 lições e 54 exercícios, até funções e resolução de problemas.</li><li>Dicas, correção e revisão das lições liberadas.</li><li>Laboratório, glossário, missões introdutórias de inglês e roteiros de projetos como recursos abertos.</li><li>Tutor local com pistas e busca na base gratuita, sem cota comercial.</li></ul><p>O gratuito não inclui chamadas ao modelo de IA externo.</p><Link to="/nivel/n0" className="btn accent">Começar gratuitamente</Link></section>
+ <section className="card"><span className="badge">CONTINUE SUA EVOLUÇÃO</span><h2>Premium</h2><p className="stat">{formatBRL(PLANS.premium.price!.monthly)} / mês</p><p>Preço previsto, sujeito à validação antes do lançamento. Referência anual: {formatBRL(PLANS.premium.price!.yearly)}; contratação ainda indisponível.</p><ul><li>Tudo do gratuito.</li><li>Aulas e exercícios dos níveis 2 a 14: Python, estruturas de dados, algoritmos, orientação a objetos, web, bancos e demais assuntos.</li><li>Revisão dos conteúdos liberados pela assinatura.</li><li>Tutor com IA contextual: até {PLANS.premium.tutorDailyLimit} perguntas por dia, dentro de {PLANS.premium.tutorMonthlyLimit} por mês.</li><li>Progresso sincronizado quando o servidor de contas estiver ativo.</li></ul><span className="badge">Assinaturas ainda indisponíveis</span><p><Link to="/nivel/n2">Conhecer a próxima etapa: Python →</Link></p></section></div>
+ <h2>O que muda depois da trilha gratuita?</h2><p>Você já terá estudado variáveis, decisões, repetições e funções. A continuidade aprofunda Python, coleções, arquivos, depuração e testes, antes de avançar para os outros temas. O mapa e as descrições permanecem visíveis para você saber o que vem depois.</p>
+ <h2>Como funciona a cota do tutor</h2><p>No Premium, cada pedido encaminhado ao provedor de IA usa uma pergunta da cota, inclusive se houver falha após o envio. São até 20 por dia e 200 por mês calendário; vale o limite que for atingido primeiro. A contagem reinicia à meia-noite UTC para o dia e no primeiro dia do mês UTC para o mês. Não há acúmulo nem cobrança automática por excedente.</p><p>Quando a cota termina, o tutor local continua disponível. As cotas não limitam a leitura ou a prática das aulas incluídas no plano. Nesta demonstração, o modelo externo está desligado.</p>
+ <h2>Seu progresso continua sendo seu</h2><p>O fim da assinatura restringe o acesso aos conteúdos Premium, sem apagar o progresso registrado. Ao reativar, você pode retomar. Concluir pré-requisitos, usar o diagnóstico ou importar um backup não substitui uma assinatura ativa.</p><p>Os simulados avaliados, certificados e análises avançadas continuam em desenvolvimento e não compõem a oferta disponível.</p>
+ <section aria-labelledby="compromissos"><h2 id="compromissos">Compromissos</h2><p>Hoje não há cobrança: nada está à venda e nenhum dado de pagamento é pedido. Quando a assinatura existir, ela vai seguir estes compromissos:</p><ul><li>Antes de qualquer contratação, esta página vai apresentar as condições de pagamento, renovação, cancelamento e reembolso, inclusive o que acontece com o plano anual depois do prazo de desistência.</li><li>Cancelar vai ser simples, a partir da sua conta, sem etapas para dificultar.</li><li>Quem assinar pode desistir em até 7 dias e recebe de volta o que pagou, como garante o Código de Defesa do Consumidor (art. 49).</li><li>O preço mostrado aqui é uma previsão. Se ele mudar antes do lançamento, esta página muda antes de qualquer cobrança.</li><li>Sem publicidade invasiva, sem contagem regressiva, sem falsa urgência e sem venda de dados.</li><li>Os dados do cartão vão ficar só com o provedor de pagamento, nunca na Alicerce. Sobre o plano, a Alicerce guarda qual é o plano da conta, até quando ele vale e o histórico de mudanças. Veja <Link to="/privacidade">Privacidade</Link>.</li></ul></section><Link to="/trilha">Explorar o mapa completo →</Link></div>;
 }

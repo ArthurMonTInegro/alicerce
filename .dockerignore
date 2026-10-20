@@ -5,7 +5,15 @@ node_modules
 apps/web/public/pyodide
 test-results
 playwright-report
-*.db
-*.db-*
+# banco local, backups e bancos guardados pela restauração (têm dados das contas):
+# sem **/, o padrão só vale na raiz do contexto, e apps/api/data/ entraria na imagem
+apps/api/data
+**/*.db
+**/*.db-*
+**/*.db.antes-da-restauracao-*
+**/*.db.sha256
+**/*.parcial
+**/.*.restaurando-*
 .env
 .git
+premium

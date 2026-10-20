@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
-import { api, ApiError } from '../state/api.ts';
-import { signIn, signOut, syncNow, useAuth } from '../state/store.ts';
+import { ApiError } from '../state/api.ts';
+import { deleteAccount, signIn, signOut, signOutEverywhere, syncNow, useAuth } from '../state/store.ts';
 import { STATIC_SITE } from '../lib/base.ts';
 import { FEATURES, PLANS, PREMIUM_FOR_SALE } from '@alicerce/engine';
 
@@ -14,6 +14,8 @@ export function Conta() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -24,6 +26,7 @@ export function Conta() {
     if (mode === 'register' && password.length < 10) return setError('Use uma senha com pelo menos 10 caracteres. Frases longas são fáceis de lembrar e difíceis de adivinhar.');
     setBusy(true);
     setError('');
+    setNotice('');
     try {
       await signIn(mode, email, password, name);
     } catch (err) {
@@ -39,13 +42,46 @@ export function Conta() {
     }
   };
 
-  const deleteAccount = async () => {
-    if (!window.confirm('Excluir sua conta e todo o progresso salvo no servidor? O progresso neste navegador continua aqui.')) return;
+  const endEverywhere = async () => {
+    setBusy(true);
+    setError('');
+    setNotice('');
     try {
-      await api.deleteAccount();
-      await signOut();
-    } catch {
-      setError('Não consegui excluir a conta agora. Tente de novo.');
+      const ended = await signOutEverywhere();
+      setMode('login');
+      setDeleting(false);
+      setNotice(ended > 1 ? `Pronto: ${ended} sessões encerradas, incluindo a deste aparelho.` : 'Pronto: sessão encerrada em todos os aparelhos.');
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmDelete = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const password = String(new FormData(e.currentTarget).get('password') ?? '');
+    if (!password) return setError('Digite sua senha atual para excluir a conta.');
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await deleteAccount(password);
+      setDeleting(false);
+      setMode('login');
+      setNotice('Conta excluída: os dados dela foram apagados do servidor e as sessões em todos os aparelhos, encerradas. Cópias de segurança feitas antes da exclusão só os perdem quando forem descartadas.');
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.status === 429
+            ? 'Muitas tentativas. Espere alguns minutos e tente de novo.'
+            : err.status === 401
+              ? 'A sessão deste aparelho foi encerrada. Entre de novo para excluir a conta.'
+              : err.message
+          : 'Não consegui falar com o servidor, e a exclusão não foi confirmada. Tente de novo quando a conexão voltar.',
+      );
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -54,7 +90,7 @@ export function Conta() {
       <div className="container prose" style={{ maxWidth: '60ch' }}>
         <p className="eyebrow">Conta · account</p>
         <h1>Conta</h1>
-        <p>Esta é a versão de demonstração, publicada sem servidor. Tudo funciona, mas o progresso fica só neste navegador: criar conta, sincronizar entre aparelhos e o tutor com IA ficam disponíveis quando a plataforma roda com o servidor dela.</p>
+        <p>Esta é a versão de demonstração, publicada sem servidor. A trilha inicial está disponível e o progresso fica neste navegador: criar conta, sincronizar entre aparelhos e o tutor com IA ficam disponíveis quando a plataforma roda com o servidor dela.</p>
         <p>
           Seu progresso pode ser exportado e importado em <Link to="/progresso">Progresso</Link>.
         </p>
@@ -70,7 +106,7 @@ export function Conta() {
         <p>
           <strong>Situação:</strong> {SYNC_LABEL[syncStatus]}
         </p>
-        <p className="small muted">O progresso é salvo no navegador e enviado para sua conta automaticamente. Se você estudar em dois aparelhos, os dois progressos são somados, nada se perde.</p>
+        <p className="small muted">Cada conta tem seu próprio progresso e rascunhos. O progresso de visitante não é importado automaticamente: exporte-o antes de entrar e importe o arquivo em Progresso se quiser combiná-lo com esta conta. Reiniciar o progresso prevalece sobre cópias antigas.</p>
         {user.entitlements && (
           <section aria-labelledby="h-plano" style={{ margin: '1.5rem 0' }}>
             <h2 id="h-plano">
@@ -81,10 +117,10 @@ export function Conta() {
               {user.entitlements.features.map((f) => (
                 <li key={f}>{FEATURES[f].title}</li>
               ))}
-              <li>Tutor com IA: até {user.entitlements.tutorDailyLimit} perguntas por dia</li>
+              <li>Tutor com IA: até {user.entitlements.tutorDailyLimit} perguntas por dia e {user.entitlements.tutorMonthlyLimit} por mês</li>
             </ul>
             <p className="small muted">
-              {PREMIUM_FOR_SALE ? 'A trilha inteira é gratuita.' : 'Hoje, tudo é gratuito. O premium ainda não está à venda.'} Veja <Link to="/planos">Planos</Link>.
+              A trilha inicial é gratuita. O Premium libera os níveis seguintes e ainda não está à venda. Veja <Link to="/planos">Planos</Link>.
             </p>
           </section>
         )}
@@ -92,13 +128,38 @@ export function Conta() {
           <button type="button" className="btn" onClick={() => void syncNow()} disabled={syncStatus === 'syncing'}>
             Sincronizar agora
           </button>
-          <button type="button" className="btn" onClick={() => void signOut().then(() => setMode('login'))}>
+          <button type="button" className="btn" onClick={() => void signOut().then(() => setMode('login')).catch(e=>setError(String(e.message)))}>
             Sair
           </button>
-          <button type="button" className="btn danger" onClick={deleteAccount}>
+          <button type="button" className="btn" onClick={() => void endEverywhere()} disabled={busy}>
+            Sair de todos os aparelhos
+          </button>
+          <button type="button" className="btn danger" aria-expanded={deleting} aria-controls="excluir-conta" onClick={() => (setDeleting(!deleting), setError(''))}>
             Excluir conta
           </button>
         </div>
+        <p className="small muted">Cada sessão vale por até 30 dias no aparelho em que você entrou. “Sair de todos os aparelhos” encerra todas de uma vez, inclusive a deste; use se entrou num computador emprestado ou suspeita de acesso indevido.</p>
+        {deleting && (
+          <form id="excluir-conta" onSubmit={confirmDelete} aria-labelledby="h-excluir" style={{ marginTop: '1.5rem' }}>
+            <h2 id="h-excluir">Excluir conta</h2>
+            <p>Isso apaga do servidor, na hora, a conta, o progresso sincronizado e as sessões em todos os aparelhos. Não dá para desfazer. As cópias de segurança do servidor feitas antes da exclusão ainda guardam esses dados até serem descartadas.</p>
+            <p className="small muted">
+              A cópia do progresso desta conta que está neste navegador não é apagada nem passa para o modo visitante: fica aqui, sem acesso pelo site. Se quiser levá-la, exporte antes em <Link to="/progresso">Progresso</Link>.
+            </p>
+            <div className="field-group">
+              <label htmlFor="c-del-pass">Senha atual</label>
+              <input id="c-del-pass" name="password" type="password" autoComplete="current-password" required maxLength={200} autoFocus />
+            </div>
+            <div className="row">
+              <button type="submit" className="btn danger" disabled={busy}>
+                {busy ? 'Aguarde…' : 'Excluir conta definitivamente'}
+              </button>
+              <button type="button" className="btn" onClick={() => (setDeleting(false), setError(''))}>
+                Cancelar
+              </button>
+            </div>
+          </form>
+        )}
         {error && (
           <p className="field-error" role="alert">
             {error}
@@ -112,7 +173,12 @@ export function Conta() {
     <div className="container prose" style={{ maxWidth: '52ch' }}>
       <p className="eyebrow">Conta · account</p>
       <h1>{mode === 'login' ? 'Entrar' : 'Criar conta'}</h1>
-      <p>A conta é opcional: serve para sincronizar o progresso entre aparelhos e, quando o tutor com IA está ativado, para usá-lo. Todo o resto funciona sem ela. Veja a <Link to="/privacidade">política de privacidade</Link>.</p>
+      <p>Nos níveis 0 e 1, a conta é opcional: serve para sincronizar o progresso entre aparelhos. O Premium (níveis 2 a 14 e tutor com IA) exige conta com assinatura ativa e ainda não está à venda; criar uma conta, sozinho, não libera esses conteúdos. Veja a <Link to="/privacidade">política de privacidade</Link>.</p>
+      {notice && (
+        <p className="small" role="status">
+          {notice}
+        </p>
+      )}
       <div className="segmented" role="group" aria-label="Escolha">
         <button type="button" aria-pressed={mode === 'login'} onClick={() => (setMode('login'), setError(''))}>
           Já tenho conta

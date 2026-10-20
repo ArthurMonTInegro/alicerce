@@ -1,3 +1,5 @@
+import {PremiumGate} from '../components/PremiumGate.tsx';
+import {useAccessPlan,lessonAccess} from '../lib/access.ts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { lessonById, levelById, moduleById, modules, referenceById, STAGE_LABEL, useLesson, type LessonMeta, type Stage } from '../content.ts';
 import { exercisesToRedo, topologicalOrder } from '@alicerce/engine';
@@ -17,9 +19,14 @@ function nextLesson(id: string): LessonMeta | undefined {
   return i >= 0 ? ORDERED_LESSONS[i + 1] : undefined;
 }
 
-export function Licao({ id }: { id: string }) {
+export function Licao({id}:{id:string}){
+  const plan=useAccessPlan();const lesson=lessonById.get(id);
+  if(lesson&&!lessonAccess(plan,id))return <PremiumGate title={lesson.title} summary={lesson.summary}/>;
+  return <LessonBody key={id+plan} id={id}/>;
+}
+function LessonBody({ id }: { id: string }) {
   const lesson = lessonById.get(id);
-  const { lesson: full, failed, retry } = useLesson(lesson?.id);
+  const { lesson: full, failed, failure, retry } = useLesson(lesson?.id);
   const mod = lesson ? moduleById.get(lesson.moduleId) : undefined;
   const level = mod ? levelById.get(mod.levelId) : undefined;
   useHead(lesson ? `${lesson.title} (${lesson.titleEn})` : 'Lição não encontrada', lesson?.summary ?? '');
@@ -48,6 +55,7 @@ export function Licao({ id }: { id: string }) {
     if (!lesson) return;
     visitStage(lesson.id, stage);
     resetTutorContext({ lessonId: lesson.id });
+    return () => resetTutorContext();
   }, [lesson, stage]);
 
   if (!lesson || !mod || !level || !stages.length) return <NotFound />;
@@ -88,6 +96,7 @@ export function Licao({ id }: { id: string }) {
 
       <div className="lesson-layout">
         <nav className="stage-nav" aria-label="Etapas da lição">
+          {lesson.theoryTitle && <p className="small callout info">Esta aula inclui aprofundamento em <strong>Explicação</strong>, exemplo resolvido em <strong>Exemplo</strong> e reflexão com retorno em <strong>Desafio</strong> e <strong>Revisão</strong>.</p>}
           <ol>
             {stages.map((st) => ({ stage: st })).map((s) => (
               <li key={s.stage}>
@@ -150,7 +159,7 @@ export function Licao({ id }: { id: string }) {
             <Blocks blocks={section.blocks} lessonId={lesson.id} />
           ) : failed ? (
             <div className="feedback err" role="alert">
-              <p>Não foi possível carregar esta lição. Verifique a conexão.</p>
+              <p>{failure ?? 'Não foi possível carregar esta lição. Verifique a conexão.'}</p>
               <button type="button" className="btn" onClick={retry}>
                 Tentar de novo
               </button>
@@ -212,7 +221,7 @@ export function Licao({ id }: { id: string }) {
                   )}
                   {next && (
                     <Link to={`/licao/${next.id}`} className={`btn${done ? ' primary' : ''}`}>
-                      Próxima lição: {next.title} →
+                      {lessonAccess('free',next.id)?'Próxima lição':'Continue no Premium'}: {next.title} →
                     </Link>
                   )}
                 </div>

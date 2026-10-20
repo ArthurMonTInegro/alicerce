@@ -40,7 +40,7 @@ Pensar em algoritmos e expressá-los com variáveis, decisões, repetições e f
 
 ## Nível 2: Primeira Linguagem: Python (First Language: Python)
 
-Dominar uma linguagem de verdade: coleções, texto, arquivos, erros, depuração, módulos e testes.
+Escrever, depurar e testar programas em Python, praticando coleções, texto, arquivos, erros, módulos e testes.
 
 - **m2-1 Python e seu ambiente** (Python and its environment) ← m1-5
   - Por que Python, e como ele executa seu código
@@ -192,7 +192,7 @@ Explicar como os dados atravessam a internet, camada por camada, e programar com
 
 ## Nível 10: Engenharia de Software (Software Engineering)
 
-Trabalhar como um profissional: versionamento, código limpo, testes, CI/CD, arquitetura e colaboração.
+Praticar o que equipes de software usam no dia a dia: versionamento, código limpo, testes, CI/CD, arquitetura e colaboração.
 
 - **m10-1 Git e GitHub** (Git and GitHub) ← m0-2
   - Git e GitHub: controle de versão
@@ -205,7 +205,7 @@ Trabalhar como um profissional: versionamento, código limpo, testes, CI/CD, arq
 
 ## Nível 11: Segurança (Security)
 
-Construir software que resiste a ataques comuns e proteger dados e usuários.
+Reconhecer ataques comuns e praticar defesas que protegem dados e usuários.
 
 - **m11-1 Fundamentos de segurança** (Security fundamentals) ← m6-3
   - Fundamentos: autenticação, autorização e senhas
@@ -238,7 +238,7 @@ Entender e construir modelos de aprendizado de máquina desde os fundamentos, e 
 
 ## Nível 14: Matemática para Computação (Mathematics for Computing)
 
-Dominar a matemática que sustenta algoritmos, segurança e IA — sempre conectada ao código.
+Estudar a matemática que sustenta algoritmos, segurança e IA, praticando sempre em código.
 
 - **m14-1 Lógica e conjuntos** (Logic and sets) ← m1-3
   - Lógica proposicional e conjuntos

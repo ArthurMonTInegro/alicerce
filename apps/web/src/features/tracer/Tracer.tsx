@@ -7,7 +7,8 @@ import { runPython } from '../runner/python.ts';
 import type { RunResult } from '../runner/types.ts';
 import { ErrorBox } from '../runner/ErrorBox.tsx';
 
-export function Tracer({ code, stdin, autoStart = false }: { code: string; stdin?: string | undefined; autoStart?: boolean }) {
+/** `untrusted`: o código pode ter vindo de outra pessoa (laboratório); ver python.ts. */
+export function Tracer({ code, stdin, autoStart = false, untrusted = false }: { code: string; stdin?: string | undefined; autoStart?: boolean; untrusted?: boolean }) {
   const [result, setResult] = useState<RunResult | null>(null);
   const [i, setI] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -17,7 +18,7 @@ export function Tracer({ code, stdin, autoStart = false }: { code: string; stdin
     setLoading(true);
     setFailed(null);
     try {
-      const r = await runPython(code, { trace: true, stdin: stdin ?? '' });
+      const r = await runPython(code, { trace: true, stdin: stdin ?? '', untrusted });
       setResult(r);
       setI(0);
     } catch (e) {
@@ -91,7 +92,7 @@ export function Tracer({ code, stdin, autoStart = false }: { code: string; stdin
         <input id="trace-range" type="range" min={0} max={steps.length - 1} value={i} onChange={(e) => setI(Number(e.target.value))} style={{ flex: 1, minWidth: 120 }} />
         <span className="small muted" aria-live="polite">
           Passo {i + 1} de {steps.length}
-          {steps.length >= 400 ? ' (limite de 400 passos)' : ''} · linha {step.line}
+          {result.traceTruncated ? ' (passo a passo cortado: ficou grande demais)' : steps.length >= 400 ? ' (limite de 400 passos)' : ''} · linha {step.line}
         </span>
       </div>
       <div className="tracer">

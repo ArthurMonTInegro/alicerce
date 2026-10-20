@@ -1,36 +1,66 @@
-# Publica a versão de demonstração (só o site estático, sem servidor) no GitHub Pages.
-name: Pages
+# Rollback da demonstração no GitHub Pages (Settings → Pages → Deploy from a branch → gh-pages).
+# A publicação normal fica no CI (.github/workflows/ci.yml, job pages-publicar) e só
+# acontece depois que todos os testes passam no mesmo commit da main.
+# Aqui nada é reconstruído: o rollback pega a árvore de uma publicação anterior do
+# gh-pages e a publica como um commit novo, sem force push. Detalhes em docs/PUBLICACAO.md.
+name: Pages (rollback)
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
-permissions:
-  contents: write
-concurrency:
-  group: pages
-  cancel-in-progress: true
+    inputs:
+      versao:
+        description: 'anterior = volta uma publicação; listar = só mostra o histórico; ou o commit do gh-pages ou da main (7 a 40 caracteres)'
+        required: true
+        default: anterior
+        type: string
+      motivo:
+        description: 'Motivo (vai para a mensagem do commit)'
+        required: false
+        type: string
+permissions: {}
 jobs:
-  publish:
+  listar:
+    if: github.ref == 'refs/heads/main' && inputs.versao == 'listar'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
+          persist-credentials: false
+          sparse-checkout: scripts
+      - name: Histórico do gh-pages
         env:
-          BASE_PATH: /${{ github.event.repository.name }}/
-          VITE_STATIC: '1'
-          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
-      # publica o build no branch gh-pages (Settings → Pages → Deploy from a branch → gh-pages)
-      - name: Publicar no branch gh-pages
-        run: |
-          cd apps/web/dist
-          find . -name '*.map' -delete
-          touch .nojekyll
-          git init -q -b gh-pages
-          git add -A
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -q -m "Publica ${GITHUB_SHA::7}"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" gh-pages
+          PAGES_TOKEN: ${{ github.token }}
+        run: bash scripts/publish-pages.sh listar --quantas 30
+
+  rollback:
+    if: github.ref == 'refs/heads/main' && inputs.versao != 'listar'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: pages-publicacao
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts
+      # As entradas chegam por variável de ambiente, nunca interpoladas no script.
+      - name: Republicar a versão escolhida
+        env:
+          PAGES_TOKEN: ${{ github.token }}
+          VERSAO: ${{ inputs.versao }}
+          MOTIVO: ${{ inputs.motivo }}
+        run: >-
+          bash scripts/publish-pages.sh rollback
+          --versao "$VERSAO"
+          --motivo "$MOTIVO"
+          --autor "$GITHUB_ACTOR"
+          --execucao "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+      - name: Histórico depois do rollback
+        env:
+          PAGES_TOKEN: ${{ github.token }}
+        run: bash scripts/publish-pages.sh listar --quantas 10

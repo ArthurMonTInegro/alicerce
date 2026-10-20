@@ -25,7 +25,12 @@ COPY packages/content/package.json packages/content/
 RUN npm ci --omit=dev --no-audit --no-fund --workspace @alicerce/api --include-workspace-root=false
 
 FROM node:22-slim
-ENV NODE_ENV=production PORT=3001 DATABASE_PATH=/data/alicerce.db WEB_DIST=/app/apps/web/dist
+# Conteúdo pago (níveis 2 a 14): NÃO entra na imagem (premium/ está no .dockerignore).
+# Monte o clone do repositório privado em /premium, só leitura:
+#   docker run -v /srv/alicerce-premium:/premium:ro ...
+# Sem ele o servidor sobe só com os níveis gratuitos e responde 503 ao Premium.
+# ALICERCE_EXIGIR_PREMIUM=1 faz a inicialização falhar se o conteúdo pago não carregar.
+ENV NODE_ENV=production PORT=3001 DATABASE_PATH=/data/alicerce.db WEB_DIST=/app/apps/web/dist ALICERCE_PREMIUM_DIR=/premium
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
@@ -33,6 +38,10 @@ COPY packages ./packages
 COPY apps/api ./apps/api
 COPY --from=build /app/apps/web/dist ./apps/web/dist
 RUN mkdir -p /data && chown node:node /data
+# Backups (apps/api/scripts/backup.ts e o automático antes de migrações) ficam no
+# mesmo volume, em /data/backups. É o mesmo disco do banco: copie-os para fora
+# da máquina (docs/OPERACAO.md).
+ENV BACKUP_DIR=/data/backups
 USER node
 VOLUME ["/data"]
 EXPOSE 3001

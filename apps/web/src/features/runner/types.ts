@@ -30,6 +30,10 @@ export interface RunResult {
   error: PyError | null;
   tests: Array<{ name: string; passed: boolean; message: string; error?: PyError }>;
   steps: TraceStep[];
+  /** a saída (ou um texto de erro) passou do teto e foi cortada na fronteira (limits.ts) */
+  truncated?: boolean;
+  /** o passo a passo passou do teto e os passos finais foram descartados */
+  traceTruncated?: boolean;
 }
 
 export interface SqlResult {
@@ -40,6 +44,8 @@ export interface SqlResult {
   expectedRows: unknown[][];
   error: string | null;
   message: string;
+  /** linhas ou valores cortados na fronteira (limits.ts) */
+  truncated?: boolean;
 }
 
 export type RunnerStatus = 'parado' | 'carregando' | 'pronto' | 'executando';
@@ -48,4 +54,6 @@ export interface JsResult {
   ok: boolean;
   stdout: string;
   error: { type: string; message: string; line: number | null } | null;
+  /** a saída passou do teto e foi cortada na fronteira (limits.ts) */
+  truncated?: boolean;
 }

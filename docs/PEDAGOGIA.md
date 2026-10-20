@@ -52,23 +52,27 @@ Um banco de 30 itens em 5 áreas (computação, lógica, programação, matemát
 
 ## Revisão espaçada
 
-Ao concluir uma lição, seus cartões (198 no total) entram na fila. O agendamento usa o FSRS (`fsrs.ts`): cada cartão tem estabilidade e dificuldade, e o próximo intervalo é o tempo até a recuperabilidade cair para 90%. A tela de revisão mostra quanto tempo cada resposta (errei, difícil, bom, fácil) vai adiar o cartão.
+Ao concluir uma lição, seus cartões (525 no currículo completo, 44 deles nas lições gratuitas) entram na fila. O agendamento usa o FSRS (`fsrs.ts`): cada cartão tem estabilidade e dificuldade, e o próximo intervalo é o tempo até a recuperabilidade cair para 90%. A tela de revisão mostra quanto tempo cada resposta (errei, difícil, bom, fácil) vai adiar o cartão.
 
 ## Inglês técnico
 
-Todo termo novo aparece como **termo PT → EN**, com pronúncia por síntese de voz do navegador, e entra no glossário (584 termos). As mensagens de erro são mostradas no original em inglês e traduzidas, porque é assim que elas aparecem no mundo real.
+Todo termo novo aparece como **termo PT → EN**, com pronúncia por síntese de voz do navegador, e entra no glossário (820 termos). As mensagens de erro são mostradas no original em inglês e traduzidas, porque é assim que elas aparecem no mundo real.
 
 ## Tutor
 
 O tutor (com IA ou offline) segue regras fixas:
 
-- nunca entrega a solução nem código que resolva o exercício;
+- é orientado a evitar a entrega de soluções; uma integração com IA exige avaliação contínua;
 - responde com uma pergunta ou uma pista de cada vez;
 - aponta onde investigar e pede que o estudante tente antes de seguir;
 - recusa pedidos de "só me dá a resposta" e explica por que isso atrapalha.
 
-O tutor com IA não recebe a solução oficial, então não tem como vazá-la.
+O tutor com IA não recebe a solução oficial, mas ainda pode gerar uma solução por conta própria. A integração exige avaliação contínua; não há garantia absoluta de impedir revelação.
 
 ## Projetos e carreira
 
 10 projetos de portfólio com requisitos, critérios de avaliação e extensões, ligados aos módulos que pedem. A área de carreira cobre entrevistas (28 perguntas com o que o entrevistador avalia), currículo, GitHub e portfólio.
+
+## Avaliação formativa v8
+
+A página /autonomia oferece 12 situações nos níveis 0–2, quatro por nível. O nível 2 acompanha a autorização Premium. Respostas fechadas recebem feedback; perguntas de transferência são abertas, sem correção automática. Histórico local separado não aumenta o indicador de domínio. Repetições são identificadas e o aviso de sete dias não comprova retenção. Os dois primeiros projetos permitem registrar e baixar evidências; o preenchimento não é aprovação automática.

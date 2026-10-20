@@ -129,7 +129,13 @@ export function useRouteFocus(path: string) {
       return;
     }
     if (window.location.hash) {
-      document.getElementById(decodeURIComponent(window.location.hash.slice(1)))?.scrollIntoView();
+      const alvo = document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
+      if (alvo) {
+        // leva também o foco até a âncora: quem usa teclado ou leitor de tela continua dali
+        if (!alvo.hasAttribute('tabindex')) alvo.tabIndex = -1;
+        alvo.focus({ preventScroll: true });
+        alvo.scrollIntoView();
+      }
       return;
     }
     window.scrollTo(0, 0);

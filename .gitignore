@@ -3,6 +3,12 @@ dist
 dist-ssr
 *.db
 *.db-*
+# banco local, backups e bancos guardados pela restauração: têm e-mails e hashes das contas
+apps/api/data/
+*.db.antes-da-restauracao-*
+*.db.sha256
+*.parcial
+.*.restaurando-*
 .env
 playwright-report
 test-results
@@ -11,3 +17,5 @@ coverage
 apps/web/src/generated
 packages/content/src/levels/modulos/_rascunho-*
 __pycache__/
+# clone do repositório privado (conteúdo pago); ver docs/PREMIUM.md
+/premium

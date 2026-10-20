@@ -469,15 +469,28 @@ const PHRASES: Array<[RegExp, string]> = [
   [/is not defined/, 'não está definido'],
 ];
 
+/**
+ * As expressões só olham o começo da mensagem. Ela vem do código do estudante (pela fronteira com a
+ * página de execução, pode ter até 65.536 caracteres), e algumas expressões acima levam tempo
+ * quadrático numa mensagem longa sem a frase procurada: medido no Node, `raise NameError("a" * 65536)`
+ * levava mais de 8 s em `traduzir` e mais de 1 min em `explainError`, com a página do site travada.
+ * Mensagens de erro de verdade são curtas.
+ */
+const MAX_MATCH = 1_000;
+const head = (s: string) => (s.length > MAX_MATCH ? s.slice(0, MAX_MATCH) : s);
+
 export function traduzir(message: string): string {
-  for (const [re, pt] of PHRASES) if (re.test(message)) return message.replace(re, pt);
+  const h = head(message);
+  for (const [re, pt] of PHRASES) if (re.test(h)) return h.replace(re, pt) + message.slice(h.length);
   return message;
 }
 
 export function explainError(err: { type: string; message: string; line: number | null }, lineCode?: string): ErrorExplanation {
+  const type = head(err.type);
+  const message = head(err.message);
   for (const r of RULES) {
-    if (!r.type.test(err.type)) continue;
-    const m = r.msg ? err.message.match(r.msg) : null;
+    if (!r.type.test(type)) continue;
+    const m = r.msg ? message.match(r.msg) : null;
     if (r.msg && !m) continue;
     const e = r.explain(m, { message: err.message, line: err.line, lineCode });
     return { ...e, searchHint: e.searchHint ?? `${err.type}: ${err.message}`.slice(0, 90) };

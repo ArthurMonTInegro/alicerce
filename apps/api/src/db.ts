@@ -5,8 +5,9 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { createBackup } from './backup.ts';
 
-const MIGRATIONS: string[] = [
+export const MIGRATIONS: string[] = [
   `CREATE TABLE users (
      id TEXT PRIMARY KEY,
      email TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -46,11 +47,16 @@ const MIGRATIONS: string[] = [
    CREATE INDEX plan_changes_user ON plan_changes(user_id);`,
 ];
 
-export function openDb(path: string): DatabaseSync {
+/** Maior versão de esquema que este código conhece (a restauração recusa backup mais novo). */
+export const SCHEMA_VERSION = MIGRATIONS.length;
+
+/** `backupDir`: onde fica o backup automático antes de migrações (padrão: BACKUP_DIR ou backups/ ao lado do banco). */
+export function openDb(path: string, opts: { backupDir?: string } = {}): DatabaseSync {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
   const version = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
+  if (path !== ':memory:' && version > 0 && version < MIGRATIONS.length) backupBeforeMigrating(db, path, version, opts.backupDir);
   for (let i = version; i < MIGRATIONS.length; i++) {
     db.exec('BEGIN');
     try {
@@ -63,4 +69,18 @@ export function openDb(path: string): DatabaseSync {
     }
   }
   return db;
+}
+
+function backupBeforeMigrating(db: DatabaseSync, path: string, from: number, dir: string | undefined): void {
+  const to = MIGRATIONS.length;
+  try {
+    const b = createBackup(db, { dbPath: path, ...(dir ? { dir } : {}), label: `antes-da-migracao-v${from}-v${to}` });
+    console.log(`Backup automático antes das migrações ${from} → ${to}: ${b.path}`);
+  } catch (e) {
+    db.close();
+    throw new Error(
+      `O banco ${path} está no esquema ${from} e este código precisa aplicar as migrações até o ${to}, mas o backup automático antes delas falhou: ${(e as Error).message}. Nenhuma migração foi aplicada. Confira o espaço em disco e a permissão de escrita na pasta de backups (BACKUP_DIR) e inicie de novo.`,
+      { cause: e },
+    );
+  }
 }

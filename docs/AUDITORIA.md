@@ -8,18 +8,18 @@ Revisão feita ao fim da construção, em 06/10/2026, contra o pedido original. 
 |---|---|---|
 | Níveis 0 a 14 | Feito | 15 níveis, 59 módulos, todos com pelo menos uma lição completa ([CURRICULO.md](CURRICULO.md)) |
 | Metodologia CONCEITO → REVISÃO | Feito | 8 etapas em toda lição; teste de conteúdo garante a ordem |
-| Inglês técnico PT → EN | Feito | Termos em toda lição, glossário com 584 termos, pronúncia por voz do navegador |
+| Inglês técnico PT → EN | Feito | Termos em toda lição, glossário com 820 termos, pronúncia por voz do navegador |
 | Erros explicados (o que, por que, investigar, corrigir, evitar) | Feito para Python e os erros comuns de JavaScript | `features/runner/errors.ts`; teste e2e confere |
 | Vários tipos de exercício | Feito | 7 tipos, 484 exercícios; 290 verificados executando a solução |
 | Editor que executa código | Feito | Python (Pyodide), JavaScript (worker), SQL (SQLite), sem servidor |
 | Árvore de habilidades com pré-requisitos | Feito | Grafo validado em teste; 78 habilidades |
 | Diagnóstico | Feito | Adaptativo, 5 áreas, opção "Não sei" |
 | Visualizações e simuladores | Feito | 18 visualizações, execução passo a passo, simulador de terminal |
-| Quizzes e flashcards com repetição espaçada | Feito | 357 cartões, FSRS |
-| Tutor que não dá a resposta | Feito | IA (Claude) para contas, offline para todos; solução nunca enviada |
-| Carreira e referências | Feito | 28 perguntas de entrevista, currículo, GitHub, portfólio; 77 referências verificadas |
+| Quizzes e flashcards com repetição espaçada | Feito | 525 cartões (44 nas lições gratuitas), FSRS |
+| Tutor que não dá a resposta | Feito, com ressalva | IA (Claude) para contas, offline para todos; a solução oficial nunca é enviada ao modelo, mas a IA ainda pode gerar uma solução por conta própria, sem garantia absoluta de impedir isso ([PEDAGOGIA.md](PEDAGOGIA.md)) |
+| Carreira e referências | Feito | 28 perguntas de entrevista, currículo, GitHub, portfólio; 129 referências (as 77 da pesquisa inicial foram abertas durante a pesquisa; as 52 acrescentadas pela cópia do Codex, com os aprofundamentos, não foram reconferidas uma a uma na integração) |
 | Pesquisa internacional sem inventar fontes | Feito, com ressalvas abaixo | [PESQUISA.md](PESQUISA.md) |
-| Desempenho, acessibilidade, segurança, SEO, celular | Feito, com ressalvas abaixo | axe WCAG 2.2 AA em 16 páginas e nas etapas Explicação, Exercícios e Desafio de todas as lições, 211 páginas pré-renderizadas, CSP estrita |
+| Desempenho, acessibilidade, segurança, SEO, celular | Feito, com ressalvas abaixo | axe WCAG 2.2 AA em 16 páginas e nas etapas Explicação, Exercícios e Desafio de todas as lições, 215 páginas pré-renderizadas, CSP estrita |
 
 ## Fraquezas reais
 

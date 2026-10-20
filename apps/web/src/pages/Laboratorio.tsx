@@ -10,7 +10,7 @@ import { ErrorBox } from '../features/runner/ErrorBox.tsx';
 import { RunnerBadge } from '../features/runner/RunnerBadge.tsx';
 import { traduzir } from '../features/runner/errors.ts';
 import { Tracer } from '../features/tracer/Tracer.tsx';
-import { setTutorContext } from '../features/tutor/context.ts';
+import { setTutorContext, resetTutorContext } from '../features/tutor/context.ts';
 import { loadDraft, saveDraft } from '../state/store.ts';
 
 type Lang = 'python' | 'javascript' | 'sql';
@@ -49,13 +49,14 @@ function decodeShare(s: string): { lang: Lang; code: string } | null {
 }
 
 export function Laboratorio() {
+  useEffect(()=>{resetTutorContext();return ()=>resetTutorContext();},[]);
   useHead('Laboratório', 'Escreva e execute Python, JavaScript e SQL direto no navegador, com execução passo a passo e explicação dos erros em português.');
   const [lang, setLang] = useState<Lang>('python');
   const [code, setCode] = useState(EXAMPLES.python[0]!.code);
   const [stdin, setStdin] = useState('Ada');
   const [out, setOut] = useState<string>('');
   const [err, setErr] = useState<{ type: string; message: string; line: number | null; traceback?: string } | null>(null);
-  const [table, setTable] = useState<{ columns: string[]; rows: unknown[][] } | null>(null);
+  const [table, setTable] = useState<{ columns: string[]; rows: unknown[][]; truncated?: boolean | undefined } | null>(null);
   const [busy, setBusy] = useState(false);
   const [trace, setTrace] = useState(false);
   const [shareMsg, setShareMsg] = useState('');
@@ -97,21 +98,21 @@ export function Laboratorio() {
     setTable(null);
     try {
       if (lang === 'python') {
-        const r = await runPython(code, { stdin });
+        const r = await runPython(code, { stdin, untrusted: true });
         setOut(r.stdout);
         setErr(r.error);
-        setTutorContext({ code, error: r.error ? `${r.error.type}: ${r.error.message}` : undefined, exerciseId: undefined });
+        setTutorContext({ lessonId:undefined, code, error: r.error ? `${r.error.type}: ${r.error.message}` : undefined, exerciseId: undefined });
       } else if (lang === 'javascript') {
         const r = await runJavaScript(code);
         setOut(r.stdout);
         setErr(r.error);
       } else {
-        const r = await runSql(SETUP_ESCOLA, code, code, true);
+        const r = await runSql(SETUP_ESCOLA, code, code, true, { untrusted: true });
         setOut('');
         if (r.error) setErr({ type: 'SQL', message: r.error, line: null });
         else {
           setErr(null);
-          setTable({ columns: r.columns, rows: r.rows });
+          setTable({ columns: r.columns, rows: r.rows, truncated: r.truncated });
         }
       }
     } catch (e) {
@@ -134,7 +135,7 @@ export function Laboratorio() {
     <div className="container">
       <p className="eyebrow">Laboratório · playground</p>
       <h1>Laboratório</h1>
-      <p className="lead">Experimente à vontade. O código roda no seu navegador, isolado da página: nada é enviado para servidores.</p>
+      <p className="lead">Experimente à vontade. O código roda no seu navegador, num ambiente separado do site, sem acesso à sua conta nem aos dados salvos, e não é enviado para servidores.</p>
       <div className="row between" style={{ marginBottom: '0.75rem' }}>
         <div className="segmented" role="group" aria-label="Linguagem">
           {(Object.keys(LANG_NAME) as Lang[]).map((l) => (
@@ -194,7 +195,11 @@ export function Laboratorio() {
               {table ? (
                 <div className="table-wrap">
                   <table>
-                    <caption>{table.rows.length} linha(s)</caption>
+                    <caption>
+                      {table.rows.length} linha(s)
+                      {table.truncated ? ' (resultado cortado: grande demais)' : ''}
+                      {table.rows.length > 200 ? ', mostrando as 200 primeiras' : ''}
+                    </caption>
                     <thead>
                       <tr>
                         {table.columns.map((c) => (
@@ -247,7 +252,7 @@ export function Laboratorio() {
       </div>
       {trace && lang === 'python' && (
         <section style={{ marginTop: '1.5rem' }} aria-label="Execução passo a passo">
-          <Tracer code={code} stdin={stdin} autoStart />
+          <Tracer code={code} stdin={stdin} autoStart untrusted />
         </section>
       )}
     </div>

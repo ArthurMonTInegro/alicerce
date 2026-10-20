@@ -4,8 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch --disable-warning=ExperimentalWarning src/main.ts",
-    "start": "node --disable-warning=ExperimentalWarning src/main.ts"
+    "dev": "node --env-file-if-exists=../../.env --watch --disable-warning=ExperimentalWarning src/main.ts",
+    "start": "node --env-file-if-exists=../../.env --disable-warning=ExperimentalWarning src/main.ts",
+    "backup": "node --env-file-if-exists=../../.env --disable-warning=ExperimentalWarning scripts/backup.ts",
+    "restore": "node --env-file-if-exists=../../.env --disable-warning=ExperimentalWarning scripts/restore.ts"
   },
   "dependencies": {
     "@alicerce/content": "*",

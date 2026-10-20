@@ -17,16 +17,21 @@ export function Privacidade() {
       <h2>Com conta</h2>
       <ul>
         <li>Guardamos e-mail, nome (opcional), um resumo criptográfico da senha (scrypt com sal, nunca a senha em si) e uma cópia do seu progresso para sincronizar entre aparelhos.</li>
-        <li>Guardamos também o plano da conta (gratuito ou premium), até quando ele vale, o histórico de mudanças de plano e quantas perguntas você fez ao tutor com IA em cada dia, para aplicar o limite diário. Quando houver cobrança, os dados do cartão vão ficar só com o provedor de pagamento, nunca na Alicerce.</li>
-        <li>A sessão usa um cookie <span lang="en">HttpOnly</span>, <span lang="en">Secure</span> e <span lang="en">SameSite=Lax</span>; no servidor fica só o hash do token.</li>
+        <li>Guardamos também o plano da conta (gratuito ou premium), até quando ele vale, o histórico de mudanças de plano e quantas perguntas você fez ao tutor com IA em cada dia, para aplicar os limites diário e mensal. Quando houver cobrança, os dados do cartão vão ficar só com o provedor de pagamento, nunca na Alicerce.</li>
         <li>
-          Você pode excluir a conta a qualquer momento em <Link to="/conta">Conta</Link>; isso apaga os dados do servidor imediatamente.
+          A sessão usa um cookie <span lang="en">HttpOnly</span> e <span lang="en">SameSite=Lax</span>, válido por até 30 dias; no servidor fica só o hash do token. O atributo <span lang="en">Secure</span> (o cookie só trafega por HTTPS) depende da configuração do servidor: vem ligado quando ele roda em modo de produção (<code>NODE_ENV=production</code>). A variável <code>COOKIE_SECURE</code>, quando tem valor, decide em qualquer modo: <code>1</code>, <code>true</code>, <code>yes</code> ou <code>sim</code> ligam o atributo, e qualquer outro valor o desliga. Numa instalação local sem essas opções, o cookie vai sem <span lang="en">Secure</span>.
+        </li>
+        <li>
+          Em <Link to="/conta">Conta</Link>, “Sair de todos os aparelhos” encerra de uma vez todas as sessões da conta, inclusive a do aparelho em uso.
+        </li>
+        <li>
+          Você pode excluir a conta a qualquer momento em <Link to="/conta">Conta</Link>, confirmando com a senha atual; isso apaga do servidor, imediatamente, a conta e tudo o que está ligado a ela: progresso sincronizado, histórico de planos, uso do tutor e sessões. As cópias de segurança do banco do servidor feitas antes da exclusão ainda guardam esses dados até serem descartadas. A cópia do progresso dessa conta que está no navegador não é apagada pela exclusão nem passa para o modo visitante: continua guardada nele, sem acesso pelo site. Para levá-la, exporte-a em <Link to="/progresso">Progresso</Link> antes de excluir; para apagá-la, limpe os dados deste site nas configurações do navegador (isso apaga também o progresso de visitante).
         </li>
       </ul>
 
       <h2>Tutor</h2>
       <p>
-        Quando o tutor com IA está ativado no servidor, sua pergunta, o enunciado do exercício, seu código e a mensagem de erro são enviados ao provedor de IA (Anthropic) apenas para gerar a resposta. Não envie dados pessoais nas perguntas. Quando a IA não está ativada, quando você não tem conta ou quando o limite diário acaba, as pistas são geradas pelo próprio servidor da Alicerce: a pergunta e o código chegam ao servidor só para gerar a resposta e não são guardados. Na versão de demonstração, sem servidor, o tutor roda no navegador e nada é enviado.
+        O tutor com IA é só do Premium. Quando ele está ativado no servidor e a sua conta tem o Premium ativo, sua pergunta, as mensagens anteriores da conversa, seu código e a mensagem de erro vão ao provedor de IA (Anthropic) apenas para gerar a resposta, junto com o enunciado e a próxima dica do exercício. Não envie dados pessoais nas perguntas. Quando a IA não está ativada, quando você não tem conta, quando a sua conta não tem o Premium ativo ou quando o limite diário ou o mensal acaba, nada vai ao provedor de IA: as pistas são geradas pelo próprio servidor da Alicerce, e a pergunta e o código chegam ao servidor só para gerar a resposta e não são guardados. Na versão de demonstração, sem servidor, o tutor roda no navegador e nada é enviado.
       </p>
 
       <h2>O que não fazemos</h2>

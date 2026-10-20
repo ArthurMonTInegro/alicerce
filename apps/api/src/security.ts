@@ -1,37 +1,79 @@
 /** Cabeçalhos de segurança, CSP e limitador de requisições em memória. */
 
 /**
- * CSP estrita: só scripts do próprio domínio. 'wasm-unsafe-eval' permite
- * compilar o WebAssembly do Pyodide sem liberar eval() de JavaScript.
- * O worker que executa JavaScript do aluno precisa de 'unsafe-eval' (usa
- * new Function), mas roda isolado num Web Worker sem acesso ao DOM, aos cookies
- * HttpOnly nem ao armazenamento da página; a exceção vale só para a resposta
- * desse arquivo (a CSP de um worker vem da resposta do próprio script).
+ * CSP estrita do site: só scripts do próprio domínio, sem eval e sem WebAssembly
+ * (o código do estudante não roda nesta origem). O site só emoldura a si mesmo
+ * (frame-src 'self': a página de execução) e não pode ser emoldurado.
  */
-const BASE_CSP = [
+export const CSP = [
   "default-src 'self'",
+  "script-src 'self'",
   "img-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self'",
   "connect-src 'self'",
-  "worker-src 'self'",
+  "frame-src 'self'",
+  "worker-src 'none'",
   "object-src 'none'",
   "base-uri 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-];
-export const CSP = [...BASE_CSP, "script-src 'self' 'wasm-unsafe-eval'"].join('; ');
-export const CSP_JS_WORKER = [...BASE_CSP, "script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'"].join('; ');
+].join('; ');
 
-export function securityHeaders(path: string, production: boolean): Record<string, string> {
+/**
+ * Página de execução (public/runner.html), onde roda o código do estudante.
+ * - `sandbox allow-scripts`: mesmo aberta direto, como página normal, a origem é
+ *   opaca (o iframe do site também usa sandbox, sem allow-same-origin);
+ * - `frame-ancestors 'self'`: só o próprio site pode emoldurá-la;
+ * - `'unsafe-eval'` (new Function do JavaScript do estudante) e `'wasm-unsafe-eval'`
+ *   (Pyodide) valem só aqui, numa origem opaca que não tem nada a proteger;
+ * - workers só de URL data: e módulos só de blob: (o Pyodide chega do site como bytes);
+ * - `connect-src 'none'`: o código do estudante não faz requisição nenhuma.
+ * Os workers criados a partir de data: herdam esta política (medido no Chromium).
+ */
+export const CSP_RUNNER = [
+  'sandbox allow-scripts',
+  "default-src 'none'",
+  "script-src 'self' blob: 'unsafe-eval' 'wasm-unsafe-eval'",
+  'worker-src data:',
+  "connect-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'self'",
+].join('; ');
+
+/** O servidor serve o build com base "/" (BASE_PATH só existe no build estático do GitHub Pages). */
+const RUNNER_PAGE = '/runner.html';
+/**
+ * Único arquivo que a página de execução busca do servidor. Ela tem origem opaca, então
+ * para ela este arquivo é de outra origem: precisa de Cross-Origin-Resource-Policy: cross-origin
+ * (com same-origin o Chromium bloqueia: ERR_BLOCKED_BY_RESPONSE.NotSameOrigin). É um script
+ * clássico, sem CORS, então não precisa de Access-Control-Allow-Origin. O Pyodide, o código
+ * dos workers e o harness são baixados pelo site (mesma origem) e entregues ao iframe.
+ * Nada em /api recebe exceção.
+ */
+const RUNNER_SCRIPT = '/runner.js';
+
+/** O servidor de arquivos decodifica a URL (/runner%2Ehtml serve runner.html): a comparação também. */
+function decodePath(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
+export function securityHeaders(rawPath: string, production: boolean): Record<string, string> {
+  const path = decodePath(rawPath);
+  const runnerPage = path === RUNNER_PAGE;
   const h: Record<string, string> = {
-    'content-security-policy': /^\/assets\/js\.worker-[\w-]+\.js$/.test(path) ? CSP_JS_WORKER : CSP,
+    'content-security-policy': runnerPage ? CSP_RUNNER : CSP,
     'x-content-type-options': 'nosniff',
     'referrer-policy': 'strict-origin-when-cross-origin',
     'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
     'cross-origin-opener-policy': 'same-origin',
-    'cross-origin-resource-policy': 'same-origin',
-    'x-frame-options': 'DENY',
+    'cross-origin-resource-policy': path === RUNNER_SCRIPT ? 'cross-origin' : 'same-origin',
+    'x-frame-options': runnerPage ? 'SAMEORIGIN' : 'DENY',
   };
   if (production) h['strict-transport-security'] = 'max-age=31536000; includeSubDomains';
   return h;

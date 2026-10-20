@@ -60,6 +60,16 @@ export function deleteSession(db: DatabaseSync, token: string | undefined) {
   if (token) db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha256(token));
 }
 
+/**
+ * Encerra todas as sessões de uma conta, em qualquer aparelho. Devolve quantas
+ * ainda valiam (as vencidas, que já não funcionavam, são apagadas sem contar).
+ */
+export function deleteUserSessions(db: DatabaseSync, userId: string, now = Date.now()): number {
+  const active = (db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE user_id = ? AND expires_at > ?').get(userId, now) as { n: number }).n;
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+  return Number(active);
+}
+
 export function purgeExpiredSessions(db: DatabaseSync, now = Date.now()) {
   db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(now);
 }

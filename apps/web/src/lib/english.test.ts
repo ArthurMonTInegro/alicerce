@@ -1,0 +1,9 @@
+import {describe,it,expect} from 'vitest';
+import {missions,parsePortfolio,canComplete} from './english.ts';
+describe('English practice integrity',()=>{
+ it('provides eight unique, complete conversations with valid comprehension answers',()=>{expect(new Set(missions.map(m=>m.id)).size).toBe(8);for(const m of missions){expect(m.dialogue.length).toBeGreaterThanOrEqual(4);expect(m.question.options[m.question.answer]).toBeTruthy();expect(m.prompts).toHaveLength(2);expect(m.models).toHaveLength(2);expect(m.transfer.length).toBeGreaterThan(30);}});
+ it('recovers from malformed saved data without fabricating progress',()=>{for(const raw of ['{','null','42','[]','{"hello":null}'])expect(parsePortfolio(raw)).toEqual({});});
+ it('bounds restored text and rejects unknown missions and invalid completion dates',()=>{const p=parsePortfolio(JSON.stringify({unknown:{completedAt:1},hello:{responses:['a'.repeat(3000),7],checks:[true,'true',false],completedAt:Date.now()+86400000}}));expect(Object.keys(p)).toEqual(['hello']);expect(p.hello?.responses.map(s=>s.length)).toEqual([2000,0]);expect(p.hello?.checks).toEqual([true,false,false]);expect(p.hello?.completedAt).toBeUndefined();});
+ it('requires comprehension, both original responses and all self-reported practice steps',()=>{const p={responses:['Hello','I study Python'],checks:[true,true,true]};expect(canComplete(p,true)).toBe(true);expect(canComplete(p,false)).toBe(false);expect(canComplete({...p,responses:['Hello',' ']},true)).toBe(false);expect(canComplete({...p,checks:[true,false,true]},true)).toBe(false);});
+ it('round trips a valid portfolio without losing learner responses',()=>{const p={hello:{responses:['Hello!','I learn Python.'],checks:[true,true,true],completedAt:1000}};expect(parsePortfolio(JSON.stringify(p))).toEqual(p);});
+});

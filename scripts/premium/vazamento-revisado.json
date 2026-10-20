@@ -1,0 +1,176 @@
+{
+  "explicacao": "Coincidências revisadas entre o conteúdo pago e arquivos públicos que já eram públicos por outro motivo. Só hashes SHA-256 (24 primeiros hexadecimais) das sequências de palavras, gerados por scripts/premium/verificar-vazamento.ts --rascunho; este arquivo não contém texto pago. Revisado em 2026-10-14 na separação do repositório privado.",
+  "grupos": [
+    {
+      "onde": ".github/workflows/ci.yml",
+      "motivo": "CI do próprio projeto. As aulas de testes/CI e de deploy mostram o mesmo modelo padrão de GitHub Actions (actions/checkout, actions/setup-node, npm ci), que é exemplo público da documentação do GitHub, não material exclusivo da aula.",
+      "sequencias": [
+        "843ff0a6b8d58e1e074ea83a",
+        "a0183d7979d3adbd69e4a3c2",
+        "52ee6ba73496b7e0d45b3779",
+        "44cf610659d1d3e319859bcc",
+        "5a1ed2411cd59807a61db3f8",
+        "db71bd00d00283156c704804",
+        "8f4e1f563447f066c2bae4f8",
+        "9ab3fdfc5e39c536ddff5e38",
+        "19148de6e6069756a3394cf0",
+        "8d863507c3b52cc7d88e2b30",
+        "80bb8a7939cc91cbaac33575",
+        "50eadf6b8998605cf55f5469"
+      ]
+    },
+    {
+      "onde": ".github/workflows/pages.yml",
+      "motivo": "Workflow de publicação do próprio projeto; mesmo modelo padrão de GitHub Actions usado como exemplo nas aulas de CI e deploy.",
+      "sequencias": [
+        "d8c0a26e7d386cc032aa3239",
+        "13bbc89f06618b1e6a6ae674",
+        "8e785e0b7d245419d720ade8",
+        "8ba1494abc671063c210ce3f",
+        "843ff0a6b8d58e1e074ea83a",
+        "a0183d7979d3adbd69e4a3c2",
+        "52ee6ba73496b7e0d45b3779",
+        "44cf610659d1d3e319859bcc",
+        "5a1ed2411cd59807a61db3f8",
+        "db71bd00d00283156c704804",
+        "8f4e1f563447f066c2bae4f8",
+        "9ab3fdfc5e39c536ddff5e38",
+        "19148de6e6069756a3394cf0",
+        "8d863507c3b52cc7d88e2b30",
+        "80bb8a7939cc91cbaac33575",
+        "50eadf6b8998605cf55f5469"
+      ]
+    },
+    {
+      "onde": "apps/api/src/db.ts",
+      "motivo": "Esquema real do banco do servidor (coluna email TEXT NOT NULL UNIQUE); a aula de restrições usa a mesma declaração SQL genérica.",
+      "sequencias": [
+        "a5939bbee3abc92caddc54e8"
+      ]
+    },
+    {
+      "onde": "apps/api/src/security.ts",
+      "motivo": "Cabeçalhos de segurança reais do servidor (CSP, X-Content-Type-Options, Referrer-Policy); a aula de OWASP mostra os mesmos valores padrão como exemplo.",
+      "sequencias": [
+        "cc084ce14d3ad719a18db81d",
+        "7d3914a0233985294f67c8e8",
+        "bcbeec90250bf3c931dd24f1",
+        "564e299c6176b0221aad8c40",
+        "52f0da84ab86c57b9a9e4258"
+      ]
+    },
+    {
+      "onde": "apps/web/src/features/runner/errors.ts",
+      "motivo": "Estrutura da explicação de erros do laboratório público (o que aconteceu, por que, como investigar, como corrigir, como evitar); a aula de exceções descreve esse recurso da plataforma.",
+      "sequencias": [
+        "0bc05a813a6adb0b428ba489",
+        "92cd38b77956b3c5776a1d19"
+      ]
+    },
+    {
+      "onde": "apps/web/src/features/viz/algorithms.tsx",
+      "motivo": "Legenda da visualização pública de busca binária (/visualizacoes é recurso aberto), repetida no texto da aula.",
+      "sequencias": [
+        "c8e022efe4f41b773f330193"
+      ]
+    },
+    {
+      "onde": "apps/web/src/features/viz/structures.tsx",
+      "motivo": "Rótulo da visualização pública de pilha (LIFO, last in first out), definição padrão também usada num cartão.",
+      "sequencias": [
+        "acec030efbe7f2e8dbc9105a"
+      ]
+    },
+    {
+      "onde": "apps/web/src/features/viz/systems.tsx",
+      "motivo": "Legendas e consulta de exemplo das visualizações públicas (escalonador, JOIN), recurso aberto; a aula repete a mesma frase/consulta.",
+      "sequencias": [
+        "bed41af116731d1583898ab0",
+        "bd072f6710e50c7347742977",
+        "1203cc4fcc00b26f9a53f1c0",
+        "5955f43580f313828efd68c6"
+      ]
+    },
+    {
+      "onde": "apps/web/src/pages/Laboratorio.tsx",
+      "motivo": "Exemplos prontos do laboratório público (fatorial, event loop, JOIN e GROUP BY sobre o banco escola, também público em SETUP_ESCOLA); as aulas usam os mesmos exemplos.",
+      "sequencias": [
+        "db14362bb253535fac681f33",
+        "3dbffe6fd533c557e48d3f6c",
+        "df49511dcf808d728baf2e3b",
+        "75bb4aa77c1dbb2d060d11e1",
+        "f5ce0bb0cb1c7701e08cc4c9",
+        "8ab9454ba7967833072f6bb0",
+        "5955f43580f313828efd68c6",
+        "4cbffa2e74a3d97c8f1ecafa",
+        "018b785e23850937412111e6",
+        "9520c52e75b85421b56fde3e",
+        "bd74739a87f6ed6e7c342537",
+        "3279a2ebaa0f5ce1e019e8d3",
+        "018b30a065b9c70b20f564d6",
+        "72501dd27eb4f47345f57b0c",
+        "8b05825ffb5a9e899959b6a6",
+        "d6a841aec001d5ec458e8540",
+        "d75b030c9c34fd06290a0768"
+      ]
+    },
+    {
+      "onde": "apps/web/src/pages/Metodologia.tsx",
+      "motivo": "Página pública de metodologia descreve a explicação de erros em cinco partes; a aula de exceções cita o mesmo recurso.",
+      "sequencias": [
+        "0bc05a813a6adb0b428ba489",
+        "92cd38b77956b3c5776a1d19",
+        "e1b73997bff61b7f6f6d0353",
+        "658f18ee3b58c823f76b0915",
+        "ca1144169f0770cffdf5a3a4"
+      ]
+    },
+    {
+      "onde": "apps/web/src/styles.css",
+      "motivo": "CSS do próprio site (display: grid; grid-template-columns: repeat(auto-fill, minmax(...))), padrão genérico também mostrado na aula de HTML/CSS.",
+      "sequencias": [
+        "3256132103e7a8ccc71eb090",
+        "308f26d274ebc4243f95abb9"
+      ]
+    },
+    {
+      "onde": "docs/APROFUNDAMENTO_TEORICO_V7.md",
+      "motivo": "Citação bibliográfica pública (Software Engineering at Google; Refactoring) que também aparece na lista de fontes da aula.",
+      "sequencias": [
+        "6599e5c2c376d0c07a3d0765"
+      ]
+    },
+    {
+      "onde": "docs/ARQUITETURA.md",
+      "motivo": "Documentação pública da explicação de erros em cinco partes; a aula de exceções cita o mesmo recurso.",
+      "sequencias": [
+        "0bc05a813a6adb0b428ba489",
+        "92cd38b77956b3c5776a1d19",
+        "e1b73997bff61b7f6f6d0353",
+        "658f18ee3b58c823f76b0915",
+        "ca1144169f0770cffdf5a3a4"
+      ]
+    },
+    {
+      "onde": "docs/SEGURANCA.md",
+      "motivo": "Documentação pública dos cabeçalhos de segurança do servidor; mesmos valores padrão citados na aula de OWASP.",
+      "sequencias": [
+        "d527e4c13203d0cba841a2c8",
+        "01b72913e44fab3cb4f65858"
+      ]
+    },
+    {
+      "onde": "scripts/premium/modelo-privado.ts",
+      "motivo": "Modelo do workflow de CI do repositório privado; mesmo boilerplate padrão de GitHub Actions citado nas aulas de CI e deploy.",
+      "sequencias": [
+        "db71bd00d00283156c704804",
+        "8f4e1f563447f066c2bae4f8",
+        "9ab3fdfc5e39c536ddff5e38",
+        "19148de6e6069756a3394cf0",
+        "8d863507c3b52cc7d88e2b30",
+        "80bb8a7939cc91cbaac33575",
+        "50eadf6b8998605cf55f5469"
+      ]
+    }
+  ]
+}

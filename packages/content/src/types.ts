@@ -176,8 +176,16 @@ export interface LessonSection {
   blocks: Block[];
 }
 
+export interface AutonomyQuestion {
+  id: string; title: string; prompt: string; answer: string; explain: string; caseSensitive?: boolean;
+  review: string; wrong: {answer: string; feedback: string}[]; transfer: string;
+}
 export interface Lesson {
+  /** Avaliação suplementar; acompanha a autorização do corpo da aula. */
+  autonomy?: AutonomyQuestion[];
   id: string;
+  /** Metadado público; explicações e exemplos continuam nos blocos protegidos. */
+  theoryTitle?: string;
   moduleId: string;
   title: string;
   titleEn: string;
@@ -221,6 +229,42 @@ export interface Level {
   /** por que este nível existe e como se conecta ao resto */
   why: string;
   modules: Module[];
+}
+
+/* ---------- Metadados públicos (mapa do currículo) ---------- */
+
+/**
+ * O que o mapa público sabe de um exercício: o suficiente para validar e mesclar
+ * progresso (id, habilidades, dificuldade) e para montar a trilha. Enunciado,
+ * dicas, testes e solução ficam no corpo da lição.
+ */
+export interface ExerciseMeta {
+  id: string;
+  kind: Exercise['kind'];
+  difficulty: Difficulty;
+  skills: string[];
+  stage: Stage;
+}
+
+/** Metadados públicos de uma lição. O corpo (seções, cartões, termos, objetivos, avaliação) não entra aqui. */
+export type LessonMeta = Pick<Lesson, 'id' | 'moduleId' | 'title' | 'titleEn' | 'summary' | 'minutes' | 'skills' | 'references' | 'theoryTitle'> & {
+  stages: Stage[];
+  exercises: ExerciseMeta[];
+  cardCount: number;
+};
+export type ModuleMeta = Omit<Module, 'lessons'> & { lessons: LessonMeta[] };
+export type LevelMeta = Omit<Level, 'modules'> & { modules: ModuleMeta[] };
+
+export interface ExerciseMetaRef {
+  exercise: ExerciseMeta;
+  lessonId: string;
+  moduleId: string;
+}
+
+/** Termos em inglês de uma lição: alimentam o glossário, que é um recurso aberto. */
+export interface LessonTerms {
+  lessonId: string;
+  terms: Term[];
 }
 
 /* ---------- Projetos, entrevistas, diagnóstico ---------- */

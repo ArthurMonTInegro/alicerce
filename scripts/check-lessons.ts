@@ -1,18 +1,22 @@
 /**
  * Confere um arquivo de lições antes de ele entrar no currículo.
  *
- *   node scripts/check-lessons.ts packages/content/src/levels/modulos/_rascunho-m3-1.ts m3-1
+ *   node scripts/check-lessons.ts premium/src/levels/modulos/m3-1.ts m3-1
  *
  * Roda as mesmas regras dos testes de conteúdo e de verify-solutions.ts, mas só
- * sobre as lições do arquivo, comparando ids com o resto do currículo. Também
- * confere os tipos do arquivo com o TypeScript. Sai com código 1 se houver problema.
+ * sobre as lições do arquivo, comparando ids com o mapa público do currículo
+ * (todas as lições, exercícios e cartões, inclusive os pagos). Também confere os
+ * tipos do arquivo com o TypeScript. Arquivos do repositório privado podem estar
+ * fora desta árvore: o import '@alicerce/content/autoria' é mapeado para cá.
+ * Sai com código 1 se houver problema.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { exercises, lessons as allLessons, moduleById, projectById, referenceById, references, skillById, STAGES, type Block, type Exercise, type Lesson } from '../packages/content/src/index.ts';
+import { cardIdsOf, exercises, lessons as allLessons, moduleById, projectById, referenceById, references, skillById, STAGES, type Block, type Exercise, type Lesson } from '../packages/content/src/index.ts';
+import { allowAlicerceImportsFrom, REPO_ROOT } from '../packages/content/src/privado.ts';
 import { checkExercise } from './exercise-check.ts';
 
 const VIZ = ['binary', 'cpu', 'terminal', 'client-server', 'memory', 'sorting', 'binary-search', 'stack-queue', 'hash-table', 'big-o', 'tree', 'graph-bfs', 'tcp-handshake', 'scheduler', 'logic-gates', 'hashing', 'neuron', 'sql-join'];
@@ -29,9 +33,17 @@ const bad = (where: string, msg: string) => problems.push(`✘ ${where}: ${msg}`
 // 1. Tipos (só este arquivo e o que ele importa)
 const tmp = mkdtempSync(join(tmpdir(), 'alicerce-tsc-'));
 const tsconfig = join(tmp, 'tsconfig.json');
-writeFileSync(tsconfig, JSON.stringify({ extends: resolve('tsconfig.base.json'), include: [], files: [resolve(file)] }));
+writeFileSync(
+  tsconfig,
+  JSON.stringify({
+    extends: join(REPO_ROOT, 'tsconfig.base.json'),
+    compilerOptions: { paths: { '@alicerce/content/autoria': [join(REPO_ROOT, 'packages/content/src/autoria.ts')] } },
+    include: [],
+    files: [resolve(file)],
+  }),
+);
 try {
-  execFileSync('npx', ['tsc', '-p', tsconfig], { encoding: 'utf8', stdio: 'pipe' });
+  execFileSync('npx', ['tsc', '-p', tsconfig], { cwd: REPO_ROOT, encoding: 'utf8', stdio: 'pipe' });
 } catch (e) {
   const out = (e as { stdout?: string }).stdout ?? String(e);
   for (const line of out.trim().split('\n').slice(0, 30)) bad('tipos', line);
@@ -40,6 +52,7 @@ try {
 // 2. Carrega as lições do arquivo
 let draft: Lesson[] = [];
 try {
+  allowAlicerceImportsFrom(dirname(resolve(file)));
   const mod = (await import(pathToFileURL(resolve(file)).href)) as { lessons?: Lesson[] };
   if (!Array.isArray(mod.lessons)) bad(file, 'o arquivo precisa exportar `lessons: Lesson[]`');
   else draft = mod.lessons;
@@ -58,7 +71,7 @@ const others = allLessons.filter((l) => !installed.has(l.id));
 const otherIds = {
   lessons: new Set(others.map((l) => l.id)),
   exercises: new Set(exercises.filter((e) => !installed.has(e.lessonId)).map((e) => e.exercise.id)),
-  cards: new Set(others.flatMap((l) => l.cards.map((c) => c.id))),
+  cards: new Set(others.flatMap(cardIdsOf)),
 };
 const seen = { lessons: new Set<string>(), exercises: new Set<string>(), cards: new Set<string>() };
 const dup = (kind: keyof typeof seen, id: string, where: string) => {

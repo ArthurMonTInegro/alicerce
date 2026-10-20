@@ -1,10 +1,14 @@
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
+import { loadContentStore } from './conteudo.ts';
 import { openDb } from './db.ts';
 
 const config = loadConfig();
 const db = openDb(config.dbPath);
-const app = await buildApp({ config, db, logger: true });
+const { store: content, warnings } = await loadContentStore(config.premiumDir);
+const app = await buildApp({ config, db, content, logger: true });
+app.log.info(`conteúdo: ${content.description}`);
+for (const w of warnings) app.log.warn(w);
 
 const shutdown = async () => {
   await app.close();

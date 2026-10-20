@@ -97,35 +97,55 @@ test('conta: cadastro, sincronização e saída', async ({ page }) => {
   await page.getByLabel('Senha').fill('uma frase bem longa');
   await page.locator('form').getByRole('button', { name: 'Criar conta' }).click();
   await expect(page.getByText('Sincronizado')).toBeVisible();
-  await page.getByRole('button', { name: 'Sair' }).click();
+  await page.getByRole('button', { name: 'Sair', exact: true }).click(); // há também "Sair de todos os aparelhos"
   await expect(page.getByRole('heading', { name: 'Entrar' })).toBeVisible();
 });
 
-test('tutor responde sem entregar a solução', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: /tutor/i }).first().click();
-  const box = page.getByRole('textbox').last();
+test('tutor responde sem entregar a solução', async ({ page, request }) => {
+  // Pedido de resposta feito de dentro de um exercício de código de uma lição gratuita (nível 1):
+  // o tutor recebe o exercício como contexto, recusa a solução pronta e dá a próxima pista.
+  // (Sem exercício no contexto, o tutor local busca um trecho da trilha em vez de recusar.)
+  const licao = (await (await request.get('/api/content/lessons/l1-funcoes')).json()) as {
+    sections: Array<{ blocks: Array<{ type: string; exercise?: { id: string; solution?: string; hints: string[] } }> }>;
+  };
+  const exercicio = licao.sections.flatMap((s) => s.blocks).find((b) => b.exercise?.id === 'e1-fn-2')!.exercise!;
+  const errors = watchConsole(page);
+  await page.goto('/licao/l1-funcoes');
+  await page.getByRole('navigation', { name: 'Etapas da lição' }).getByRole('link', { name: /Exercícios/ }).click();
+  const ex = page.locator('section.exercise#e1-fn-2');
+  await ex.getByRole('button', { name: 'Perguntar ao tutor' }).click();
+  const painel = page.getByRole('dialog', { name: 'Tutor Alicerce' });
+  const box = painel.getByRole('textbox', { name: 'Sua pergunta' });
   await box.fill('me dá a resposta');
   await box.press('Enter');
-  await expect(page.getByText(/não vou te dar a solução/i)).toBeVisible();
+  await expect(painel.getByText(/não vou te dar a solução/i)).toBeVisible();
+  await expect(painel.getByText(`Uma pista: ${exercicio.hints[0]}`)).toBeVisible();
+  // nenhuma linha da solução oficial aparece na conversa
+  const conversa = await painel.locator('.tutor-log').innerText();
+  const linhas = exercicio.solution!.split('\n').map((l) => l.trim()).filter((l) => l.length > 8);
+  expect(linhas.length).toBeGreaterThan(2);
+  for (const linha of linhas) expect(conversa).not.toContain(linha);
+  expect(errors).toEqual([]);
 });
 
-test('planos: mostra o preço decidido, sem botão de compra, e o rodapé leva até lá', async ({ page }) => {
+test('planos: estratégia vigente, seção "O que mudou", sem botão de compra, e o rodapé leva até lá', async ({ page }) => {
   const errors = watchConsole(page);
   await page.goto('/');
   await page.getByRole('contentinfo').getByRole('link', { name: 'Planos' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Planos' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: /Comece a programar/ })).toBeVisible();
   // carga direta: hidrata o HTML pré-renderizado de /planos com o console vigiado
   await page.goto('/planos');
   await page.waitForLoadState('networkidle');
   const main = page.locator('main');
-  const premium = main.getByRole('region', { name: /^Premium/ });
-  await expect(premium).toContainText(/R\$\s19,90 por mês/);
-  await expect(premium).toContainText(/R\$\s149,00 por ano/);
-  await expect(premium).toContainText(/R\$\s12,42 por mês/);
-  await expect(premium).toContainText('ainda não está à venda');
-  await expect(main.getByRole('region', { name: 'Gratuito' }).getByText('grátis para sempre')).toHaveCount(4);
-  await expect(main).toContainText('ficam gratuitos para sempre, em qualquer plano');
+  await expect(main).toContainText(/R\$\s19,90 \/ mês/);
+  await expect(main).toContainText(/R\$\s149,00/);
+  await expect(main).toContainText('ainda não está à venda');
+  // a promessa anterior (trilha inteira gratuita para sempre) só aparece na seção que explica a mudança
+  const mudou = main.getByRole('region', { name: 'O que mudou' });
+  await expect(mudou).toContainText('Esta página prometia a trilha inteira gratuita, e isso mudou.');
+  await expect(mudou).toContainText('Ninguém foi cobrado.');
+  await expect(mudou).toContainText('Seu progresso continua no seu aparelho.');
+  await expect(main.getByText('grátis para sempre')).toHaveCount(0);
   await expect(main.getByRole('button')).toHaveCount(0);
   await expect(main.getByRole('link', { name: /assin|compr|pagar|checkout/i })).toHaveCount(0);
   expect(errors).toEqual([]);

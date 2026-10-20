@@ -1,6 +1,7 @@
 /** Configuração por variáveis de ambiente, lida uma vez e validada. */
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_TUTOR_DAILY_LIMIT } from '@alicerce/engine';
+import { resolvePremiumDir } from '@alicerce/content/completo';
 
 export interface Config {
   port: number;
@@ -15,6 +16,11 @@ export interface Config {
   anthropicApiKey: string | undefined;
   tutorModel: string;
   tutorDailyLimit: number;
+  /**
+   * Clone do repositório privado com o conteúdo pago (ALICERCE_PREMIUM_DIR; sem a
+   * variável, <raiz>/premium se existir). null = só conteúdo gratuito.
+   */
+  premiumDir: string | null;
 }
 
 const bool = (v: string | undefined, dflt: boolean) => (v === undefined || v === '' ? dflt : ['1', 'true', 'yes', 'sim'].includes(v.toLowerCase()));
@@ -36,5 +42,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     anthropicApiKey: env.ANTHROPIC_API_KEY || undefined,
     tutorModel: env.TUTOR_MODEL || 'claude-sonnet-5-5',
     tutorDailyLimit: int(env.TUTOR_DAILY_LIMIT, DEFAULT_TUTOR_DAILY_LIMIT),
+    premiumDir: resolvePremiumDir(env),
   };
 }

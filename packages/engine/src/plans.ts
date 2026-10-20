@@ -1,19 +1,8 @@
-/**
- * Planos e direitos de uso (entitlements).
- *
- * O produto decide o que cada plano pode fazer AQUI, num só lugar, e o resto do
- * código pergunta "este usuário pode X?" em vez de "este usuário é premium?".
- * Assim, criar um plano estudantil, institucional ou um período de teste muda
- * esta tabela, não o código espalhado pelas telas e rotas.
- *
- * Princípio do produto: o gratuito ensina a trilha inteira. O pago acrescenta o
- * que tem custo real por usuário (IA) ou dá trabalho extra para produzir
- * (simulados, análises, certificados), nunca bloqueia o básico.
- */
-
+/** Política comercial v3: fundamentos gratuitos, continuidade por assinatura. */
 export type PlanId = 'free' | 'premium';
 
 export type Feature =
+  | 'trilha-inicial'
   | 'trilha-completa'
   | 'exercicios-e-revisao'
   | 'laboratorio'
@@ -33,15 +22,16 @@ export interface FeatureInfo {
 }
 
 export const FEATURES: Record<Feature, FeatureInfo> = {
-  'trilha-completa': { title: 'Trilha completa, níveis 0 a 14', description: 'Todas as lições, visualizações e projetos, o diagnóstico, o glossário e o treino de entrevistas da Carreira.', status: 'disponivel' },
+  'trilha-inicial': { title: 'Trilha Comece a Programar', description: 'Níveis 0 e 1: introdução à computação e lógica, com 15 lições e 54 exercícios.', status: 'disponivel' },
+  'trilha-completa': { title: 'Trilha completa, níveis 0 a 14', description: 'Continuidade do nível 2 ao 14: Python, estruturas, algoritmos, web e demais assuntos.', status: 'disponivel' },
   'exercicios-e-revisao': { title: 'Exercícios e revisão espaçada', description: 'Correção automática, domínio por habilidade e FSRS.', status: 'disponivel' },
   laboratorio: { title: 'Laboratório', description: 'Python, JavaScript e SQL no navegador.', status: 'disponivel' },
   'tutor-offline': { title: 'Tutor com pistas guiadas', description: 'Perguntas e pistas a partir do erro e das dicas do exercício.', status: 'disponivel' },
-  'tutor-ia': { title: 'Tutor com IA', description: 'Conversa sobre o seu código, sem entregar a resposta.', status: 'disponivel' },
+  'tutor-ia': { title: 'Tutor com IA', description: 'Conversa sobre o seu código, com pistas em vez de respostas prontas. Respostas geradas podem conter erros.', status: 'disponivel' },
   sincronizacao: { title: 'Sincronização entre aparelhos', description: 'Progresso salvo na conta.', status: 'disponivel' },
   'analise-detalhada': { title: 'Análise detalhada de desempenho', description: 'Evolução de cada habilidade ao longo do tempo. O domínio atual por habilidade e o plano do dia já fazem parte do gratuito.', status: 'planejado' },
   'simulado-entrevista': { title: 'Simulado de entrevista técnica', description: 'Entrevista cronometrada com avaliação de raciocínio e comunicação.', status: 'planejado' },
-  certificado: { title: 'Certificado verificável', description: 'Certificado por nível concluído, com prova de domínio.', status: 'planejado' },
+  certificado: { title: 'Certificado verificável', description: 'Em estudo: certificado por nível, só com uma avaliação verificável. Atividade registrada no navegador não serve de prova.', status: 'planejado' },
 };
 
 /** Preço em centavos de real (R$ 19,90 = 1990), para não somar centavos com ponto flutuante. */
@@ -56,6 +46,7 @@ export interface PlanDefinition {
   features: Feature[];
   /** perguntas por dia ao tutor com IA; null = usa o padrão configurado no servidor */
   tutorDailyLimit: number | null;
+  tutorMonthlyLimit: number;
   /** null = gratuito */
   price: PlanPrice | null;
 }
@@ -64,15 +55,17 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
   free: {
     id: 'free',
     name: 'Gratuito',
-    features: ['trilha-completa', 'exercicios-e-revisao', 'laboratorio', 'tutor-offline', 'tutor-ia', 'sincronizacao'],
-    tutorDailyLimit: null,
+    features: ['trilha-inicial', 'exercicios-e-revisao', 'laboratorio', 'tutor-offline', 'sincronizacao'],
+    tutorDailyLimit: 0,
+    tutorMonthlyLimit: 0,
     price: null,
   },
   premium: {
     id: 'premium',
     name: 'Premium',
-    features: ['trilha-completa', 'exercicios-e-revisao', 'laboratorio', 'tutor-offline', 'tutor-ia', 'sincronizacao', 'analise-detalhada', 'simulado-entrevista', 'certificado'],
-    tutorDailyLimit: 300,
+    features: ['trilha-inicial', 'trilha-completa', 'exercicios-e-revisao', 'laboratorio', 'tutor-offline', 'tutor-ia', 'sincronizacao', 'analise-detalhada', 'simulado-entrevista', 'certificado'],
+    tutorDailyLimit: 20,
+    tutorMonthlyLimit: 200,
     // Preço decidido em 07/10/2026. A cobrança acontece no provedor de pagamento: o
     // Alicerce não guarda dados de cartão, só o plano, a validade e o histórico em
     // plan_changes (apps/api/src/plans.ts).
@@ -93,8 +86,8 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
  */
 export const PREMIUM_FOR_SALE = false;
 
-/** Perguntas por dia ao tutor com IA no plano gratuito, se o servidor não definir TUTOR_DAILY_LIMIT. */
-export const DEFAULT_TUTOR_DAILY_LIMIT = 60;
+/** Teto diário de IA para Premium; o gratuito nunca chama o provedor. */
+export const DEFAULT_TUTOR_DAILY_LIMIT = 20;
 
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 /** 1990 → "R$ 19,90" (com espaço não separável, como o Intl escreve). */
@@ -112,12 +105,12 @@ export function yearlyDeal(price: PlanPrice) {
   };
 }
 
-/**
- * Gratuitos para sempre, decisão do Arthur em 07/10/2026 e compromisso público em
- * /planos. Nenhum plano pode deixar de ter estes recursos (um teste cobra isso).
- * O tutor com IA e a sincronização têm custo por pessoa e ficaram de fora.
- */
-export const FOREVER_FREE: readonly Feature[] = ['trilha-completa', 'exercicios-e-revisao', 'laboratorio', 'tutor-offline'];
+export const FREE_FEATURES: readonly Feature[] = ['trilha-inicial', 'exercicios-e-revisao', 'laboratorio', 'tutor-offline'];
+
+export const FREE_MAX_LEVEL = 1;
+export function canAccessLevel(plan: PlanId, level: number): boolean {
+  return Number.isInteger(level) && level >= 0 && level <= 14 && (level <= FREE_MAX_LEVEL || plan === 'premium');
+}
 
 export const isPlanId = (x: unknown): x is PlanId => x === 'free' || x === 'premium';
 
@@ -133,6 +126,7 @@ export interface Entitlements {
   expiresAt: number | null;
   features: Feature[];
   tutorDailyLimit: number;
+  tutorMonthlyLimit: number;
 }
 
 export function entitlements(plan: PlanId, expiresAt: number | null, defaultTutorLimit: number): Entitlements {
@@ -141,7 +135,8 @@ export function entitlements(plan: PlanId, expiresAt: number | null, defaultTuto
     plan,
     expiresAt: plan === 'free' ? null : expiresAt,
     features: def.features.filter((f) => FEATURES[f].status === 'disponivel'),
-    tutorDailyLimit: Math.max(def.tutorDailyLimit ?? defaultTutorLimit, defaultTutorLimit),
+    tutorDailyLimit: plan==='free'?0:Math.min(def.tutorDailyLimit??20,Math.max(0,defaultTutorLimit)),
+    tutorMonthlyLimit: def.tutorMonthlyLimit,
   };
 }
 

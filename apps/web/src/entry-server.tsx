@@ -3,10 +3,14 @@ import { renderToString } from 'react-dom/server';
 import { App } from './App.tsx';
 import { HeadProvider, type HeadData } from './lib/head.tsx';
 import { RouterProvider } from './lib/router.tsx';
-import { glossary, lessons } from '@alicerce/content';
+import { glossary, publicLessons } from '@alicerce/content';
 import { cardsResource, glossaryResource, seedLessons } from './content.ts';
 import { seedPages } from './routes.tsx';
+import * as ingles from './pages/Ingles.tsx';
+import * as tutor from './pages/Tutor.tsx';
 import * as home from './pages/Home.tsx';
+import * as autonomia from './pages/Autonomia.tsx';
+import * as evolucao from './pages/Evolucao.tsx';
 import * as trilha from './pages/Trilha.tsx';
 import * as nivel from './pages/Nivel.tsx';
 import * as modulo from './pages/Modulo.tsx';
@@ -27,10 +31,11 @@ import * as privacidade from './pages/Privacidade.tsx';
 import * as planos from './pages/Planos.tsx';
 
 // No build, tudo já está em memória: cada página sai completa, sem "Carregando".
-seedLessons(lessons);
-cardsResource.seed(Object.fromEntries(lessons.map((l) => [l.id, l.cards])));
+// O pacote público só tem o corpo das lições gratuitas; as pagas saem como prévia.
+seedLessons(publicLessons);
+cardsResource.seed(Object.fromEntries(publicLessons.map((l) => [l.id, l.cards])));
 glossaryResource.seed(glossary);
-seedPages({ home, trilha, nivel, modulo, licao, revisao, diagnostico, laboratorio, projetos, carreira, glossario, visualizacoes, progresso, conta, metodologia, referencias, sobre, privacidade, planos });
+seedPages({ tutor, ingles, evolucao, autonomia, home, trilha, nivel, modulo, licao, revisao, diagnostico, laboratorio, projetos, carreira, glossario, visualizacoes, progresso, conta, metodologia, referencias, sobre, privacidade, planos });
 
 export function render(url: string): { html: string; head: HeadData } {
   const head: HeadData = { title: 'Alicerce', description: '' };

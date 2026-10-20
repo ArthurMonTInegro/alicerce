@@ -8,7 +8,7 @@ export function Sobre() {
     <div className="container prose" style={{ maxWidth: '84ch' }}>
       <p className="eyebrow">Sobre · about</p>
       <h1>Uma formação em computação, do zero ao avançado</h1>
-      <p className="lead">A Alicerce é gratuita, funciona no navegador (inclusive no celular, sem instalar nada) e foi desenhada para quem nunca programou chegar a um nível profissional, com base sólida em ciência da computação.</p>
+      <p className="lead">A Alicerce funciona no navegador (inclusive no celular, sem instalar nada) e foi desenhada para quem nunca programou construir, passo a passo, uma base sólida em ciência da computação. Os níveis 0 e 1 são gratuitos; do nível 2 ao 14, a continuação faz parte da assinatura Premium, que ainda não está à venda. Detalhes em <Link to="/planos">Planos</Link>.</p>
 
       <h2>O que muda em relação a assistir vídeos</h2>
       <ul>
@@ -25,10 +25,10 @@ export function Sobre() {
           <strong>Erros viram aula</strong>: tradução e diagnóstico de cada mensagem de erro.
         </li>
         <li>
-          <strong>Ajuda sem cola</strong>: dicas graduais e um tutor que pergunta em vez de responder.
+          <strong>Ajuda em etapas</strong>: dicas graduais e um tutor que orienta com perguntas e pistas. Dá para ver a solução, mas o exercício volta na revisão para você refazer sem ajuda.
         </li>
         <li>
-          <strong>Mapa honesto</strong>: árvore de pré-requisitos, diagnóstico inicial e domínio medido por habilidade.
+          <strong>Mapa honesto</strong>: árvore de pré-requisitos, diagnóstico inicial e domínio estimado por habilidade, a partir dos seus exercícios.
         </li>
         <li>
           <strong>Inglês técnico desde o primeiro dia</strong>, e preparação para entrevistas e portfólio.
@@ -64,9 +64,9 @@ export function Sobre() {
         A lista completa, com documentação oficial e padrões, está em <Link to="/referencias">Referências</Link>. A base em ciência da aprendizagem está em <Link to="/metodologia">Metodologia</Link>.
       </p>
 
-      <h2>Código aberto e privacidade</h2>
+      <h2>Privacidade</h2>
       <p>
-        O progresso fica no seu navegador; conta é opcional. Não há anúncios nem rastreadores de terceiros. Detalhes em <Link to="/privacidade">Privacidade</Link>.
+        O progresso fica no seu navegador. Nos níveis gratuitos, não é preciso criar conta; o Premium, quando estiver à venda, vai exigir uma conta com assinatura ativa. Não há anúncios nem rastreadores de terceiros. Detalhes em <Link to="/privacidade">Privacidade</Link>.
       </p>
     </div>
   );

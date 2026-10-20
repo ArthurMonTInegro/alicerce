@@ -1,9 +1,15 @@
 /**
  * Verificação educacional automática de todos os exercícios executáveis do
- * currículo (regras em exercise-check.ts).
+ * currículo (regras em exercise-check.ts). Com o repositório privado
+ * (ALICERCE_PREMIUM_DIR ou <raiz>/premium) cobre os níveis 0 a 14; sem ele, só
+ * os gratuitos, e a primeira linha da saída diz isso.
  */
-import { exercises } from '../packages/content/src/index.ts';
+import { describeCurriculum, loadCurriculum } from '../packages/content/src/completo.ts';
 import { checkExercise } from './exercise-check.ts';
+
+const curriculum = await loadCurriculum();
+const { exercises } = curriculum;
+console.log(describeCurriculum(curriculum));
 
 let failures = 0;
 let checked = 0;
