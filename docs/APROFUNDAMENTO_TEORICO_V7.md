@@ -2,11 +2,11 @@
 
 Entrega editorial de 11/10/2026 (America/Fortaleza). Cópia independente do Alicerce; não modifica automaticamente o GitHub original.
 
-> **Situação em 14/10/2026.** Este documento registra a entrega da v7 na cópia do Codex, que tinha 91 aulas; os números abaixo são os daquela entrega. Depois da integração com o repositório do GitHub, o currículo tem 111 lições, 484 exercícios e 525 cartões. As 20 lições dos módulos m7-1 a m9-3 (níveis 7 a 9) vieram do repositório do GitHub e **não têm aprofundamento teórico**: a cobertura é de **91 de 111 aulas** (todas as 15 gratuitas e 76 das 96 pagas). Por nível, hoje: nível 7, 4 de 12; nível 8, 3 de 9; nível 9, 3 de 9; os demais como na tabela abaixo. Desde a separação do conteúdo pago, `packages/content/src/theory/` e `theory-expansions.ts` guardam só o aprofundamento dos níveis 0 e 1; o das aulas pagas fica no repositório privado (`src/aprofundamento/`), e o mapa público leva só o título (`theoryTitle` em `catalogo-pago.ts`). O "fluxo Sites" citado no fim era o da publicação da cópia, não o GitHub Pages deste repositório.
+> **Situação em 14/10/2026.** Este documento registra a entrega da v7 na cópia do Codex, que tinha 91 aulas; os números abaixo são os daquela entrega. Depois da integração com o repositório do GitHub, o currículo tem 111 lições, 484 exercícios e 525 cartões. As 20 lições dos módulos m7-1 a m9-3 (níveis 7 a 9) vieram do repositório do GitHub sem aprofundamento teórico; até 21/10/2026, a cobertura era de 91 de 111 aulas (nível 7, 4 de 12; nível 8, 3 de 9; nível 9, 3 de 9). Em 21/10/2026 elas receberam o seu, no mesmo formato (ver "Complemento de 21/10/2026", no fim), e a cobertura passou a **111 de 111 aulas**. Desde a separação do conteúdo pago, `packages/content/src/theory/` e `theory-expansions.ts` guardam só o aprofundamento dos níveis 0 e 1; o das aulas pagas fica no repositório privado (`src/aprofundamento/`), e o mapa público leva só o título (`theoryTitle` em `catalogo-pago.ts`). O "fluxo Sites" citado no fim era o da publicação da cópia, não o GitHub Pages deste repositório.
 
 ## Resultado
 
-A v6 acrescentou 15 suplementos, um por nível. Esta entrega acrescenta os 76 restantes: **91/91 aulas** da cópia passaram a ter aprofundamento (hoje, com as 20 lições vindas depois, são 91 de 111), distribuído nas etapas Explicação, Exemplo, Desafio e Revisão. São aproximadamente **31.670 palavras novas**, contadas nos nove campos editoriais dos novos suplementos, sem bibliografia e tabelas. Não são 76 cursos novos nem evidência de domínio completo da área.
+A v6 acrescentou 15 suplementos, um por nível. Esta entrega acrescenta os 76 restantes: **91/91 aulas** da cópia passaram a ter aprofundamento (com as 20 lições vindas depois, foram 91 de 111 até 21/10/2026; hoje são 111 de 111), distribuído nas etapas Explicação, Exemplo, Desafio e Revisão. São aproximadamente **31.670 palavras novas**, contadas nos nove campos editoriais dos novos suplementos, sem bibliografia e tabelas. Não são 76 cursos novos nem evidência de domínio completo da área.
 
 O currículo mantém **91 aulas, 364 exercícios e 357 cartões**. IDs e soluções avaliadas permanecem preservados; houve correção pontual de textos e feedbacks imprecisos. Reflexões novas não recebem nota automática e não concedem certificação.
 
@@ -235,3 +235,32 @@ Documentação primária e referências acadêmicas; os exemplos foram redigidos
 - **mit-6042** — [6.042J Mathematics for Computer Science](https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2010/), MIT OpenCourseWare.
 - **v7-applied-discrete** — [6.1200J — Mathematics for Computer Science](https://ocw.mit.edu/courses/6-1200j-mathematics-for-computer-science-spring-2024/), MIT OpenCourseWare.
 - **v7-applied-gradient** — [The Gradient and Directional Derivatives](https://www.ocw.mit.edu/ans7870/18/18.013a/textbook/HTML/chapter06/section06.html), MIT OpenCourseWare.
+
+## Complemento de 21/10/2026: as 20 lições de m7-1 a m9-3
+
+No repositório privado, em `src/aprofundamento/dados-sistemas-redes.ts`, com os mesmos campos dos outros suplementos (cerca de 13.000 palavras nos nove campos editoriais). Cada um parte do que a lição já ensina e acrescenta um ângulo que ela não cobre, com exemplo original e números conferidos à mão:
+
+| Lição | Aprofundamento |
+|---|---|
+| l7-restricoes-dml | Onde a regra mora: o alcance de cada restrição |
+| l7-sql-no-python | Código e dados em canais separados, e a transação que a conexão guarda |
+| l7-null-tres-valores | O que um NULL quer dizer: desconhecido, inaplicável ou ainda não aconteceu |
+| l7-subconsultas | Algum, nenhum e todos: quantificadores escritos em SQL |
+| l7-isolamento-concorrencia | Regras que atravessam linhas: por que o write skew escapa do instantâneo |
+| l7-otimizacao-consultas | Custo de uma consulta: páginas lidas e estimativas do planejador |
+| l7-documentos-chave-valor | Modelar pelo acesso é escolher quais perguntas ficam baratas |
+| l7-replicacao-consistencia | Garantias de sessão: consistência descrita pelo que a pessoa vê |
+| l8-fork-exec-wait | O que atravessa fork e exec: descritores, deslocamentos e pontas de pipe |
+| l8-prioridades-mlfq | Prioridade sem recurso livre não adianta: inversão de prioridade |
+| l8-ponteiros-heap-c | Tempo de vida e posse: quem é responsável por cada bloco |
+| l8-inodes-journaling | Durabilidade é um protocolo: write, fsync e rename |
+| l8-semaforos-condicao | Raciocinar com invariantes: o que vale sempre que o lock está livre |
+| l8-async-threads-processos | Contrapressão: concorrência com limite para não afogar o sistema |
+| l9-ip-subredes-nat | Diagnosticar de dentro para fora: uma pergunta por camada |
+| l9-tcp-janelas-congestionamento | Latência e vazão: por que um link rápido pode parecer lento |
+| l9-http-versoes | Onde uma mensagem acaba é uma questão de segurança |
+| l9-tls-certificados | Operar certificados: chave privada, validade e cadeia completa |
+| l9-websockets | Conexão não é sessão: retomar sem perder nem duplicar mensagens |
+| l9-proxies-balanceamento | Capacidade e cauda: por que 70% de uso já pede atenção |
+
+As fontes são referências que já estavam em `references.ts`; nenhuma referência nova foi acrescentada, porque o ambiente desta entrega não tinha acesso à rede para conferir endereços. Nenhum texto foi revisado por outra pessoa nem testado com autodidatas: é cobertura editorial, não eficácia pedagógica medida. Enquanto os níveis 2 a 14 estão abertos na transição, o site mostra a todos, inclusive a quem tem Premium, as aulas como foram publicadas, sem esse aprofundamento. Ele aparece quando esses níveis fecharem, entregue pelo servidor só a quem tem Premium ativo.

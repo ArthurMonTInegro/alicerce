@@ -181,6 +181,15 @@
         "7e1a6da965df358edfd1d46c",
         "d01644d3e31a4734225697c1"
       ]
+    },
+    {
+      "onde": "páginas de módulo (modulo/m7-4, m9-1), com os níveis 2 a 14 abertos na transição",
+      "motivo": "Duas referências públicas de references.ts aparecem uma depois da outra na lista de referências do módulo (Designing Data-Intensive Applications e 15-445/645 Database Systems em m7-4; Kurose e Ross e CS144 em m9-1); o aprofundamento pago de 21/10/2026 cita as mesmas duas em sequência, na lista de fontes.",
+      "sequencias": [
+        "6e4184c629c1fa5bededbb84",
+        "917b00db65a2dafca185c83e",
+        "af59d280dda0dad7676b6bf4"
+      ]
     }
   ]
 }

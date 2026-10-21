@@ -4462,15 +4462,17 @@ export const paidCatalog: LevelMeta[] = [
       "title": "Tabelas com regras: restrições, INSERT, UPDATE e DELETE",
       "titleEn": "Tables with rules: constraints, INSERT, UPDATE and DELETE",
       "summary": "Criar tabelas com CREATE TABLE e pôr as regras do negócio no próprio banco (NOT NULL, UNIQUE, CHECK, DEFAULT, chave primária, composta e estrangeira com ON DELETE), escolher tipos no SQLite e no PostgreSQL, e alterar dados com INSERT, UPDATE, DELETE, UPSERT e RETURNING seguindo o ritual de conferir antes e depois.",
-      "minutes": 45,
+      "minutes": 57,
       "skills": [
        "bd-sql"
       ],
       "references": [
        "sqlite-docs",
        "postgres-docs",
-       "cmu-15445"
+       "cmu-15445",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Onde a regra mora: o alcance de cada restrição",
       "cardCount": 8,
       "stages": [
        "conceito",
@@ -4545,7 +4547,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "SQL no Python: consultas parametrizadas, cursores e paginação",
       "titleEn": "SQL from Python: parameterized queries, cursors and pagination",
       "summary": "Como um programa conversa com o banco pelo módulo sqlite3 (DB-API): cursores, fetchone e fetchall, Row, executemany, rowcount e lastrowid; por que um valor passado como parâmetro nunca vira SQL num comando preparado; o que não pode ser parâmetro e como a lista branca resolve; listas no IN, buscas com LIKE e paginação com LIMIT/OFFSET e por chave.",
-      "minutes": 45,
+      "minutes": 57,
       "skills": [
        "bd-sql"
       ],
@@ -4553,8 +4555,10 @@ export const paidCatalog: LevelMeta[] = [
        "python-docs",
        "sqlite-docs",
        "postgres-docs",
-       "owasp-cheatsheets"
+       "owasp-cheatsheets",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Código e dados em canais separados, e a transação que a conexão guarda",
       "cardCount": 8,
       "stages": [
        "conceito",
@@ -4728,7 +4732,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "NULL e a lógica de três valores",
       "titleEn": "NULL and three-valued logic",
       "summary": "Por que uma comparação com NULL não dá verdadeiro nem falso, quais linhas o WHERE descarta por isso, como COUNT, SUM e AVG tratam valores ausentes, COALESCE e NULLIF, e as armadilhas do LEFT JOIN: filtrar no WHERE o que devia estar no ON e contar 1 onde devia ser 0.",
-      "minutes": 45,
+      "minutes": 57,
       "skills": [
        "bd-joins",
        "bd-sql"
@@ -4736,8 +4740,11 @@ export const paidCatalog: LevelMeta[] = [
       "references": [
        "postgres-docs",
        "sqlite-docs",
-       "cmu-15445"
+       "cmu-15445",
+       "v7-web-sql-null",
+       "ies-study-guide"
       ],
+      "theoryTitle": "O que um NULL quer dizer: desconhecido, inaplicável ou ainda não aconteceu",
       "cardCount": 10,
       "stages": [
        "conceito",
@@ -4816,7 +4823,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "Subconsultas: IN, EXISTS e tabelas derivadas",
       "titleEn": "Subqueries: IN, EXISTS and derived tables",
       "summary": "Consultas dentro de consultas: a subconsulta escalar que compara cada linha com uma média, a correlacionada que é refeita para cada linha, IN e EXISTS para filtrar sem repetir linhas, NOT EXISTS no lugar do NOT IN que quebra com NULL, e tabelas derivadas e WITH para agregar antes de juntar sem multiplicar linhas.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "bd-joins",
        "bd-sql"
@@ -4824,8 +4831,10 @@ export const paidCatalog: LevelMeta[] = [
       "references": [
        "postgres-docs",
        "sqlite-docs",
-       "cmu-15445"
+       "cmu-15445",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Algum, nenhum e todos: quantificadores escritos em SQL",
       "cardCount": 8,
       "stages": [
        "conceito",
@@ -4994,7 +5003,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "Transações concorrentes e níveis de isolamento",
       "titleEn": "Concurrent transactions and isolation levels",
       "summary": "O que dá errado quando duas transações mexem nos mesmos dados ao mesmo tempo (leitura suja, leitura não repetível, fantasma, atualização perdida e write skew), o que cada nível de isolamento garante no padrão SQL, no PostgreSQL e no SQLite, como o MVCC entrega instantâneos e como escrever código que não perde dinheiro: UPDATE atômico, FOR UPDATE, versão otimista e repetição.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "bd-modelagem"
       ],
@@ -5003,8 +5012,12 @@ export const paidCatalog: LevelMeta[] = [
        "sqlite-docs",
        "ddia",
        "cmu-15445",
-       "python-docs"
+       "python-docs",
+       "postgres-isolation-deep",
+       "postgres-transactions-deep",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Regras que atravessam linhas: por que o write skew escapa do instantâneo",
       "cardCount": 8,
       "stages": [
        "conceito",
@@ -5082,7 +5095,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "Otimização de consultas: índices compostos e EXPLAIN",
       "titleEn": "Query optimization: composite indexes and EXPLAIN",
       "summary": "Como um índice B-tree é organizado por dentro, por que a ordem das colunas de um índice composto decide quais consultas ele acelera (regra do prefixo mais à esquerda), índices de cobertura, condições que impedem o uso do índice, como ler o EXPLAIN do SQLite e do PostgreSQL e como achar e corrigir o problema N+1.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "bd-modelagem"
       ],
@@ -5090,8 +5103,10 @@ export const paidCatalog: LevelMeta[] = [
        "postgres-docs",
        "sqlite-docs",
        "cmu-15445",
-       "ddia"
+       "ddia",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Custo de uma consulta: páginas lidas e estimativas do planejador",
       "cardCount": 9,
       "stages": [
        "conceito",
@@ -5267,15 +5282,18 @@ export const paidCatalog: LevelMeta[] = [
       "title": "Modelando para o acesso: documentos e chave-valor",
       "titleEn": "Modeling for access patterns: documents and key-value",
       "summary": "Como dar forma aos dados no MongoDB e no Redis a partir das perguntas que o sistema faz: embutir ou referenciar, o que copiar de propósito, consultas com notação de ponto e pipeline de agregação, as cinco estruturas do Redis, comandos atômicos, cache-aside e limitação de taxa.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "bd-nosql"
       ],
       "references": [
        "ddia",
        "postgres-docs",
-       "sqlite-docs"
+       "sqlite-docs",
+       "cmu-15445",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Modelar pelo acesso é escolher quais perguntas ficam baratas",
       "cardCount": 8,
       "stages": [
        "conceito",
@@ -5351,15 +5369,17 @@ export const paidCatalog: LevelMeta[] = [
       "title": "Replicação a fundo: atraso, quóruns e conflitos",
       "titleEn": "Replication in depth: lag, quorums and conflicts",
       "summary": "O que acontece entre o líder e as réplicas: replicação síncrona e assíncrona, as anomalias do atraso e como evitá-las, failover e cérebro dividido, quóruns sem líder com R + W > N e reparo na leitura, conflitos resolvidos pela última escrita ou por CRDTs, e o CAP refinado pelo PACELC.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "bd-nosql"
       ],
       "references": [
        "ddia",
        "postgres-docs",
-       "cmu-15445"
+       "cmu-15445",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Garantias de sessão: consistência descrita pelo que a pessoa vê",
       "cardCount": 10,
       "stages": [
        "conceito",
@@ -5537,7 +5557,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "Criando processos: fork, exec, wait e a árvore de processos",
       "titleEn": "Creating processes: fork, exec, wait and the process tree",
       "summary": "O que o kernel guarda sobre cada processo, como o Unix cria processos com fork, troca o programa com exec e recolhe o resultado com wait, de onde vêm zumbis e órfãos, como o shell faz redirecionamentos, por que cd não pode ser um programa à parte e onde as threads entram nessa história.",
-      "minutes": 45,
+      "minutes": 57,
       "skills": [
        "so-processos"
       ],
@@ -5545,8 +5565,10 @@ export const paidCatalog: LevelMeta[] = [
        "ostep",
        "linux-man",
        "tanenbaum-so",
-       "python-docs"
+       "python-docs",
+       "ies-study-guide"
       ],
+      "theoryTitle": "O que atravessa fork e exec: descritores, deslocamentos e pontas de pipe",
       "cardCount": 8,
       "stages": [
        "conceito",
@@ -5621,15 +5643,17 @@ export const paidCatalog: LevelMeta[] = [
       "title": "Prioridades, MLFQ e o custo da troca de contexto",
       "titleEn": "Priorities, MLFQ and the cost of context switching",
       "summary": "Como medir um escalonador (retorno × resposta), como prioridades causam inanição e o envelhecimento a evita, como a fila multinível com realimentação aprende quem é interativo sem saber a duração de ninguém, o que acontece numa troca de contexto e como o tamanho do quantum equilibra resposta e desperdício.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "so-processos"
       ],
       "references": [
        "ostep",
        "tanenbaum-so",
-       "linux-man"
+       "linux-man",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Prioridade sem recurso livre não adianta: inversão de prioridade",
       "cardCount": 10,
       "stages": [
        "conceito",
@@ -5803,7 +5827,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "Ponteiros e o heap em C: endereços, malloc, free e os bugs clássicos",
       "titleEn": "Pointers and the heap in C: addresses, malloc, free and the classic bugs",
       "summary": "O mapa do espaço de endereçamento de um processo, ponteiros e aritmética de ponteiros em C, como malloc e free funcionam por dentro (cabeçalho, lista livre, divisão e coalescência) e os erros de memória por trás da maior parte das falhas graves de segurança: vazamento, double free, use-after-free e estouro de buffer, com as ferramentas que os denunciam.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "so-memoria"
       ],
@@ -5811,8 +5835,10 @@ export const paidCatalog: LevelMeta[] = [
        "cmu-15213",
        "ostep",
        "cs50",
-       "linux-man"
+       "linux-man",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Tempo de vida e posse: quem é responsável por cada bloco",
       "cardCount": 7,
       "stages": [
        "conceito",
@@ -5887,15 +5913,18 @@ export const paidCatalog: LevelMeta[] = [
       "title": "Sistemas de arquivos por dentro: inodes, diretórios, links e journaling",
       "titleEn": "File systems inside: inodes, directories, links and journaling",
       "summary": "Como um sistema de arquivos no estilo Unix acha os blocos de um arquivo com ponteiros diretos e indiretos (e extents), transforma um caminho num número de inode, por que hard links e links simbólicos se comportam de jeitos tão diferentes, quando o espaço de um arquivo apagado volta de fato, e como o journaling e o fsync protegem os dados de uma queda de energia.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "so-memoria"
       ],
       "references": [
        "ostep",
        "linux-man",
-       "tanenbaum-so"
+       "tanenbaum-so",
+       "python-docs",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Durabilidade é um protocolo: write, fsync e rename",
       "cardCount": 8,
       "stages": [
        "conceito",
@@ -6069,7 +6098,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "Esperar sem desperdiçar: semáforos, variáveis de condição e o produtor-consumidor",
       "titleEn": "Waiting without spinning: semaphores, condition variables and the producer-consumer problem",
       "summary": "O lock garante que só uma thread mexe no dado; falta fazer uma thread esperar até algo acontecer. Semáforos contadores, variáveis de condição, o buffer limitado e o deadlock que nasce de inverter dois acquire.",
-      "minutes": 45,
+      "minutes": 57,
       "skills": [
        "so-concorrencia"
       ],
@@ -6077,8 +6106,11 @@ export const paidCatalog: LevelMeta[] = [
        "ostep",
        "tanenbaum-so",
        "python-docs",
-       "linux-man"
+       "linux-man",
+       "ostep-locks-deep",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Raciocinar com invariantes: o que vale sempre que o lock está livre",
       "cardCount": 7,
       "stages": [
        "conceito",
@@ -6154,7 +6186,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "async/await, threads ou processos: escolhendo o modelo de concorrência",
       "titleEn": "async/await vs threads vs processes: choosing a concurrency model",
       "summary": "Concorrência não é paralelismo. Como corrotinas e o laço de eventos trocam de tarefa só nos await, por que threads no CPython não aceleram cálculo, quando pagar o preço de processos, e as corridas que continuam existindo mesmo numa thread só.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "so-concorrencia",
        "so-processos"
@@ -6162,8 +6194,10 @@ export const paidCatalog: LevelMeta[] = [
       "references": [
        "ostep",
        "python-docs",
-       "tanenbaum-so"
+       "tanenbaum-so",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Contrapressão: concorrência com limite para não afogar o sistema",
       "cardCount": 7,
       "stages": [
        "conceito",
@@ -6339,7 +6373,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "IP por dentro: sub-redes, roteamento pelo prefixo mais longo e NAT",
       "titleEn": "IP in depth: subnets, longest prefix match routing and NAT",
       "summary": "O que cada camada acrescenta ao pacote, como calcular rede, broadcast e hosts de qualquer prefixo, como um host decide entre entregar direto ou mandar ao gateway, como roteadores escolhem a rota mais específica, como o NAT deixa a casa inteira sair com um IP só, por que o CGNAT da operadora impede o redirecionamento de porta e o que muda no IPv6.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "redes-tcpip",
        "comp-binario"
@@ -6348,8 +6382,10 @@ export const paidCatalog: LevelMeta[] = [
        "kurose-ross",
        "stanford-cs144",
        "python-docs",
-       "cloudflare-learning"
+       "cloudflare-learning",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Diagnosticar de dentro para fora: uma pergunta por camada",
       "cardCount": 9,
       "stages": [
        "conceito",
@@ -6428,7 +6464,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "TCP por dentro: sequência, retransmissão, janelas e congestionamento (e o que o QUIC muda)",
       "titleEn": "TCP in depth: sequence numbers, retransmission, windows and congestion control (and what QUIC changes)",
       "summary": "Como o TCP numera bytes e confirma com ACKs cumulativos, quando retransmite (temporizador com RTO adaptativo e três ACKs duplicados), por que a janela limita a vazão a janela/RTT, a diferença entre controle de fluxo e de congestionamento, o dente de serra do Reno, o que fazem o CUBIC e o BBR, e por que o QUIC reconstruiu tudo isso sobre o UDP.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "redes-tcpip"
       ],
@@ -6436,8 +6472,10 @@ export const paidCatalog: LevelMeta[] = [
        "kurose-ross",
        "rfc9293",
        "stanford-cs144",
-       "cloudflare-learning"
+       "cloudflare-learning",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Latência e vazão: por que um link rápido pode parecer lento",
       "cardCount": 10,
       "stages": [
        "conceito",
@@ -6611,7 +6649,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "HTTP por dentro: as mensagens do 1.1, os quadros do HTTP/2 e o HTTP/3",
       "titleEn": "HTTP in depth: HTTP/1.1 messages, HTTP/2 frames and HTTP/3",
       "summary": "A semântica do HTTP (métodos, status, cabeçalhos) é a mesma nas três versões; o que muda é o enquadramento. Como o HTTP/1.1 decide onde o corpo acaba (Content-Length, chunked, fechar a conexão), por que o pipelining não pegou, como o HTTP/2 corta tudo em quadros binários com fluxos multiplexados e comprime cabeçalhos com o HPACK, e o que o HTTP/3 delega ao QUIC e por que precisou do QPACK.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "redes-dns-tls",
        "web-http-api"
@@ -6620,8 +6658,10 @@ export const paidCatalog: LevelMeta[] = [
        "rfc9110",
        "mdn-http",
        "kurose-ross",
-       "cloudflare-learning"
+       "cloudflare-learning",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Onde uma mensagem acaba é uma questão de segurança",
       "cardCount": 9,
       "stages": [
        "conceito",
@@ -6697,7 +6737,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "TLS 1.3 e certificados: o handshake, a cadeia de confiança e os erros de HTTPS",
       "titleEn": "TLS 1.3 and certificates: the handshake, the chain of trust and HTTPS errors",
       "summary": "O que cada mensagem do handshake do TLS 1.3 faz e por que ele custa um RTT só, o que SNI, ALPN e 0-RTT resolvem (e o risco de repetição do 0-RTT), o que há num certificado X.509, como o cliente monta e valida a cadeia até uma raiz confiável e confere o nome com curinga, e como diagnosticar os erros de certificado mais comuns, além de revogação, Certificate Transparency, CAA, ACME, HSTS e mTLS.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "redes-dns-tls"
       ],
@@ -6706,8 +6746,11 @@ export const paidCatalog: LevelMeta[] = [
        "cloudflare-learning",
        "stanford-cs255",
        "owasp-cheatsheets",
-       "mdn"
+       "mdn",
+       "v7-web-tls",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Operar certificados: chave privada, validade e cadeia completa",
       "cardCount": 10,
       "stages": [
        "conceito",
@@ -6874,15 +6917,18 @@ export const paidCatalog: LevelMeta[] = [
       "title": "WebSockets: do HTTP a um canal bidirecional em tempo real",
       "titleEn": "WebSockets: from HTTP to a real-time bidirectional channel",
       "summary": "Por que o HTTP sozinho não deixa o servidor falar primeiro, como o WebSocket nasce de um GET com Upgrade, como é cada quadro por dentro (FIN, opcode, tamanho em 7, 16 ou 64 bits, máscara), para que servem ping, pong e o fechamento com código, e o que um servidor com milhares de conexões longas precisa vigiar: Origin, heartbeat, tamanho máximo e clientes lentos.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "redes-sockets"
       ],
       "references": [
        "kurose-ross",
        "mdn",
-       "python-docs"
+       "python-docs",
+       "tcp-rfc9293-deep",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Conexão não é sessão: retomar sem perder nem duplicar mensagens",
       "cardCount": 7,
       "stages": [
        "conceito",
@@ -6959,7 +7005,7 @@ export const paidCatalog: LevelMeta[] = [
       "title": "Proxies reversos e balanceamento de carga: um endereço, muitos servidores",
       "titleEn": "Reverse proxies and load balancing: one address, many servers",
       "summary": "O que fica entre o cliente e os seus servidores: proxy direto e reverso, balanceamento em camada 4 e em camada 7, os algoritmos (round robin, ponderado, menos conexões, dois aleatórios, hash), verificações de saúde, o IP real do cliente no X-Forwarded-For, quando um proxy pode repetir uma requisição e o que muda com conexões longas como WebSockets.",
-      "minutes": 50,
+      "minutes": 62,
       "skills": [
        "redes-sockets"
       ],
@@ -6968,8 +7014,10 @@ export const paidCatalog: LevelMeta[] = [
        "google-sre",
        "rfc9110",
        "cloudflare-learning",
-       "twelve-factor"
+       "twelve-factor",
+       "ies-study-guide"
       ],
+      "theoryTitle": "Capacidade e cauda: por que 70% de uso já pede atenção",
       "cardCount": 7,
       "stages": [
        "conceito",

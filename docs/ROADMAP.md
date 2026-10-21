@@ -17,7 +17,7 @@ A oferta para turmas, escolas e ONGs saiu do plano (UP35): o Alicerce é para au
 
 O branch `integracao-codex` junta o repositório do GitHub (com as 20 lições novas dos níveis 7 a 9), a cópia do Codex (v1 a v8: tutor v2, inglês, autonomia, aprofundamento teórico e a estratégia de acesso v3) e o lote de segurança e separação. Ele **não está na `main`**: a demonstração publicada no GitHub Pages ainda é a de 13/10/2026 (gerada de `8b29cc2`), com a promessa antiga de trilha inteira gratuita e as 111 lições em arquivos públicos.
 
-Currículo: 15 níveis, 59 módulos, 111 lições, 484 exercícios (290 executáveis), 525 cartões e 820 termos no glossário. Gratuito (níveis 0 e 1): 15 lições e 54 exercícios. Premium (níveis 2 a 14): 96 lições e 430 exercícios. Aprofundamento teórico em 91 das 111 aulas: as 20 lições de m7-1 a m9-3 ainda não têm.
+Currículo: 15 níveis, 59 módulos, 111 lições, 484 exercícios (290 executáveis), 525 cartões e 820 termos no glossário. Gratuito (níveis 0 e 1): 15 lições e 54 exercícios. Premium (níveis 2 a 14): 96 lições e 430 exercícios. Aprofundamento teórico nas 111 aulas desde 21/10/2026 (o das 20 lições de m7-1 a m9-3, no repositório privado).
 
 | Frente | Implementado e testado | O que falta | Item |
 |---|---|---|---|
@@ -59,7 +59,7 @@ Feito no ciclo 3 (08 a 13/10/2026): identidade visual com verde militar e ciment
 Feito em 14/10/2026, na integração (testado localmente, nada em produção): isolamento do código do aluno, backup e restauração, publicação só depois dos testes com rollback, contas (senha para excluir, sair de todos os aparelhos, limite da sincronização, `.env`), conteúdo pago num repositório privado entregue só a assinantes e a preparação da transição da promessa de acesso gratuito. No fim do dia, os objetivos dos níveis 2, 10, 11 e 14 deixaram de prometer domínio, trabalho profissional e software que resiste a ataques (no privado e no mapa público), e os compromissos da assinatura voltaram a `/planos`.
 
 1. **Mais lições nos níveis 5, 6 e 10 a 14** (1): 5 · 4 · 1 · 5 · 4. Mesmo processo dos ciclos 2 e 3 (uma pessoa escreve, outra revisa tentando passar soluções erradas pelos testes). Próximos: orientação a objetos (5) e engenharia de software (10), que hoje têm 3 e 4 lições. As lições novas dos níveis 2 a 14 se escrevem no repositório privado.
-2. **Aprofundamento teórico das 20 lições de m7-1 a m9-3** (UP33): 3 · 3 · 1 · 4 · 3. No repositório privado, no mesmo formato das outras 91.
+2. **Revisar o aprofundamento das 20 lições de m7-1 a m9-3** (UP33): 3 · 2 · 1 · 3 · 2. Escrito em 21/10/2026, no repositório privado; falta a leitura de outra pessoa e a validação com autodidatas.
 3. **Revisão humana dos níveis 0 a 4** (13): 4 · 3 · 1 · 5 · 3. A revisão por máquina pega soluções erradas; texto e múltipla escolha ainda precisam de leitura humana.
 4. **Painel de métricas**: 3 · 2 · 1 · 3 · 3. Hoje as métricas saem por `node apps/api/scripts/metricas.ts`; um painel para quem administra a instância.
 5. **Editor e visualizações carregados só onde são usados** (2): 3 · 2 · 1 · 2 · 2.
