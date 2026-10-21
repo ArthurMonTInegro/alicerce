@@ -23,6 +23,10 @@ export function CodeEditor({ value, onChange, lang, label, onRun, readOnly, plac
   const [ready, setReady] = useState(false);
   const cb = useRef({ onChange, onRun });
   cb.current = { onChange, onRun };
+  // O CodeMirror chega depois (import dinâmico): ele nasce com o valor de agora, e não com o
+  // do primeiro render. Sem isso, um rascunho carregado nesse meio-tempo some do editor.
+  const latest = useRef(value);
+  latest.current = value;
   const helpId = useId();
 
   useEffect(() => {
@@ -31,7 +35,7 @@ export function CodeEditor({ value, onChange, lang, label, onRun, readOnly, plac
       if (cancelled || !host.current) return;
       ed.current = mountEditor({
         parent: host.current,
-        value,
+        value: latest.current,
         lang,
         label,
         readOnly,

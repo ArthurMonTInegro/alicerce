@@ -30,7 +30,7 @@ export interface TutorSources {
 export interface TutorReply {
   reply: string;
   mode: 'ia' | 'offline';
-  reason?: 'not_configured' | 'login_required' | 'daily_limit' | 'monthly_limit' | 'premium_required' | 'provider_unavailable';
+  reason?: 'not_configured' | 'login_required' | 'daily_limit' | 'monthly_limit' | 'budget_limit' | 'premium_required' | 'provider_unavailable';
 }
 export interface TutorProvider {
   readonly name: 'ia' | 'offline';
@@ -99,9 +99,12 @@ export class ClaudeTutor implements TutorProvider {
   readonly name = 'ia' as const;
   private readonly client: Anthropic;
   private readonly model: string;
-  constructor(apiKey: string, model: string, client?: Anthropic) {
+  private readonly onUsage: ((u: { input: number; output: number }) => void) | undefined;
+  /** `onUsage` recebe os tokens de cada resposta do modelo, inclusive as descartadas (já custaram). */
+  constructor(apiKey: string, model: string, client?: Anthropic, onUsage?: (u: { input: number; output: number }) => void) {
     this.model = model;
     this.client = client ?? new Anthropic({ apiKey, timeout: 25_000, maxRetries: 0 });
+    this.onUsage = onUsage;
   }
 
   /** Instruções fixas + contexto confiável do exercício (vindo do conteúdo do servidor). */
@@ -148,6 +151,7 @@ export class ClaudeTutor implements TutorProvider {
       system: this.system(req, sources),
       messages: this.messages(req),
     });
+    if (res.usage) this.onUsage?.({ input: res.usage.input_tokens ?? 0, output: res.usage.output_tokens ?? 0 });
     if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') throw new Error('recusa do modelo');
     const text = res.content
       .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')

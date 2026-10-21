@@ -45,6 +45,15 @@ export const MIGRATIONS: string[] = [
      at INTEGER NOT NULL
    );
    CREATE INDEX plan_changes_user ON plan_changes(user_id);`,
+  // Uso da IA no Alicerce todo, por dia (UTC), sem ligação com contas: o teto global de
+  // chamadas e a medição do custo real (tokens). Excluir uma conta não apaga estes totais.
+  `CREATE TABLE tutor_ai_daily (
+     day TEXT PRIMARY KEY,
+     calls INTEGER NOT NULL DEFAULT 0,
+     failures INTEGER NOT NULL DEFAULT 0,
+     input_tokens INTEGER NOT NULL DEFAULT 0,
+     output_tokens INTEGER NOT NULL DEFAULT 0
+   );`,
 ];
 
 /** Maior versão de esquema que este código conhece (a restauração recusa backup mais novo). */

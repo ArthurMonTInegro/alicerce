@@ -91,8 +91,9 @@ Migrações versionadas por `PRAGMA user_version` (`apps/api/src/db.ts`). Num ba
 | `progress` | `user_id`, `data` (JSON), `updated_at` | Um documento de progresso por pessoa |
 | `tutor_usage` | `user_id`, `day`, `count` | Uso do tutor com IA por dia; a cota do mês soma os dias do mês |
 | `plan_changes` | `user_id`, `plan`, `expires_at`, `source`, `at` | Histórico auditável de mudanças de plano |
+| `tutor_ai_daily` | `day`, `calls`, `failures`, `input_tokens`, `output_tokens` | Totais da IA no Alicerce todo por dia (UTC), sem ligação com contas: teto global (`TUTOR_GLOBAL_DAILY_LIMIT`) e custo real (migração 4) |
 
-Todas as tabelas filhas usam `ON DELETE CASCADE`, então excluir a conta apaga tudo do banco em uso. Os backups continuam com a conta até saírem da retenção ([Operação](OPERACAO.md)).
+Todas as tabelas filhas usam `ON DELETE CASCADE`, então excluir a conta apaga tudo do banco em uso (`tutor_ai_daily` não guarda nada da conta). Os backups continuam com a conta até saírem da retenção ([Operação](OPERACAO.md)).
 
 ## API
 

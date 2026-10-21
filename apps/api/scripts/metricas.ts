@@ -24,9 +24,13 @@ const users: UserSnapshot[] = rows.map((r) => {
 });
 const m = computeMetrics(users, now);
 const tutor = db.prepare('SELECT COALESCE(SUM(count), 0) AS n, COUNT(DISTINCT user_id) AS u FROM tutor_usage WHERE day >= ?').get(new Date(now - 30 * 86_400_000).toISOString().slice(0, 10)) as { n: number; u: number };
+// Chamadas à IA no Alicerce todo (inclusive as que falharam) e tokens, para medir o custo real.
+const ia = db
+  .prepare('SELECT COALESCE(SUM(calls), 0) AS calls, COALESCE(SUM(failures), 0) AS failures, COALESCE(SUM(input_tokens), 0) AS input, COALESCE(SUM(output_tokens), 0) AS output FROM tutor_ai_daily WHERE day >= ?')
+  .get(new Date(now - 30 * 86_400_000).toISOString().slice(0, 10)) as { calls: number; failures: number; input: number; output: number };
 
 if (process.argv.includes('--json')) {
-  console.log(JSON.stringify({ ...m, tutor30d: tutor }, null, 2));
+  console.log(JSON.stringify({ ...m, tutor30d: tutor, ia30d: ia }, null, 2));
 } else {
   const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
   const of = (n: number) => `${n} (${pct(m.users.total ? n / m.users.total : 0)})`;
@@ -39,6 +43,7 @@ if (process.argv.includes('--json')) {
   console.log(`Funil: alguma atividade ${of(m.funnel.anyActivity)} → 1ª lição ${of(m.funnel.firstLesson)} → 5 lições ${of(m.funnel.fiveLessons)}; diagnóstico ${of(m.funnel.diagnostic)}; revisão ${of(m.funnel.reviews)}`);
   console.log(`Aprendizagem: ${m.learning.attempts} tentativas, ${pct(m.learning.solveRate)} corretas; ${m.learning.lessonsCompleted} lições concluídas; ${m.learning.reviewsLast30d} revisões em 30 dias`);
   console.log(`Tutor com IA (30 dias): ${tutor.n} perguntas de ${tutor.u} contas`);
+  console.log(`Chamadas à IA (30 dias, todas as contas): ${ia.calls}, ${ia.failures} com falha · tokens: ${ia.input} de entrada, ${ia.output} de saída${ia.calls > 0 ? ` (média por chamada: ${Math.round(ia.input / ia.calls)} + ${Math.round(ia.output / ia.calls)})` : ''}`);
   if (m.hardestExercises.length) {
     console.log('\nExercícios mais difíceis (acerto de primeira mais baixo): revisar enunciado, dicas ou posição na trilha');
     for (const e of m.hardestExercises) console.log(`  ${e.exerciseId.padEnd(22)} ${String(e.users).padStart(5)} pessoas · de primeira ${pct(e.firstTry).padStart(6)} · revelaram ${pct(e.revealed)}`);

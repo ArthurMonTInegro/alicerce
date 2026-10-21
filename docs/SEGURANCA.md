@@ -61,6 +61,8 @@ Exceções, só para a página de execução:
 - `POST /api/auth/sessions/encerrar` ("Sair de todos os aparelhos", em Conta) apaga todas as sessões da conta, inclusive a atual, e limpa o cookie; `ended` conta as que ainda valiam. Exige uma sessão válida. Num outro aparelho com o site aberto, a próxima sincronização recebe 401 e o navegador passa a visitante.
 - Excluir a conta (`DELETE /api/auth/me`) exige a senha atual no corpo, além da sessão: um cookie esquecido num computador emprestado não basta para apagar tudo. A senha passa pelo mesmo scrypt e pela mesma comparação em tempo constante do login; sem senha a resposta é 400 (sem gastar tentativa), com senha errada é 403. As tentativas contam no limite por IP da exclusão e no mesmo balde por conta do login, então palpites de senha somam, venham de onde vierem.
 - Excluir a conta apaga usuário, sessões, progresso, histórico de planos e uso do tutor (cascata).
+- No navegador, cada conta e o visitante têm chaves próprias para o progresso e os rascunhos (`alicerce:progresso:v2:<perfil>` e `alicerce:draft:v2:<perfil>:`, em `apps/web/src/state/store.ts`). Entrar não importa o progresso de visitante, e trocar de conta numa aba troca as outras (`alicerce:auth-change`). Testes em `e2e/contas.spec.ts`: visitante, duas contas e de novo a primeira na mesma aba, e a troca entre duas abas, sem misturar progresso nem rascunhos, nem no servidor.
+- Saída que o servidor não confirmou (sem rede, por exemplo): a conta some da aba na hora, e a pendência fica gravada (`alicerce:saida-pendente`). Com ela, as outras abas também escondem a conta, e recarregar a página tenta sair de novo em vez de entrar com o cookie que ainda vale; o aviso do topo tem o botão "Tentar encerrar sessão", e a volta da conexão tenta sozinha. Antes de 21/10/2026, a pendência ficava só na memória da aba: recarregar trazia a conta de volta e as outras abas continuavam mostrando os dados dela. Se o navegador não deixa gravar, a pendência vale só na aba aberta.
 
 ## CSRF
 
@@ -80,7 +82,7 @@ Essa defesa vale contra outros sites, não contra código que roda na origem do 
 | Excluir a conta | 10 por 15 minutos por IP e, por conta, somadas às tentativas de login dessa conta |
 | Sincronizar o progresso (`PUT /api/progress`) | 60 por minuto por conta, conferidas antes de ler o corpo |
 | Tutor | 12 por minuto por conta; sem conta, por IP |
-| Tutor com IA | só para contas com Premium ativo: 20 perguntas por dia, dentro de 200 por mês (mês do calendário em UTC); `TUTOR_DAILY_LIMIT` só reduz o diário. Conta gratuita e visitante usam o tutor local |
+| Tutor com IA | só para contas com Premium ativo: 20 perguntas por dia, dentro de 200 por mês (mês do calendário em UTC); `TUTOR_DAILY_LIMIT` só reduz o diário. Teto do Alicerce todo: `TUTOR_GLOBAL_DAILY_LIMIT` chamadas por dia (padrão 300). Conta gratuita e visitante usam o tutor local |
 
 Corpos de requisição têm no máximo 1 MB, exceto `PUT /api/progress`, que aceita até 4 MiB: o maior progresso legítimo (5 000 tentativas e 5 000 revisões, o teto do saneamento, com todo o catálogo estudado) mede cerca de 2,5 MB, e o teste `apps/api/test/contas.test.ts` gera esse caso e confere a folga. Essa rota confere a sessão e o limite por conta antes de ler o corpo: sem conta, ou acima do limite, o corpo é descartado sem ser guardado nem interpretado. Ler, sanear, mesclar e gravar um envio no maior caso legítimo custa cerca de 300 ms de CPU (medido num teste local com `app.inject`; a maior parte é a mesclagem), e o limite por conta impede que uma conta só ocupe o servidor; várias contas no mesmo IP ainda conseguem, dentro do limite geral. Atrás de um proxy reverso, o limite de corpo do proxy também precisa aceitar 4 MiB nessa rota (no nginx, `client_max_body_size` vale 1 MB por padrão).
 
@@ -94,6 +96,7 @@ O documento de progresso vem do navegador e é tratado como entrada hostil (`pac
 - A solução oficial do exercício nunca é enviada ao modelo.
 - O código e o erro do estudante vão delimitados por tags, como dados; as regras pedagógicas ficam no prompt de sistema, que o estudante não controla.
 - Qualquer erro, recusa ou estouro do limite cai no tutor offline, sem expor detalhes do erro.
+- Além das cotas por conta, um teto de chamadas por dia no Alicerce todo (`TUTOR_GLOBAL_DAILY_LIMIT`, padrão 300) limita o gasto mesmo com muitas contas Premium; os totais do dia (chamadas, falhas e tokens) ficam em `tutor_ai_daily`, sem dados de contas.
 
 ## Privacidade
 

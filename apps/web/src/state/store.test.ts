@@ -32,6 +32,19 @@ describe('UP02 / UP06 / UP08 / UP10',()=>{
   it('logout com rede indisponível rejeita e esconde dados privados',async()=>{
     const s=await import('./store.ts');mock.login.mockResolvedValue({id:'A'});await s.signIn('login','a','p');s.visitStage('private','conceito');mock.logout.mockRejectedValue(new Error('offline'));await expect(s.signOut()).rejects.toThrow('não foi encerrada');expect(s.getProgress().lessons.private).toBeUndefined();
   });
+  it('saída não confirmada vale depois de recarregar: a página tenta sair de novo em vez de entrar com a conta',async()=>{
+    const s=await import('./store.ts');mock.login.mockResolvedValue({id:'A'});await s.signIn('login','a','p');mock.logout.mockRejectedValue(new Error('offline'));await expect(s.signOut()).rejects.toThrow('não foi encerrada');expect(data['alicerce:saida-pendente']).toBeDefined();
+    vi.resetModules();mock.me.mockResolvedValue({id:'A'});
+    const ainda=await import('./store.ts');await ainda.initAuth();expect(ainda.getSaveStatus()).toMatchObject({user:null,logoutPending:true,authChecked:true});expect(mock.me).not.toHaveBeenCalled();
+    vi.resetModules();mock.logout.mockResolvedValue(undefined);
+    const depois=await import('./store.ts');await depois.initAuth();expect(depois.getSaveStatus()).toMatchObject({user:null,logoutPending:false});expect(data['alicerce:saida-pendente']).toBeUndefined();expect(data['alicerce:auth-change']).toBeDefined();expect(mock.me).not.toHaveBeenCalled();
+  });
+  it('outra aba esconde a conta enquanto a saída não é confirmada, e entrar de novo desfaz a pendência',async()=>{
+    const s=await import('./store.ts');s.getProgress();mock.login.mockResolvedValue({id:'A'});await s.signIn('login','a','p');s.visitStage('privateA','conceito');
+    for(const f of storageListeners)f({key:'alicerce:saida-pendente',newValue:'1'});expect(s.getSaveStatus()).toMatchObject({user:null,logoutPending:true});expect(s.getProgress().lessons.privateA).toBeUndefined();
+    for(const f of storageListeners)f({key:'alicerce:saida-pendente',newValue:null as unknown as string});expect(s.getSaveStatus().logoutPending).toBe(false);
+    data['alicerce:saida-pendente']='1';await s.signIn('login','a','p');expect(data['alicerce:saida-pendente']).toBeUndefined();expect(s.getSaveStatus()).toMatchObject({user:{id:'A'},logoutPending:false});
+  });
   it('retenta a sincronização depois de uma falha transitória',async()=>{
     const s=await import('./store.ts');mock.login.mockResolvedValue({id:'A'});mock.putProgress.mockRejectedValueOnce(new Error('offline'));await s.signIn('login','a','p');await vi.advanceTimersByTimeAsync(1500);expect(mock.putProgress).toHaveBeenCalledTimes(2);
   });

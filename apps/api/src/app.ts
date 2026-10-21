@@ -80,7 +80,14 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     }
   });
   const offline = new OfflineTutor();
-  const ai: TutorProvider | null = tutor ?? (config.anthropicApiKey ? new ClaudeTutor(config.anthropicApiKey, config.tutorModel) : null);
+  // Totais da IA no Alicerce todo, por dia (UTC): chamadas, falhas e tokens (tutor_ai_daily).
+  const today = () => new Date().toISOString().slice(0, 10);
+  const aiDaily = (calls: number, failures: number, input: number, output: number) =>
+    db
+      .prepare('INSERT INTO tutor_ai_daily (day, calls, failures, input_tokens, output_tokens) VALUES (?, ?, ?, ?, ?) ON CONFLICT(day) DO UPDATE SET calls = calls + excluded.calls, failures = failures + excluded.failures, input_tokens = input_tokens + excluded.input_tokens, output_tokens = output_tokens + excluded.output_tokens')
+      .run(today(), calls, failures, input, output);
+  const ai: TutorProvider | null =
+    tutor ?? (config.anthropicApiKey ? new ClaudeTutor(config.anthropicApiKey, config.tutorModel, undefined, (u) => aiDaily(0, 0, u.input, u.output)) : null);
 
   const limits = {
     global: new RateLimiter(600, 60_000),
@@ -305,19 +312,28 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     const sources = tutorSources(content, parsed, plan);
     let reason: TutorReply['reason'] = !ai ? 'not_configured' : !u ? 'login_required' : 'daily_limit';
     if (plan === 'free' && u) reason = 'premium_required';
-    // IA só para quem tem conta (controla custo e abuso), com limite diário.
+    // IA só para quem tem conta (controla custo e abuso), com limite diário e do mês por conta,
+    // e um teto diário de chamadas no Alicerce todo (TUTOR_GLOBAL_DAILY_LIMIT).
     if (ai && u && rights && plan === 'premium') {
-      const day = new Date().toISOString().slice(0, 10);
+      const day = today();
       const used = (db.prepare('SELECT count FROM tutor_usage WHERE user_id = ? AND day = ?').get(u.id, day) as { count: number } | undefined)?.count ?? 0;
       const monthly=(db.prepare('SELECT COALESCE(SUM(count),0) AS total FROM tutor_usage WHERE user_id = ? AND day LIKE ?').get(u.id,day.slice(0,7)+'%') as {total:number}).total;
+      const global = (db.prepare('SELECT calls FROM tutor_ai_daily WHERE day = ?').get(day) as { calls: number } | undefined)?.calls ?? 0;
       if(monthly>=rights.tutorMonthlyLimit)reason='monthly_limit';
       if (used < rights.tutorDailyLimit && monthly < rights.tutorMonthlyLimit) {
-        db.prepare('INSERT INTO tutor_usage (user_id, day, count) VALUES (?, ?, 1) ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1').run(u.id, day);
-        try {
-          return { reply: await ai.answer(parsed, sources), mode: 'ia' };
-        } catch (err) {
-          reason='provider_unavailable';
-          req.log.warn('tutor IA indisponível; usando apoio local');
+        if (global >= config.tutorGlobalDailyLimit) reason = 'budget_limit';
+        else {
+          // Reserva antes de chamar (pedidos simultâneos não passam do limite). Falha depois do envio
+          // também conta (docs/ESTRATEGIA_ASSINATURA.md): o provedor pode ter cobrado.
+          db.prepare('INSERT INTO tutor_usage (user_id, day, count) VALUES (?, ?, 1) ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1').run(u.id, day);
+          aiDaily(1, 0, 0, 0);
+          try {
+            return { reply: await ai.answer(parsed, sources), mode: 'ia' };
+          } catch (err) {
+            reason='provider_unavailable';
+            aiDaily(0, 1, 0, 0);
+            req.log.warn('tutor IA indisponível; usando apoio local');
+          }
         }
       }
     }

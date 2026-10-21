@@ -34,6 +34,7 @@ Todas são opcionais. Para não repeti-las a cada comando, copie `.env.example` 
 | `ANTHROPIC_API_KEY` | vazio | Liga o tutor com IA. Sem ela, o tutor usa o modo offline de pistas guiadas |
 | `TUTOR_MODEL` | `claude-sonnet-5-5` | Modelo usado pelo tutor |
 | `TUTOR_DAILY_LIMIT` | `20` | Teto diário de IA Premium (não aumenta o máximo de 20); 200/mês calendário UTC. Gratuito: sem IA externa. |
+| `TUTOR_GLOBAL_DAILY_LIMIT` | `300` | Teto de chamadas à IA por dia (UTC), somando todas as contas; atingido, todos usam o tutor local até o dia seguinte. `0` desliga a IA. Valor provisório, até medir o custo real por chamada (`apps/api/scripts/metricas.ts`) |
 | `TRUST_PROXY` | `false` | Ative só atrás de um proxy reverso conhecido |
 | `COOKIE_SECURE` | ligado só com `NODE_ENV=production` | Cookie de sessão com atributo `Secure` (exige HTTPS). Com valor, prevalece em qualquer modo: `true`, `1`, `yes` ou `sim` liga; outro valor desliga; vazia vale como não definida |
 | `SITE_URL` | vazio | Usado no build para canonical, sitemap e robots.txt |

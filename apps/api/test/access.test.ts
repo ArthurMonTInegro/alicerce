@@ -62,12 +62,21 @@ const fakeLevel: Level = { ...level2, modules: [{ ...level2.modules.find((m) => 
 const withPremium = contentStore(assembleCurriculum([...publicLevels, fakeLevel], 'completo', '/fixture'));
 const freeLesson = publicLessons[0]!;
 
-async function fixture(content: ContentStore = withPremium) {
+async function fixture(content: ContentStore = withPremium, env: Record<string, string> = {}) {
   let calls = 0;
   let seen: TutorSources | undefined;
+  let falhar = false;
   const db = openDb(':memory:');
-  const tutor = { name: 'ia' as const, answer: async (_req: unknown, sources: TutorSources) => ((calls++, (seen = sources)), 'orientação') };
-  const app = await buildApp({ db, content, config: { ...loadConfig({}), webDist: '/none' }, tutor });
+  const tutor = {
+    name: 'ia' as const,
+    answer: async (_req: unknown, sources: TutorSources) => {
+      calls++;
+      seen = sources;
+      if (falhar) throw new Error('provedor fora do ar');
+      return 'orientação';
+    },
+  };
+  const app = await buildApp({ db, content, config: { ...loadConfig(env), webDist: '/none' }, tutor });
   const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'reader@example.com', password: 'long-password-123' } });
   const id = reg.json().user.id as string;
   const cookie = String(reg.headers['set-cookie']).split(';')[0]!;
@@ -77,6 +86,8 @@ async function fixture(content: ContentStore = withPremium) {
     id,
     headers: { ...H, cookie },
     calls: () => calls,
+    /** faz o provedor de IA (falso) falhar nas próximas chamadas */
+    falhar: (sim = true) => (falhar = sim),
     /** o que o provedor de IA (falso) recebeu na última chamada */
     seen: () => seen,
     premium: (ms = 60_000) => setPlan(db, id, 'premium', Date.now() + ms, 'test'),
@@ -329,6 +340,50 @@ describe('cota do tutor com IA (Premium)', () => {
       f.db.prepare('UPDATE tutor_usage SET count=200 WHERE user_id=?').run(f.id);
       expect((await ask0(f, { message: 'Explique variáveis' })).json().reason).toBe('monthly_limit');
       expect(f.calls()).toBe(1);
+    } finally {
+      await f.close();
+    }
+  });
+  it('falha da IA depois do envio conta na cota da conta e entra nos totais do dia, com a falha', async () => {
+    const f = await fixture();
+    try {
+      setPlan(f.db, f.id, 'premium', null, 'test');
+      const day = new Date().toISOString().slice(0, 10);
+      f.db.prepare('INSERT INTO tutor_usage(user_id,day,count) VALUES(?,?,?)').run(f.id, day, 17);
+      f.falhar();
+      for (let i = 0; i < 2; i++) expect((await ask0(f, { message: 'Explique variáveis' })).json()).toMatchObject({ mode: 'offline', reason: 'provider_unavailable' });
+      expect((f.db.prepare('SELECT count FROM tutor_usage WHERE user_id=?').get(f.id) as { count: number }).count).toBe(19);
+      f.falhar(false);
+      expect((await ask0(f, { message: 'Explique variáveis' })).json().mode).toBe('ia');
+      expect((await ask0(f, { message: 'Explique variáveis' })).json().reason).toBe('daily_limit');
+      expect(f.calls()).toBe(3);
+      expect(f.db.prepare('SELECT calls, failures FROM tutor_ai_daily WHERE day=?').get(day)).toEqual({ calls: 3, failures: 2 });
+    } finally {
+      await f.close();
+    }
+  });
+  it('teto do dia no Alicerce todo: atingido, ninguém chama a IA, e o motivo é outro', async () => {
+    const f = await fixture(withPremium, { TUTOR_GLOBAL_DAILY_LIMIT: '2' });
+    try {
+      setPlan(f.db, f.id, 'premium', null, 'test');
+      const day = new Date().toISOString().slice(0, 10);
+      f.db.prepare('INSERT INTO tutor_ai_daily(day,calls) VALUES(?,?)').run('2020-01-01', 99); // outro dia não conta
+      expect((await ask0(f, { message: 'Explique variáveis' })).json().mode).toBe('ia');
+      expect((await ask0(f, { message: 'Explique variáveis' })).json().mode).toBe('ia');
+      expect((await ask0(f, { message: 'Explique variáveis' })).json()).toMatchObject({ mode: 'offline', reason: 'budget_limit' });
+      expect(f.calls()).toBe(2);
+      // a pergunta recusada pelo teto não gasta a cota da conta
+      expect((f.db.prepare('SELECT count FROM tutor_usage WHERE user_id=? AND day=?').get(f.id, day) as { count: number }).count).toBe(2);
+    } finally {
+      await f.close();
+    }
+  });
+  it('TUTOR_GLOBAL_DAILY_LIMIT=0 desliga a IA sem desligar o tutor', async () => {
+    const f = await fixture(withPremium, { TUTOR_GLOBAL_DAILY_LIMIT: '0' });
+    try {
+      setPlan(f.db, f.id, 'premium', null, 'test');
+      expect((await ask0(f, { message: 'Explique variáveis' })).json()).toMatchObject({ mode: 'offline', reason: 'budget_limit' });
+      expect(f.calls()).toBe(0);
     } finally {
       await f.close();
     }

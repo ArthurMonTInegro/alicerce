@@ -30,6 +30,9 @@ let scope = 'guest';
 const key = () => `alicerce:progresso:v2:${scope}`;
 let generation = 0;
 const AUTH_CHANGE = 'alicerce:auth-change';
+// Saída que o servidor ainda não confirmou. Fica gravada para que recarregar a página ou abrir
+// outra aba não traga a conta de volta: o site tenta sair de novo em vez de entrar com ela.
+const LOGOUT_PENDING = 'alicerce:saida-pendente';
 type LocalSave = 'saved' | 'pending' | 'error';
 let localSave: LocalSave = 'saved';
 let lastSync: number | null = null;
@@ -55,6 +58,7 @@ function load() {
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush());
   window.addEventListener('storage', (e) => {
     if(e.key === AUTH_CHANGE){switchUser(null);void initAuth();return;}
+    if(e.key === LOGOUT_PENDING){if(e.newValue!==null){logoutPending=true;switchUser(null);}else{logoutPending=false;emitAuth();}return;}
     if (e.key !== key() || !e.newValue) return;
     try {
       state = mergeProgress(state, sanitizeProgress(JSON.parse(e.newValue)));
@@ -63,7 +67,7 @@ function load() {
       /* ignora valor inválido de outra aba */
     }
   });
-  window.addEventListener('online', () => { if(unsaved) persist(); void syncNow(); });
+  window.addEventListener('online', () => { if(unsaved) persist(); if(logoutPending) void signOut().catch(()=>{}); else void syncNow(); });
 }
 
 function emit() {
@@ -359,6 +363,8 @@ function switchUser(next:User|null){
   syncStatus=next?'idle':'offline';emit();emitAuth();
 }
 function broadcastAuth(){try{localStorage.setItem(AUTH_CHANGE,crypto.randomUUID());}catch{/* sessão continua isolada nesta aba */}}
+function markLogoutPending(on:boolean){try{if(on)localStorage.setItem(LOGOUT_PENDING,String(Date.now()));else localStorage.removeItem(LOGOUT_PENDING);}catch{/* sem armazenamento: vale só nesta aba */}}
+function logoutPendingSaved(){try{return localStorage.getItem(LOGOUT_PENDING)!==null;}catch{return false;}}
 function scheduleSync() {
   if (!user) return;
   clearTimeout(syncTimer);
@@ -400,6 +406,8 @@ export async function syncNow() {
 }
 
 export async function initAuth() {
+  // Uma saída anterior não foi confirmada: a conta continua oculta, e a saída é tentada de novo.
+  if(logoutPendingSaved()){logoutPending=true;authChecked=true;emitAuth();await signOut().catch(()=>{});return;}
   if(logoutPending){authChecked=true;emitAuth();return;}
   const currentGeneration=generation;
   try {
@@ -416,7 +424,7 @@ export async function initAuth() {
 
 export async function signIn(kind: 'login' | 'register', email: string, password: string, name?: string) {
   const next = kind === 'login' ? await api.login(email, password) : await api.register(email, password, name ?? '');
-  logoutPending=false;
+  logoutPending=false;markLogoutPending(false);
   switchUser(next);broadcastAuth();
   await syncNow();
   // A primeira sincronização já chegou sem sessão (401): o navegador não guardou o cookie.
@@ -424,14 +432,14 @@ export async function signIn(kind: 'login' | 'register', email: string, password
 }
 
 export async function signOut() {
-  logoutPending=true;
+  logoutPending=true;markLogoutPending(true);
   switchUser(null);
-  try{await api.logout();logoutPending=false;broadcastAuth();emitAuth();}
+  try{await api.logout();logoutPending=false;markLogoutPending(false);broadcastAuth();emitAuth();}
   catch{emitAuth();throw new Error('A sessão no servidor ainda não foi encerrada. Tente sair novamente quando a conexão voltar.');}
 }
 
 /** O servidor já encerrou a sessão: este aparelho e as outras abas voltam a ser visitante. */
-function endedOnServer(){logoutPending=false;switchUser(null);broadcastAuth();}
+function endedOnServer(){logoutPending=false;markLogoutPending(false);switchUser(null);broadcastAuth();}
 const sessionGone=(e:unknown)=>(e as {status?:unknown}|null)?.status===401;
 
 /** Encerra a sessão em todos os aparelhos, inclusive neste. Sem a confirmação do servidor, nada muda aqui. */

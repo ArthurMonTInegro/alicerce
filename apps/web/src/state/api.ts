@@ -33,7 +33,7 @@ export interface TutorRequest {
 export interface TutorReply {
   reply: string;
   mode: 'ia' | 'offline';
-  reason?: 'not_configured' | 'login_required' | 'daily_limit' | 'monthly_limit' | 'premium_required' | 'provider_unavailable';
+  reason?: 'not_configured' | 'login_required' | 'daily_limit' | 'monthly_limit' | 'budget_limit' | 'premium_required' | 'provider_unavailable';
 }
 
 export class ApiError extends Error {
