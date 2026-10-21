@@ -1,18 +1,22 @@
 import { useState, type FormEvent } from 'react';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
-import { ApiError } from '../state/api.ts';
+import { api, ApiError } from '../state/api.ts';
 import { deleteAccount, signIn, signOut, signOutEverywhere, syncNow, useAuth } from '../state/store.ts';
 import { STATIC_SITE } from '../lib/base.ts';
 import { FEATURES, PLANS, PREMIUM_FOR_SALE, TRANSICAO_ACESSO } from '@alicerce/engine';
 import { CARENCIA } from '../components/AvisoCarencia.tsx';
+import { Assinatura } from '../components/Assinatura.tsx';
+
+export { PagamentoTeste } from '../components/Assinatura.tsx';
+export { RedefinirSenha } from '../components/RedefinirSenha.tsx';
 
 const SYNC_LABEL = { offline: 'Sem conta: progresso só neste navegador', idle: 'Sincronizado', syncing: 'Sincronizando…', error: 'Falha ao sincronizar; tentaremos de novo' } as const;
 
 export function Conta() {
   useHead('Conta', 'Crie uma conta para sincronizar seu progresso entre aparelhos. A plataforma funciona sem conta.');
   const { user, syncStatus } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'recover'>('login');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
@@ -24,12 +28,13 @@ export function Conta() {
     const email = String(f.get('email') ?? '').trim();
     const password = String(f.get('password') ?? '');
     const name = String(f.get('name') ?? '').trim();
+    if (mode === 'recover') return void recover(email);
     if (mode === 'register' && password.length < 10) return setError('Use uma senha com pelo menos 10 caracteres. Frases longas são fáceis de lembrar e difíceis de adivinhar.');
     setBusy(true);
     setError('');
     setNotice('');
     try {
-      await signIn(mode, email, password, name);
+      await signIn(mode === 'register' ? 'register' : 'login', email, password, name);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -38,6 +43,20 @@ export function Conta() {
             : err.message
           : 'Não consegui falar com o servidor. A plataforma continua funcionando offline; tente a conta mais tarde.',
       );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const recover = async (email: string) => {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await api.requestPasswordReset(email);
+      setNotice('Se houver uma conta com esse e-mail, enviamos um link para trocar a senha. Ele vale por 30 minutos e só pode ser usado uma vez.');
+    } catch (err) {
+      setError(err instanceof ApiError ? (err.status === 429 ? 'Muitos pedidos. Espere alguns minutos e tente de novo.' : err.message) : 'Não consegui falar com o servidor. Tente de novo em instantes.');
     } finally {
       setBusy(false);
     }
@@ -125,6 +144,7 @@ export function Conta() {
             </p>
           </section>
         )}
+        <Assinatura />
         <div className="row">
           <button type="button" className="btn" onClick={() => void syncNow()} disabled={syncStatus === 'syncing'}>
             Sincronizar agora
@@ -173,7 +193,7 @@ export function Conta() {
   return (
     <div className="container prose" style={{ maxWidth: '52ch' }}>
       <p className="eyebrow">Conta · account</p>
-      <h1>{mode === 'login' ? 'Entrar' : 'Criar conta'}</h1>
+      <h1>{mode === 'login' ? 'Entrar' : mode === 'register' ? 'Criar conta' : 'Trocar a senha'}</h1>
       <p>Nos níveis 0 e 1, a conta é opcional: serve para sincronizar o progresso entre aparelhos. O Premium (níveis 2 a 14 e tutor com IA) exige conta com assinatura ativa e ainda não está à venda; criar uma conta, sozinho, não libera esses conteúdos.{TRANSICAO_ACESSO.niveisPagosAbertos ? ` Até ${CARENCIA.diasDepoisDaVenda} dias depois que a venda começar, os níveis 2 a 14 continuam abertos para todos, com ou sem conta.` : ''} Veja a <Link to="/privacidade">política de privacidade</Link>.</p>
       {notice && (
         <p className="small" role="status">
@@ -199,7 +219,7 @@ export function Conta() {
           <label htmlFor="c-email">E-mail</label>
           <input id="c-email" name="email" type="email" autoComplete="email" required maxLength={254} />
         </div>
-        <div className="field-group">
+        {mode !== 'recover' && <div className="field-group">
           <label htmlFor="c-pass">Senha</label>
           <input id="c-pass" name="password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required minLength={mode === 'register' ? 10 : 1} maxLength={200} aria-describedby={mode === 'register' ? 'c-pass-hint' : undefined} />
           {mode === 'register' && (
@@ -207,16 +227,24 @@ export function Conta() {
               Mínimo de 10 caracteres. Uma frase com espaços vale.
             </span>
           )}
-        </div>
+        </div>}
         {error && (
           <p className="field-error" role="alert">
             {error}
           </p>
         )}
         <button type="submit" className="btn primary" disabled={busy}>
-          {busy ? 'Aguarde…' : mode === 'login' ? 'Entrar' : 'Criar conta'}
+          {busy ? 'Aguarde…' : mode === 'login' ? 'Entrar' : mode === 'register' ? 'Criar conta' : 'Enviar o link'}
         </button>
       </form>
+      {mode === 'login' && (
+        <p className="small" style={{ marginTop: '1rem' }}>
+          <button type="button" className="btn small" onClick={() => (setMode('recover'), setError(''), setNotice(''))}>
+            Esqueci a senha
+          </button>
+        </p>
+      )}
+      {mode === 'recover' && <p className="small muted" style={{ marginTop: '1rem' }}>Vamos mandar um link para o e-mail da conta. Trocar a senha encerra todas as sessões abertas.</p>}
     </div>
   );
 }

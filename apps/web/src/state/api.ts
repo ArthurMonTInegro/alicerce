@@ -36,6 +36,26 @@ export interface TutorReply {
   reason?: 'not_configured' | 'login_required' | 'daily_limit' | 'monthly_limit' | 'budget_limit' | 'premium_required' | 'provider_unavailable';
 }
 
+export type Periodo = 'mensal' | 'anual';
+export interface AssinaturaView {
+  id: string;
+  periodo: Periodo;
+  /** centavos */
+  preco: number;
+  situacao: 'pendente' | 'ativa' | 'cancelada' | 'recusada' | 'reembolsada';
+  pagoAte: number | null;
+  renova: boolean;
+  podeDesistir: boolean;
+  desistirAte: number | null;
+}
+export interface AssinaturaReply {
+  /** null: o Premium não está à venda neste servidor */
+  venda: { provedor: string; teste: boolean; precos: Record<Periodo, number> } | null;
+  assinatura: AssinaturaView | null;
+  plano: Entitlements;
+}
+type AssinaturaChange = Pick<AssinaturaReply, 'assinatura' | 'plano'>;
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -79,4 +99,14 @@ export const api = {
   /** O servidor só exclui com a senha atual (403 se estiver errada). */
   deleteAccount: (password: string) => call<void>('DELETE', '/auth/me', { password }),
   tutor: (req: TutorRequest, signal?:AbortSignal) => call<TutorReply>('POST', '/tutor', req, signal),
+  /** Sempre responde igual, com ou sem conta para o e-mail. */
+  requestPasswordReset: (email: string) => call<{ ok: true }>('POST', '/auth/senha/recuperar', { email }),
+  resetPassword: (token: string, password: string) => call<void>('POST', '/auth/senha/redefinir', { token, password }),
+  subscription: () => call<AssinaturaReply>('GET', '/assinatura'),
+  /** Devolve o endereço da página de pagamento do provedor. */
+  subscribe: (periodo: Periodo) => call<{ url: string }>('POST', '/assinatura', { periodo }),
+  cancelSubscription: () => call<AssinaturaChange>('POST', '/assinatura/cancelar'),
+  withdraw: () => call<AssinaturaChange>('POST', '/assinatura/desistir'),
+  /** Só no provedor de teste: o que a página de pagamento dele faria. */
+  simulatePayment: (assinatura: string, resultado: 'aprovar' | 'recusar') => call<AssinaturaChange>('POST', '/pagamento/teste/simular', { assinatura, resultado }),
 };

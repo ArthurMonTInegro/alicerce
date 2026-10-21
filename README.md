@@ -35,6 +35,11 @@ Todas são opcionais. Para não repeti-las a cada comando, copie `.env.example` 
 | `TUTOR_MODEL` | `claude-sonnet-5-5` | Modelo usado pelo tutor |
 | `TUTOR_DAILY_LIMIT` | `20` | Teto diário de IA Premium (não aumenta o máximo de 20); 200/mês calendário UTC. Gratuito: sem IA externa. |
 | `TUTOR_GLOBAL_DAILY_LIMIT` | `300` | Teto de chamadas à IA por dia (UTC), somando todas as contas; atingido, todos usam o tutor local até o dia seguinte. `0` desliga a IA. Valor provisório, até medir o custo real por chamada (`apps/api/scripts/metricas.ts`) |
+| `APP_URL` | `http://127.0.0.1:<PORT>` | Endereço público do servidor, usado nos links dos e-mails |
+| `EMAIL_LOG_PATH` | `apps/api/data/emails.log` (desligado em produção) | Enquanto não há provedor de envio, os e-mails (recuperação de senha) vão para este arquivo. Em produção a recuperação responde 503. Ver [docs/PAGAMENTO.md](docs/PAGAMENTO.md) |
+| `PAGAMENTO_PROVEDOR` | vazio | `teste` liga o pagamento simulado (nada é cobrado; recusado com `NODE_ENV=production`). Vazio: Premium sem venda |
+| `PAGAMENTO_WEBHOOK_SEGREDO` | aleatório a cada início | Segredo HMAC dos webhooks do provedor |
+| `AUTH_RATE_LIMIT` | `10` | Tentativas de cadastro e de entrada por IP em 15 minutos; só muda fora de produção (o e2e usa 50) |
 | `TRUST_PROXY` | `false` | Ative só atrás de um proxy reverso conhecido |
 | `COOKIE_SECURE` | ligado só com `NODE_ENV=production` | Cookie de sessão com atributo `Secure` (exige HTTPS). Com valor, prevalece em qualquer modo: `true`, `1`, `yes` ou `sim` liga; outro valor desliga; vazia vale como não definida |
 | `SITE_URL` | vazio | Usado no build para canonical, sitemap e robots.txt |
@@ -115,6 +120,7 @@ docs               documentação do projeto
 - [Currículo](docs/CURRICULO.md): todos os níveis, módulos e lições (gerado com `npm run docs`)
 - [Testes](docs/TESTES.md)
 - [Segurança](docs/SEGURANCA.md)
+- [Pagamento e recuperação de senha (ambiente de teste)](docs/PAGAMENTO.md)
 - [Conteúdo pago no repositório privado](docs/PREMIUM.md)
 - [Operação](docs/OPERACAO.md): backup, restauração, volta de versão e resposta a incidente
 - [Roadmap](docs/ROADMAP.md)

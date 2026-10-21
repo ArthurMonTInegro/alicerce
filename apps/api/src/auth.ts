@@ -70,6 +70,26 @@ export function deleteUserSessions(db: DatabaseSync, userId: string, now = Date.
   return Number(active);
 }
 
+/** Validade do link de recuperação de senha. */
+export const RESET_MINUTES = 30;
+
+/** Novo link de recuperação: o anterior que ainda não foi usado deixa de valer. */
+export function createResetToken(db: DatabaseSync, userId: string, now = Date.now()): string {
+  const token = randomBytes(32).toString('base64url');
+  db.prepare('DELETE FROM password_resets WHERE user_id = ? AND used_at IS NULL').run(userId);
+  db.prepare('INSERT INTO password_resets (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(sha256(token), userId, now, now + RESET_MINUTES * 60_000);
+  return token;
+}
+
+/** Usa o link (uma vez só) e devolve de quem é a conta; null se não existe, venceu ou já foi usado. */
+export function consumeResetToken(db: DatabaseSync, token: string, now = Date.now()): string | null {
+  if (!token || token.length > 100) return null;
+  const row = db.prepare('SELECT user_id, expires_at, used_at FROM password_resets WHERE token_hash = ?').get(sha256(token)) as { user_id: string; expires_at: number; used_at: number | null } | undefined;
+  if (!row || row.used_at !== null || row.expires_at <= now) return null;
+  db.prepare('UPDATE password_resets SET used_at = ? WHERE token_hash = ?').run(now, sha256(token));
+  return row.user_id;
+}
+
 export function purgeExpiredSessions(db: DatabaseSync, now = Date.now()) {
   db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(now);
 }

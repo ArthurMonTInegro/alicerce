@@ -13,12 +13,17 @@ export function getEntitlements(db: DatabaseSync, userId: string, defaultTutorLi
   return entitlements(plan, row?.plan_expires_at ?? null, defaultTutorLimit);
 }
 
+/** Muda o plano e registra a mudança, dentro de uma transação que já está aberta. */
+export function applyPlan(db: DatabaseSync, userId: string, plan: PlanId, expiresAt: number | null, source: string, now = Date.now()) {
+  db.prepare('UPDATE users SET plan = ?, plan_expires_at = ? WHERE id = ?').run(plan, plan === 'free' ? null : expiresAt, userId);
+  db.prepare('INSERT INTO plan_changes (user_id, plan, expires_at, source, at) VALUES (?, ?, ?, ?, ?)').run(userId, plan, expiresAt, source.slice(0, 40), now);
+}
+
 /** Muda o plano e registra a mudança (histórico para suporte, auditoria e métricas de churn). */
 export function setPlan(db: DatabaseSync, userId: string, plan: PlanId, expiresAt: number | null, source: string, now = Date.now()) {
   db.exec('BEGIN');
   try {
-    db.prepare('UPDATE users SET plan = ?, plan_expires_at = ? WHERE id = ?').run(plan, plan === 'free' ? null : expiresAt, userId);
-    db.prepare('INSERT INTO plan_changes (user_id, plan, expires_at, source, at) VALUES (?, ?, ?, ?, ?)').run(userId, plan, expiresAt, source.slice(0, 40), now);
+    applyPlan(db, userId, plan, expiresAt, source, now);
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');

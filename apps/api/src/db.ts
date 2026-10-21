@@ -54,6 +54,38 @@ export const MIGRATIONS: string[] = [
      input_tokens INTEGER NOT NULL DEFAULT 0,
      output_tokens INTEGER NOT NULL DEFAULT 0
    );`,
+  // Recuperação de senha (só o SHA-256 do token, como nas sessões) e assinatura do Premium.
+  // A cobrança acontece no provedor; aqui ficam só a situação da assinatura e o período pago.
+  // payment_events guarda o id de cada evento do provedor para não aplicar o mesmo duas vezes.
+  `CREATE TABLE password_resets (
+     token_hash TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     created_at INTEGER NOT NULL,
+     expires_at INTEGER NOT NULL,
+     used_at INTEGER
+   );
+   CREATE INDEX password_resets_user ON password_resets(user_id);
+   CREATE TABLE subscriptions (
+     id TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     provider TEXT NOT NULL,
+     period TEXT NOT NULL,
+     price INTEGER NOT NULL,
+     status TEXT NOT NULL,
+     paid_until INTEGER,
+     first_paid_at INTEGER,
+     canceled_at INTEGER,
+     created_at INTEGER NOT NULL,
+     updated_at INTEGER NOT NULL
+   );
+   CREATE INDEX subscriptions_user ON subscriptions(user_id);
+   CREATE TABLE payment_events (
+     id TEXT PRIMARY KEY,
+     provider TEXT NOT NULL,
+     type TEXT NOT NULL,
+     subscription_id TEXT,
+     received_at INTEGER NOT NULL
+   );`,
 ];
 
 /** Maior versão de esquema que este código conhece (a restauração recusa backup mais novo). */

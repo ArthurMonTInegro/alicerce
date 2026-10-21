@@ -92,8 +92,11 @@ Migrações versionadas por `PRAGMA user_version` (`apps/api/src/db.ts`). Num ba
 | `tutor_usage` | `user_id`, `day`, `count` | Uso do tutor com IA por dia; a cota do mês soma os dias do mês |
 | `plan_changes` | `user_id`, `plan`, `expires_at`, `source`, `at` | Histórico auditável de mudanças de plano |
 | `tutor_ai_daily` | `day`, `calls`, `failures`, `input_tokens`, `output_tokens` | Totais da IA no Alicerce todo por dia (UTC), sem ligação com contas: teto global (`TUTOR_GLOBAL_DAILY_LIMIT`) e custo real (migração 4) |
+| `password_resets` | `token_hash`, `user_id`, `created_at`, `expires_at`, `used_at` | Links de troca de senha: só o SHA-256 do código, 30 minutos, uso único (migração 5) |
+| `subscriptions` | `id`, `user_id`, `provider`, `period`, `price`, `status`, `paid_until`, `first_paid_at`, `canceled_at`, `created_at`, `updated_at` | Assinaturas do Premium: `pendente`, `ativa`, `cancelada`, `recusada` ou `reembolsada`; preço em centavos (migração 5) |
+| `payment_events` | `id`, `provider`, `type`, `subscription_id`, `received_at` | Eventos do provedor já aplicados: o mesmo webhook entregue duas vezes só vale uma (migração 5) |
 
-Todas as tabelas filhas usam `ON DELETE CASCADE`, então excluir a conta apaga tudo do banco em uso (`tutor_ai_daily` não guarda nada da conta). Os backups continuam com a conta até saírem da retenção ([Operação](OPERACAO.md)).
+Todas as tabelas filhas usam `ON DELETE CASCADE`, então excluir a conta apaga tudo do banco em uso (`tutor_ai_daily` não guarda nada da conta, e `payment_events` só guarda o id da assinatura). Antes de apagar, a renovação de uma assinatura em vigor é cancelada no provedor. Os backups continuam com a conta até saírem da retenção ([Operação](OPERACAO.md)).
 
 ## API
 
@@ -111,6 +114,10 @@ Toda mutação exige o cabeçalho `x-alicerce: 1` (defesa contra CSRF somada ao 
 | `PUT /api/progress` | Recebe o progresso local, saneia, mescla com o salvo e devolve o resultado | corpo até 4 MiB (demais rotas: 1 MB); 60 por minuto por conta; sessão e limite conferidos antes de ler o corpo |
 | `GET /api/content/lessons/:id` | Corpo de uma lição; as pagas só com sessão válida e Premium ativo (401 visitante, 403 gratuito, 503 sem o repositório privado) | `private, no-store` |
 | `GET /api/content/cards` | Cartões de revisão de todas as lições, só com sessão válida e Premium ativo (401, 403 ou 503, como acima); os das lições gratuitas também saem no build | `private, no-store` |
+| `POST /api/auth/senha/recuperar` | `{ email }`: manda o link de troca de senha; sempre 202, exista a conta ou não (503 sem envio de e-mail) | 10 por 15 min por IP e por e-mail |
+| `POST /api/auth/senha/redefinir` | `{ token, password }`: troca a senha e encerra todas as sessões (204; 400 com link vencido ou usado) | 10 por 15 min por IP |
+| `GET /api/assinatura` e `POST /api/assinatura`, `/cancelar`, `/desistir` | Assinatura do Premium (ver [PAGAMENTO.md](PAGAMENTO.md)); sem provedor, não há venda | exige sessão |
+| `POST /api/pagamento/webhook` | Eventos do provedor; sem `x-alicerce`, só com assinatura HMAC válida | |
 | `POST /api/tutor` | Pista do tutor; IA só para Premium ativo, até 20 por dia dentro de 200 por mês; tutor local nos demais casos. Contexto de aula paga (lição ou exercício) segue a regra do conteúdo: 401, 403 ou 503 | 12/min por conta (sem conta, por IP) |
 
 ## Navegação
@@ -178,7 +185,7 @@ Resultado: o JavaScript inicial caiu de 1,09 MB (344 KB com gzip) para 427 KB (1
 
 Transição da promessa anterior (trilha inteira gratuita, publicada em 07/10/2026): `packages/engine/src/transicao.ts` guarda numa constante só (`TRANSICAO_ACESSO`) as datas, a data de corte e a chave do aviso único, que vêm desligadas; `atividadeNosNiveisPagos` diz se um progresso tem atividade nos níveis 2 a 14 antes do corte. O navegador usa isso só para decidir se mostra um aviso (`apps/web/src/components/TransicaoAcesso.tsx`); o servidor, para contar contas afetadas (`apps/api/scripts/afetados-transicao.ts`). Nenhum dos dois concede acesso. Veja TRANSICAO-ACESSO.md.
 
-No servidor, `apps/api/src/plans.ts` lê e muda o plano (`setPlan` grava também em `plan_changes`). Não há provedor de pagamento: quando houver, o webhook dele chama `setPlan`, e nenhum dado de cartão passa pelo Alicerce. Para testes e cortesias: `node apps/api/scripts/plano.ts <email> <free|premium> [dias]`.
+No servidor, `apps/api/src/plans.ts` lê e muda o plano (`setPlan` grava também em `plan_changes`). A assinatura (`apps/api/src/assinatura.ts`) muda o plano só pelo webhook do provedor, dentro da mesma transação que registra o evento; nenhum dado de cartão passa pelo Alicerce. Só existe o provedor simulado, para testes ([PAGAMENTO.md](PAGAMENTO.md)). Para testes e cortesias: `node apps/api/scripts/plano.ts <email> <free|premium> [dias]`.
 
 ## Métricas
 

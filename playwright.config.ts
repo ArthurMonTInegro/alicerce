@@ -21,6 +21,8 @@ export default defineConfig({
     command: 'node --disable-warning=ExperimentalWarning apps/api/src/main.ts',
     url: `http://127.0.0.1:${PORT}/api/health`,
     reuseExistingServer: !process.env.CI,
-    env: { PORT: String(PORT), HOST: '127.0.0.1', DATABASE_PATH: 'test-results/e2e.db', ANTHROPIC_API_KEY: '' },
+    // Pagamento simulado e e-mails num arquivo (e2e/contas.spec.ts); AUTH_RATE_LIMIT dá folga ao limite
+    // de cadastros e entradas por IP, porque todos os testes saem de 127.0.0.1 (só vale fora de produção).
+    env: { PORT: String(PORT), HOST: '127.0.0.1', DATABASE_PATH: 'test-results/e2e.db', ANTHROPIC_API_KEY: '', PAGAMENTO_PROVEDOR: 'teste', EMAIL_LOG_PATH: 'test-results/emails.log', AUTH_RATE_LIMIT: '50' },
   },
 });

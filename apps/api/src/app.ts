@@ -11,8 +11,26 @@ import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { exerciseById, lessonById } from '@alicerce/content';
 import { emptyProgress, mergeProgress, sanitizeProgress } from '@alicerce/engine';
 import {
+  applyPaymentEvent,
+  canWithdraw,
+  createSubscription,
+  currentSubscription,
+  getSubscription,
+  PERIODS,
+  periodPrice,
+  subscriptionView,
+  TEST_RESULTS,
+  TestPaymentProvider,
+  WEBHOOK_ROUTE,
+  type PaymentProvider,
+  type Period,
+  type TestResult,
+} from './assinatura.ts';
+import {
   clearCookie,
+  consumeResetToken,
   COOKIE,
+  createResetToken,
   createSession,
   deleteSession,
   deleteUserSessions,
@@ -23,8 +41,10 @@ import {
   sessionCookie,
   userForToken,
   verifyPassword,
+  RESET_MINUTES,
   type UserRow,
 } from './auth.ts';
+import { FileMailer, type Mailer } from './email.ts';
 import type { Config } from './config.ts';
 import { getEntitlements } from './plans.ts';
 import { RateLimiter, securityHeaders } from './security.ts';
@@ -39,6 +59,15 @@ export interface AppDeps {
   /** corpo das aulas (gratuitas + pagas, se o diretório privado foi carregado); padrão: só gratuitas */
   content?: ContentStore;
   logger?: boolean;
+  /** injetável nos testes; padrão: FileMailer em config.emailLogPath, ou nenhum */
+  mailer?: Mailer | null;
+}
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    /** corpo JSON como chegou (a assinatura do webhook é conferida sobre ele) */
+    rawBody?: string;
+  }
 }
 
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
@@ -64,14 +93,17 @@ export const PROGRESS_BODY_LIMIT = 4 * 1024 * 1024;
  */
 export const PROGRESS_SYNCS_PER_MINUTE = 60;
 
-export async function buildApp({ config, db, tutor, content = publicContent, logger = false }: AppDeps) {
+export async function buildApp({ config, db, tutor, content = publicContent, logger = false, mailer = config.emailLogPath ? new FileMailer(config.emailLogPath) : null }: AppDeps) {
+  if (config.production && config.paymentProvider === 'teste') throw new Error('O provedor de pagamento de teste (PAGAMENTO_PROVEDOR=teste) não pode rodar com NODE_ENV=production.');
   const app = Fastify({
     logger: logger ? { level: 'info', redact: ['req.headers.cookie', 'req.headers.authorization'] } : false,
     bodyLimit: BODY_LIMIT,
     trustProxy: config.trustProxy,
   });
   // JSON vazio vira objeto vazio (DELETE e logout não têm corpo; clientes podem mandar o content-type mesmo assim).
-  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    // O corpo cru só interessa ao webhook, que confere a assinatura sobre os bytes recebidos.
+    if (req.routeOptions.url === WEBHOOK_ROUTE) req.rawBody = body as string;
     if (body === '') return done(null, {});
     try {
       done(null, JSON.parse(body as string));
@@ -91,10 +123,19 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
 
   const limits = {
     global: new RateLimiter(600, 60_000),
-    auth: new RateLimiter(10, 15 * 60_000),
+    auth: new RateLimiter(config.authAttempts, 15 * 60_000),
     tutor: new RateLimiter(12, 60_000),
     progress: new RateLimiter(PROGRESS_SYNCS_PER_MINUTE, 60_000),
   };
+  // Provedor de pagamento (só o de teste existe). Os webhooks dele passam pela mesma rota
+  // de um provedor real (app.inject), com a assinatura conferida do mesmo jeito.
+  const payments: PaymentProvider | null =
+    config.paymentProvider === 'teste'
+      ? new TestPaymentProvider(config.paymentWebhookSecret, async (payload, headers) => {
+          const r = await app.inject({ method: 'POST', url: WEBHOOK_ROUTE, headers, payload });
+          if (r.statusCode !== 200) throw new Error(`webhook de teste recusado (${r.statusCode})`);
+        })
+      : null;
   const tooMany = (reply: FastifyReply, retry: number) => reply.code(429).header('retry-after', String(retry)).send({ error: 'Muitas requisições. Tente de novo em instantes.' });
 
   /* ---------- ganchos globais ---------- */
@@ -109,8 +150,9 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     }
     // Defesa contra CSRF: além do cookie SameSite=Lax, toda mutação exige um cabeçalho
     // personalizado, que um formulário de outro site não consegue enviar. Vale para qualquer
-    // caminho: fora da API não há mutação legítima.
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers['x-alicerce'] !== '1') {
+    // caminho: fora da API não há mutação legítima. A exceção é o webhook do provedor de
+    // pagamento, que não usa cookie nem sessão e só vale com a assinatura HMAC.
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers['x-alicerce'] !== '1' && !(req.method === 'POST' && req.routeOptions.url === WEBHOOK_ROUTE)) {
       return reply.code(403).send({ error: 'Requisição sem o cabeçalho esperado.' });
     }
   });
@@ -203,8 +245,71 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     // Mesmo cálculo e comparação em tempo constante do login.
     const ok = await verifyPassword(password, row?.password_hash ?? (await getDummyHash()));
     if (!row || !ok) return reply.code(403).send({ error: 'Senha incorreta. A conta não foi excluída.' });
-    db.prepare('DELETE FROM users WHERE id = ?').run(u.id); // ON DELETE CASCADE apaga sessões, progresso e uso
+    // Assinatura que ainda renova: para a renovação no provedor antes de apagar a conta.
+    const sub = currentSubscription(db, u.id);
+    if (sub?.status === 'ativa') {
+      const provider = payments?.name === sub.provider ? payments : null;
+      try {
+        if (!provider) throw new Error('provedor indisponível');
+        await provider.cancel(sub.id);
+      } catch {
+        return reply.code(502).send({ error: 'Não consegui cancelar a renovação da assinatura agora, então a conta não foi excluída. Tente de novo em instantes.' });
+      }
+    }
+    db.prepare('DELETE FROM users WHERE id = ?').run(u.id); // ON DELETE CASCADE apaga sessões, progresso, uso e assinaturas
     return reply.header('set-cookie', clearCookie(config.secureCookies)).code(204).send();
+  });
+
+  /* ---------- recuperação de senha ---------- */
+  // A resposta é a mesma com ou sem conta para o e-mail (não revela quem tem conta).
+  // O link vale RESET_MINUTES minutos, uma vez só; o token vai no fragmento (#), que o
+  // navegador não manda ao servidor nem a terceiros. Trocar a senha encerra todas as sessões.
+  app.post('/api/auth/senha/recuperar', async (req, reply) => {
+    if (!mailer) return reply.code(503).send({ error: 'A recuperação de senha ainda não está disponível neste servidor.' });
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const email = typeof b.email === 'string' ? b.email.trim().toLowerCase().slice(0, 254) : '';
+    const retry = limits.auth.take(`recuperar-ip:${req.ip}`) || limits.auth.take(`recuperar:${email}`);
+    if (retry) return tooMany(reply, retry);
+    if (!EMAIL.test(email)) return reply.code(400).send({ error: 'E-mail inválido.' });
+    const row = db.prepare('SELECT id FROM users WHERE email = ?').get(email) as { id: string } | undefined;
+    if (row) {
+      const token = createResetToken(db, row.id);
+      // Sem esperar o envio: o tempo da resposta e uma falha do fornecedor de e-mail
+      // revelariam que o e-mail tem conta. A falha fica só no log.
+      mailer
+        .send({
+          to: email,
+          subject: 'Alicerce: trocar a senha',
+          text: `Alguém pediu para trocar a senha da conta do Alicerce com este e-mail.\n\nPara escolher uma senha nova, abra este link em até ${RESET_MINUTES} minutos:\n${config.appUrl}/conta/redefinir#t=${token}\n\nSe não foi você, ignore esta mensagem: a senha continua a mesma.`,
+        })
+        .catch(() => req.log.error('falha ao enviar o e-mail de recuperação'));
+    }
+    return reply.code(202).send({ ok: true });
+  });
+
+  app.post('/api/auth/senha/redefinir', async (req, reply) => {
+    const retry = limits.auth.take(`redefinir-ip:${req.ip}`);
+    if (retry) return tooMany(reply, retry);
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const token = typeof b.token === 'string' ? b.token : '';
+    const password = typeof b.password === 'string' ? b.password : '';
+    if (password.length < 10 || password.length > 200) return reply.code(400).send({ error: 'A senha precisa ter entre 10 e 200 caracteres.' });
+    const hash = await hashPassword(password);
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const userId = consumeResetToken(db, token);
+      if (!userId) {
+        db.exec('ROLLBACK');
+        return reply.code(400).send({ error: 'Este link não vale mais: ele vence em ' + RESET_MINUTES + ' minutos e só pode ser usado uma vez. Peça outro.' });
+      }
+      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
+      deleteUserSessions(db, userId);
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+    return reply.code(204).send();
   });
 
   /* ---------- progresso ---------- */
@@ -284,6 +389,83 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     if (!requirePremium(req, reply)) return reply;
     if (content.premium !== 'disponivel') return unavailable(reply);
     return content.cards('premium');
+  });
+
+  /* ---------- assinatura do Premium ---------- */
+  // Sem provedor configurado, o Premium não está à venda: GET responde venda: null e as
+  // outras rotas, 404. O plano só muda pelo webhook do provedor (applyPaymentEvent).
+  app.get('/api/assinatura', async (req, reply) => {
+    const u = requireUser(req, reply);
+    if (!u) return reply;
+    reply.headers(PRIVATE);
+    return {
+      venda: payments ? { provedor: payments.name, teste: payments.name === 'teste', precos: { mensal: periodPrice('mensal'), anual: periodPrice('anual') } } : null,
+      assinatura: subscriptionView(currentSubscription(db, u.id)),
+      plano: ent(u.id),
+    };
+  });
+
+  const salesOff = (reply: FastifyReply) => reply.code(404).send({ error: 'O Premium ainda não está à venda.' });
+
+  app.post('/api/assinatura', async (req, reply) => {
+    const u = requireUser(req, reply);
+    if (!u) return reply;
+    if (!payments) return salesOff(reply);
+    const period = (req.body as { periodo?: unknown } | null)?.periodo as Period;
+    if (!PERIODS.includes(period)) return reply.code(400).send({ error: 'Escolha mensal ou anual.' });
+    const cur = currentSubscription(db, u.id);
+    if (cur && (cur.status === 'ativa' || cur.status === 'cancelada') && (cur.paid_until ?? 0) > Date.now()) return reply.code(409).send({ error: 'Você já tem uma assinatura em vigor.' });
+    const sub = createSubscription(db, u.id, payments.name, period);
+    const { url } = await payments.checkout({ id: sub.id, email: u.email, period, price: sub.price });
+    return { url };
+  });
+
+  app.post('/api/assinatura/cancelar', async (req, reply) => {
+    const u = requireUser(req, reply);
+    if (!u) return reply;
+    if (!payments) return salesOff(reply);
+    const sub = currentSubscription(db, u.id);
+    if (sub?.status !== 'ativa' || sub.provider !== payments.name) return reply.code(409).send({ error: 'Não há assinatura renovando para cancelar.' });
+    await payments.cancel(sub.id);
+    return { assinatura: subscriptionView(getSubscription(db, sub.id)), plano: ent(u.id) };
+  });
+
+  // Desistência em até 7 dias do primeiro pagamento (CDC, art. 49): estorno integral e fim do acesso na hora.
+  app.post('/api/assinatura/desistir', async (req, reply) => {
+    const u = requireUser(req, reply);
+    if (!u) return reply;
+    if (!payments) return salesOff(reply);
+    const sub = currentSubscription(db, u.id);
+    if (!sub || sub.provider !== payments.name || !canWithdraw(sub)) return reply.code(409).send({ error: 'O prazo de 7 dias para desistir com estorno já passou, ou não há pagamento para estornar.' });
+    await payments.refund(sub.id);
+    return { assinatura: subscriptionView(getSubscription(db, sub.id)), plano: ent(u.id) };
+  });
+
+  app.post(WEBHOOK_ROUTE, async (req, reply) => {
+    if (!payments) return reply.code(404).send({ error: 'Rota não encontrada.' });
+    let result;
+    try {
+      result = applyPaymentEvent(db, payments.name, payments.parseWebhook(req.rawBody ?? '', req.headers, Date.now()));
+    } catch {
+      return reply.code(400).send({ error: 'Webhook inválido.' });
+    }
+    return { ok: true, result };
+  });
+
+  // A "página de pagamento" do provedor de teste: a própria pessoa aprova ou recusa o pagamento da assinatura dela.
+  app.post('/api/pagamento/teste/simular', async (req, reply) => {
+    const u = requireUser(req, reply);
+    if (!u) return reply;
+    if (!(payments instanceof TestPaymentProvider)) return reply.code(404).send({ error: 'Rota não encontrada.' });
+    const b = (req.body ?? {}) as { assinatura?: unknown; resultado?: unknown };
+    const sub = typeof b.assinatura === 'string' ? getSubscription(db, b.assinatura) : undefined;
+    if (!sub || sub.user_id !== u.id) return reply.code(404).send({ error: 'Assinatura não encontrada.' });
+    if (!TEST_RESULTS.includes(b.resultado as TestResult)) return reply.code(400).send({ error: 'Resultado inválido.' });
+    const result = b.resultado as TestResult;
+    const renewal = result === 'renovar' || result === 'falhar-renovacao';
+    if (renewal ? sub.status !== 'ativa' : sub.status !== 'pendente') return reply.code(409).send({ error: renewal ? 'Só uma assinatura que renova tem renovação.' : 'Este pagamento já foi resolvido.' });
+    await payments.simulate({ id: sub.id, period: sub.period, paidUntil: sub.paid_until }, result);
+    return { assinatura: subscriptionView(getSubscription(db, sub.id)), plano: ent(u.id) };
   });
 
   /* ---------- tutor ---------- */

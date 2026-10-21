@@ -1,14 +1,17 @@
 /**
- * Progresso e rascunhos separados por conta, no mesmo navegador (docs/SEGURANCA.md).
+ * Contas no navegador: progresso e rascunhos separados por conta (docs/SEGURANCA.md),
+ * a assinatura com o provedor de pagamento de teste e a recuperação de senha.
  *
  * Cada conta guarda o progresso e os rascunhos com a própria chave no navegador
  * (alicerce:progresso:v2:user:<id>, alicerce:draft:v2:user:<id>:), e o visitante com a
  * dele. O progresso de visitante não passa para a conta ao entrar. Estes testes trocam
  * de conta numa aba e entre abas e conferem que nada se mistura, nem no servidor.
  *
- * Só no projeto "desktop", e em série: o cadastro tem limite de 10 por 15 minutos por IP
- * (apps/api/src/app.ts), e duas contas por arquivo bastam.
+ * Só no projeto "desktop", e em série, com as mesmas duas contas: cada teste continua
+ * do estado em que o anterior deixou a conta (os dois últimos mudam o plano e a senha).
+ * O servidor do e2e roda com PAGAMENTO_PROVEDOR=teste e EMAIL_LOG_PATH (playwright.config.ts).
  */
+import { readFileSync } from 'node:fs';
 import { test as base, expect, type APIRequestContext, type Page } from '@playwright/test';
 
 const SENHA = 'uma frase bem longa';
@@ -60,11 +63,11 @@ async function noServidor(conta: Conta) {
 
 const contaNoTopo = (page: Page, conta: Conta | null) => page.getByRole('link', { name: conta ? `Conta de ${conta.nome}` : 'Entrar ou criar conta' });
 
-async function entrar(page: Page, conta: Conta) {
+async function entrar(page: Page, conta: Conta, senha = SENHA) {
   await page.goto('/conta');
   await expect(contaNoTopo(page, null)).toBeVisible();
   await page.getByLabel('E-mail').fill(conta.email);
-  await page.getByLabel('Senha', { exact: true }).fill(SENHA);
+  await page.getByLabel('Senha', { exact: true }).fill(senha);
   await page.locator('form').getByRole('button', { name: 'Entrar' }).click();
   await expect(page.getByText('Sincronizado')).toBeVisible();
   await expect(contaNoTopo(page, conta)).toBeVisible();
@@ -278,4 +281,85 @@ test('apagar o progresso vale nas outras abas e no servidor, e uma cópia antiga
   await aba2.reload();
   await expect(contaNoTopo(aba2, ana)).toBeVisible();
   await conferirTrilha(aba2, []);
+});
+
+test('assinatura no ambiente de teste: pagar, cancelar a renovação e desistir com estorno', async ({ page, contas }) => {
+  const { ana } = contas!;
+  page.on('dialog', (d) => void d.accept());
+  await entrar(page, ana);
+  await expect(page.getByRole('heading', { name: 'Seu plano: Gratuito' })).toBeVisible();
+  const secao = page.getByRole('region', { name: 'Assinatura do Premium' });
+  await expect(secao.getByText('Ambiente de teste.')).toBeVisible();
+  await secao.getByRole('radio', { name: /^Anual: R\$\s?149,00 por ano/ }).check();
+  await secao.getByRole('button', { name: 'Ir para o pagamento' }).click();
+
+  // A página do provedor (simulada)
+  await expect(page.getByRole('heading', { name: 'Pagamento simulado' })).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe('/conta/pagamento-teste');
+  await page.getByRole('button', { name: 'Aprovar pagamento' }).click();
+  const daquiUmAno = new Date(Date.now() + 365 * 86_400_000).toLocaleDateString('pt-BR', { timeZone: 'UTC' }).slice(-4);
+  await expect(page.getByRole('status')).toContainText(`Pagamento aprovado. O Premium vale até`);
+  await expect(page.getByRole('status')).toContainText(daquiUmAno);
+  await page.getByRole('link', { name: 'Voltar para a conta' }).click();
+  await expect(page.getByRole('heading', { name: /^Seu plano: Premium/ })).toBeVisible();
+  await expect(secao).toContainText(/Premium anual, por R\$\s?149,00\. Renova em/);
+
+  await secao.getByRole('button', { name: 'Cancelar a renovação' }).click();
+  await expect(secao.getByRole('status')).toContainText('Renovação cancelada.');
+  await expect(secao).toContainText('Assinatura cancelada: o Premium vale até');
+  await expect(page.getByRole('heading', { name: /^Seu plano: Premium/ })).toBeVisible();
+
+  await secao.getByRole('button', { name: 'Desistir e receber o estorno' }).click();
+  await expect(secao.getByRole('status')).toContainText('o estorno integral foi pedido ao provedor');
+  await expect(page.getByRole('heading', { name: 'Seu plano: Gratuito' })).toBeVisible();
+  await expect(secao.getByRole('button', { name: 'Ir para o pagamento' })).toBeVisible();
+
+  const r = await ana.req.get('/api/assinatura');
+  expect((await r.json()).assinatura.situacao).toBe('reembolsada');
+  expect((await r.json()).plano.plan).toBe('free');
+});
+
+// Por último: troca a senha do Bruno e encerra as sessões dele (inclusive a do cadastro).
+test('esqueci a senha: o link do e-mail troca a senha uma vez e encerra as sessões abertas', async ({ browser, page, contas }) => {
+  const { bruno } = contas!;
+  await entrar(page, bruno);
+
+  // Em outro navegador, sem conta: pedir o link.
+  const outro = await browser.newContext();
+  const visita = await outro.newPage();
+  await visita.goto('/conta');
+  await visita.getByRole('button', { name: 'Esqueci a senha' }).click();
+  await expect(visita.getByRole('heading', { name: 'Trocar a senha' })).toBeVisible();
+  await visita.getByLabel('E-mail').fill(bruno.email);
+  await visita.getByRole('button', { name: 'Enviar o link' }).click();
+  await expect(visita.getByRole('status')).toContainText('Se houver uma conta com esse e-mail, enviamos um link');
+
+  const linhas = readFileSync('test-results/emails.log', 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { to: string; text: string });
+  const link = /https?:\/\/\S+\/conta\/redefinir#t=[A-Za-z0-9_-]+/.exec(linhas.filter((m) => m.to === bruno.email).at(-1)!.text)![0];
+  const caminho = new URL(link).pathname + new URL(link).hash;
+  await visita.goto(caminho);
+  await expect(visita.getByRole('heading', { name: 'Trocar a senha' })).toBeVisible();
+  await expect.poll(() => new URL(visita.url()).hash).toBe(''); // o código sai do endereço
+  await visita.getByLabel('Senha nova').fill('uma senha nova e bem longa');
+  await visita.getByRole('button', { name: 'Trocar a senha' }).click();
+  await expect(visita.getByRole('status')).toContainText('Senha trocada.');
+
+  // O mesmo link não vale de novo (sai da página antes: só trocar o # não recarrega).
+  await visita.goto('/conta');
+  await visita.goto(caminho);
+  await visita.getByLabel('Senha nova').fill('outra senha nova e longa');
+  await visita.getByRole('button', { name: 'Trocar a senha' }).click();
+  await expect(visita.getByRole('alert')).toContainText('Este link não vale mais');
+  await outro.close();
+
+  // A sessão aberta antes foi encerrada; a senha antiga não entra mais, a nova sim.
+  await page.reload();
+  await expect(contaNoTopo(page, null)).toBeVisible();
+  await page.goto('/conta');
+  await page.getByLabel('E-mail').fill(bruno.email);
+  await page.getByLabel('Senha', { exact: true }).fill(SENHA);
+  await page.locator('form').getByRole('button', { name: 'Entrar' }).click();
+  await expect(page.getByRole('alert')).toContainText('E-mail ou senha incorretos.');
+  await entrar(page, bruno, 'uma senha nova e bem longa');
+  expect((await bruno.req.get('/api/auth/me').then((r) => r.json())).user).toBeNull();
 });

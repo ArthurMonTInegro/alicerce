@@ -62,6 +62,7 @@ Exceções, só para a página de execução:
 - Excluir a conta (`DELETE /api/auth/me`) exige a senha atual no corpo, além da sessão: um cookie esquecido num computador emprestado não basta para apagar tudo. A senha passa pelo mesmo scrypt e pela mesma comparação em tempo constante do login; sem senha a resposta é 400 (sem gastar tentativa), com senha errada é 403. As tentativas contam no limite por IP da exclusão e no mesmo balde por conta do login, então palpites de senha somam, venham de onde vierem.
 - Excluir a conta apaga usuário, sessões, progresso, histórico de planos e uso do tutor (cascata).
 - No navegador, cada conta e o visitante têm chaves próprias para o progresso e os rascunhos (`alicerce:progresso:v2:<perfil>` e `alicerce:draft:v2:<perfil>:`, em `apps/web/src/state/store.ts`). Entrar não importa o progresso de visitante, e trocar de conta numa aba troca as outras (`alicerce:auth-change`). Testes em `e2e/contas.spec.ts`: visitante, duas contas e de novo a primeira na mesma aba, e a troca entre duas abas, sem misturar progresso nem rascunhos, nem no servidor.
+- Recuperação de senha ("Esqueci a senha"): a resposta é a mesma exista a conta ou não, e o servidor não espera o envio do e-mail (o tempo da resposta e uma falha de envio revelariam a conta); o link vale 30 minutos e uma vez só, pedir outro invalida o anterior, e o código vai depois do `#` (o navegador não o manda a servidores) e sai do endereço ao abrir. No banco fica só o SHA-256 do código (`password_resets`). Trocar a senha encerra todas as sessões da conta. Enquanto não há provedor de envio, o e-mail vai para um arquivo (`EMAIL_LOG_PATH`), desligado em produção: lá a recuperação responde 503. Ver [PAGAMENTO.md](PAGAMENTO.md).
 - Saída que o servidor não confirmou (sem rede, por exemplo): a conta some da aba na hora, e a pendência fica gravada (`alicerce:saida-pendente`). Com ela, as outras abas também escondem a conta, e recarregar a página tenta sair de novo em vez de entrar com o cookie que ainda vale; o aviso do topo tem o botão "Tentar encerrar sessão", e a volta da conexão tenta sozinha. Antes de 21/10/2026, a pendência ficava só na memória da aba: recarregar trazia a conta de volta e as outras abas continuavam mostrando os dados dela. Se o navegador não deixa gravar, a pendência vale só na aba aberta.
 
 ## CSRF
@@ -69,6 +70,8 @@ Exceções, só para a página de execução:
 Toda requisição que muda estado exige o cabeçalho `x-alicerce: 1`. Formulários de outro site não conseguem enviar cabeçalhos personalizados sem passar por CORS, e o servidor não habilita CORS. Isso se soma ao `SameSite=Lax`, que não separa portas nem subdomínios do mesmo site: um formulário em `127.0.0.1:outra-porta` leva o cookie (teste e2e), e quem barra é o cabeçalho.
 
 A conferência vale para qualquer caminho, e a decisão sobre o que é API usa a rota escolhida pelo roteador, não o texto cru da URL. Antes, ela olhava `startsWith('/api/')` na URL crua, e o roteador decodifica o caminho: `DELETE /%61pi/auth/me` sem o cabeçalho apagava a conta, e um formulário do mesmo site encerrava a sessão com `POST /%61pi/auth/logout` (há testes em `apps/api/test/api.test.ts` e em `e2e/isolamento.spec.ts`). Do iframe de execução isso não funcionava, porque de lá o cookie não vai.
+
+A única exceção é o webhook do provedor de pagamento (`POST /api/pagamento/webhook`): quem chama é o provedor, sem cookie e sem o cabeçalho. Ele vale só com a assinatura HMAC-SHA256 do carimbo de tempo e do corpo cru, conferida em tempo constante, recusada fora de 5 minutos e sem efeito numa segunda entrega do mesmo evento. Não muda nada de uma conta que não seja a da assinatura do evento.
 
 Essa defesa vale contra outros sites, não contra código que roda na origem do próprio site: esse código envia o cabeçalho e o cookie sem esforço. É por isso que o código do estudante roda numa origem opaca (ver "Execução de código do estudante"); para a API, um pedido de lá é de outra origem, sem cookie e sem CORS.
 
@@ -79,10 +82,14 @@ Essa defesa vale contra outros sites, não contra código que roda na origem do 
 | Toda a `/api` | 600 requisições por minuto por IP |
 | Login | 10 por 15 minutos por IP e, separadamente, por e-mail |
 | Cadastro | 10 por 15 minutos por IP |
+| Pedir o link de troca de senha | 10 por 15 minutos por IP e, separadamente, por e-mail |
+| Trocar a senha pelo link | 10 por 15 minutos por IP |
 | Excluir a conta | 10 por 15 minutos por IP e, por conta, somadas às tentativas de login dessa conta |
 | Sincronizar o progresso (`PUT /api/progress`) | 60 por minuto por conta, conferidas antes de ler o corpo |
 | Tutor | 12 por minuto por conta; sem conta, por IP |
 | Tutor com IA | só para contas com Premium ativo: 20 perguntas por dia, dentro de 200 por mês (mês do calendário em UTC); `TUTOR_DAILY_LIMIT` só reduz o diário. Teto do Alicerce todo: `TUTOR_GLOBAL_DAILY_LIMIT` chamadas por dia (padrão 300). Conta gratuita e visitante usam o tutor local |
+
+Fora de produção, `AUTH_RATE_LIMIT` muda o limite de 10 do cadastro e da entrada (o e2e cria muitas contas do mesmo IP); com `NODE_ENV=production` ele é ignorado.
 
 Corpos de requisição têm no máximo 1 MB, exceto `PUT /api/progress`, que aceita até 4 MiB: o maior progresso legítimo (5 000 tentativas e 5 000 revisões, o teto do saneamento, com todo o catálogo estudado) mede cerca de 2,5 MB, e o teste `apps/api/test/contas.test.ts` gera esse caso e confere a folga. Essa rota confere a sessão e o limite por conta antes de ler o corpo: sem conta, ou acima do limite, o corpo é descartado sem ser guardado nem interpretado. Ler, sanear, mesclar e gravar um envio no maior caso legítimo custa cerca de 300 ms de CPU (medido num teste local com `app.inject`; a maior parte é a mesclagem), e o limite por conta impede que uma conta só ocupe o servidor; várias contas no mesmo IP ainda conseguem, dentro do limite geral. Atrás de um proxy reverso, o limite de corpo do proxy também precisa aceitar 4 MiB nessa rota (no nginx, `client_max_body_size` vale 1 MB por padrão).
 
@@ -98,6 +105,10 @@ O documento de progresso vem do navegador e é tratado como entrada hostil (`pac
 - Qualquer erro, recusa ou estouro do limite cai no tutor offline, sem expor detalhes do erro.
 - Além das cotas por conta, um teto de chamadas por dia no Alicerce todo (`TUTOR_GLOBAL_DAILY_LIMIT`, padrão 300) limita o gasto mesmo com muitas contas Premium; os totais do dia (chamadas, falhas e tokens) ficam em `tutor_ai_daily`, sem dados de contas.
 
+## Pagamento
+
+Só existe o provedor simulado (`PAGAMENTO_PROVEDOR=teste`), que o servidor recusa com `NODE_ENV=production`. O Alicerce nunca recebe dados de cartão ou de Pix: a cobrança acontece na página do provedor, e o plano muda só pelo webhook assinado, nunca pelo que o navegador manda. A simulação (`/api/pagamento/teste/simular`) só age sobre uma assinatura da própria conta. Detalhes em [PAGAMENTO.md](PAGAMENTO.md).
+
 ## Privacidade
 
 Sem conta, nada sai do navegador além das perguntas ao tutor offline (que não guarda nada). Com conta, o servidor guarda e-mail, nome opcional, hash da senha e o progresso. Não há rastreadores, anúncios ou scripts de terceiros. Detalhes em `/privacidade`.
@@ -109,6 +120,6 @@ Os backups do banco têm os mesmos dados, inclusive de contas excluídas depois 
 - `style-src 'unsafe-inline'` existe porque alguns componentes usam `style={...}` do React. O risco é baixo (não há injeção de HTML), mas o ideal é remover.
 - O limitador de requisições é em memória: vale para uma instância. Com várias réplicas, precisa de um armazenamento compartilhado.
 - `TRUST_PROXY` só deve ser ligado atrás de um proxy conhecido; ligado sem proxy, o IP usado nos limites pode ser falsificado.
-- O cadastro responde 409 "Já existe uma conta com esse e-mail", o que revela quem tem conta. Resolver exige confirmar o e-mail (responder igual nos dois casos e avisar por e-mail), e ainda não há provedor de envio de e-mail; o mesmo vale para recuperar senha.
-- Não há troca de senha nem lista das sessões abertas por aparelho; "Sair de todos os aparelhos" encerra todas de uma vez.
+- O cadastro responde 409 "Já existe uma conta com esse e-mail", o que revela quem tem conta. Resolver exige confirmar o e-mail (responder igual nos dois casos e avisar por e-mail), e ainda não há provedor de envio de e-mail. A recuperação de senha já responde igual nos dois casos, mas só funciona fora de produção, com os e-mails num arquivo.
+- Não há troca de senha com a senha atual nem lista das sessões abertas por aparelho; "Sair de todos os aparelhos" encerra todas de uma vez.
 - A execução do código do estudante tem limites próprios (correção sem integridade, GitHub Pages com origem compartilhada, testes só no Chromium): ver "Limites que continuam valendo", acima.

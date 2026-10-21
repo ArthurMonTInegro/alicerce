@@ -458,5 +458,13 @@ export async function deleteAccount(password: string) {
   endedOnServer();
 }
 
+/** Relê a conta no servidor (o plano muda por lá, por exemplo depois de um pagamento). Mesma conta: não remonta nada. */
+export async function refreshAccount(){
+  if(!user)return;
+  const id=user.id;
+  const next=await api.me();
+  if(next&&user?.id===id&&next.id===id){user=next;emitAuth();}
+}
+
 export function retrySave(){persist();}
 export function getSaveStatus(){return authSnapshot;}
