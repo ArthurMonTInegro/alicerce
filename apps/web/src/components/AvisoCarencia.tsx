@@ -34,7 +34,7 @@ export function OQueVaiMudar() {
         <strong>Esta página prometia a trilha inteira gratuita para sempre, e isso vai mudar.</strong> De {promessaPublicadaEm} a {anunciadaEm}, ela dizia que a trilha completa, do nível 0 ao 14, ficaria gratuita para sempre, em qualquer plano. Essa promessa foi retirada em {anunciadaEm}. Para quem já estuda aqui, nada muda por enquanto: todos os níveis continuam abertos. Os níveis 0 e 1 continuam gratuitos. Os níveis 2 a 14 só passam para a assinatura Premium {diasDepoisDaVenda} dias depois que ela começar a ser vendida, e esta página vai dizer a data com essa antecedência.
       </p>
       <p>
-        Em {anunciadaEm}, esta página chegou a anunciar o fechamento dos níveis 2 a 14 para {corteAdiado}. Em {adiadaEm}, a data foi adiada: como o Premium ainda não está à venda, ninguém conseguiria assinar.
+        Em {anunciadaEm}, esta página chegou a anunciar o fechamento dos níveis 2 a 14 para {corteAdiado}. {adiadaEm === anunciadaEm ? 'No mesmo dia' : `Em ${adiadaEm}`}, a data foi adiada: como o Premium ainda não está à venda, ninguém conseguiria assinar.
       </p>
       <p>
         A página também anunciava o tutor com IA no plano gratuito, com até {DEFAULT_TUTOR_DAILY_LIMIT} perguntas por dia, embora ele esteja desligado nesta demonstração. Quando o Premium abrir, o tutor com IA vai ficar só no Premium, com até 20 perguntas por dia dentro de 200 por mês.

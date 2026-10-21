@@ -130,7 +130,7 @@ test('planos: mostra o preço decidido, sem botão de compra, e o rodapé leva a
   const muda = main.getByRole('region', { name: 'O que vai mudar' });
   await expect(muda).toContainText('todos os níveis continuam abertos');
   await expect(muda).toContainText('Os níveis 2 a 14 só passam para a assinatura Premium 30 dias depois que ela começar a ser vendida');
-  await expect(muda).toContainText('Em 20/10/2026, a data foi adiada');
+  await expect(muda).toContainText('anunciar o fechamento dos níveis 2 a 14 para 20/11/2026. No mesmo dia, a data foi adiada');
   await expect(muda).not.toContainText('19/11/2026');
   await expect(muda).toContainText('Ninguém foi cobrado');
   await expect(muda).not.toContainText(/restam|últimos dias|corra|aproveite|assine já/i);
