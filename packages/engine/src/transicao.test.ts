@@ -32,18 +32,20 @@ function progresso(f: (p: ProgressState) => void): ProgressState {
 }
 
 describe('configuração da transição', () => {
-  it('carência decidida em 20/10/2026: anúncio em 20/10, corte em 20/11 e aviso ligado', () => {
-    expect(TRANSICAO_ACESSO).toMatchObject({ anunciadaEm: '2026-10-20', corte: '2026-11-20', avisoLigado: true });
-    expect(avisoDeTransicaoAtivo(TRANSICAO_ACESSO)).toBe(true);
+  it('fechamento adiado em 20/10/2026: anunciado nesse dia, sem data de corte, níveis 2 a 14 abertos e aviso da mudança desligado', () => {
+    expect(TRANSICAO_ACESSO).toMatchObject({ anunciadaEm: '2026-10-20', corte: null, avisoLigado: false, niveisPagosAbertos: true });
+    expect(avisoDeTransicaoAtivo(TRANSICAO_ACESSO)).toBe(false);
     // o corte conta a partir de 00:00 em Brasília (03:00 UTC)
-    expect(instanteDoCorte(TRANSICAO_ACESSO.corte)).toBe(Date.UTC(2026, 10, 20, 3));
+    expect(instanteDoCorte('2026-11-20')).toBe(Date.UTC(2026, 10, 20, 3));
   });
 
-  it('o aviso exige a chave ligada E uma data válida', () => {
-    expect(avisoDeTransicaoAtivo({ ...TRANSICAO_ACESSO, avisoLigado: true, corte: null })).toBe(false);
-    expect(avisoDeTransicaoAtivo({ ...TRANSICAO_ACESSO, avisoLigado: true, corte: '20/10/2026' })).toBe(false);
-    expect(avisoDeTransicaoAtivo({ ...TRANSICAO_ACESSO, avisoLigado: false, corte: '2026-10-20' })).toBe(false);
-    expect(avisoDeTransicaoAtivo({ ...TRANSICAO_ACESSO, avisoLigado: true, corte: '2026-10-20' })).toBe(true);
+  it('o aviso exige a chave ligada, uma data válida e os níveis 2 a 14 fechados', () => {
+    const fechado = { ...TRANSICAO_ACESSO, niveisPagosAbertos: false };
+    expect(avisoDeTransicaoAtivo({ ...fechado, avisoLigado: true, corte: null })).toBe(false);
+    expect(avisoDeTransicaoAtivo({ ...fechado, avisoLigado: true, corte: '20/10/2026' })).toBe(false);
+    expect(avisoDeTransicaoAtivo({ ...fechado, avisoLigado: false, corte: '2026-10-20' })).toBe(false);
+    expect(avisoDeTransicaoAtivo({ ...fechado, avisoLigado: true, corte: '2026-10-20' })).toBe(true);
+    expect(avisoDeTransicaoAtivo({ ...fechado, avisoLigado: true, corte: '2026-10-20', niveisPagosAbertos: true })).toBe(false);
   });
 
   it('as datas registradas são as do histórico', () => {

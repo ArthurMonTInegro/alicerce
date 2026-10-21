@@ -4,7 +4,8 @@ import { Link } from '../lib/router.tsx';
 import { ApiError } from '../state/api.ts';
 import { deleteAccount, signIn, signOut, signOutEverywhere, syncNow, useAuth } from '../state/store.ts';
 import { STATIC_SITE } from '../lib/base.ts';
-import { FEATURES, PLANS, PREMIUM_FOR_SALE } from '@alicerce/engine';
+import { FEATURES, PLANS, PREMIUM_FOR_SALE, TRANSICAO_ACESSO } from '@alicerce/engine';
+import { CARENCIA } from '../components/AvisoCarencia.tsx';
 
 const SYNC_LABEL = { offline: 'Sem conta: progresso só neste navegador', idle: 'Sincronizado', syncing: 'Sincronizando…', error: 'Falha ao sincronizar; tentaremos de novo' } as const;
 
@@ -120,7 +121,7 @@ export function Conta() {
               <li>Tutor com IA: até {user.entitlements.tutorDailyLimit} perguntas por dia e {user.entitlements.tutorMonthlyLimit} por mês</li>
             </ul>
             <p className="small muted">
-              A trilha inicial é gratuita. O Premium libera os níveis seguintes e ainda não está à venda. Veja <Link to="/planos">Planos</Link>.
+              {TRANSICAO_ACESSO.niveisPagosAbertos ? `A trilha inicial é gratuita. Os níveis seguintes estão abertos por enquanto e passam para o Premium ${CARENCIA.diasDepoisDaVenda} dias depois que ele começar a ser vendido.` : 'A trilha inicial é gratuita. O Premium libera os níveis seguintes e ainda não está à venda.'} Veja <Link to="/planos">Planos</Link>.
             </p>
           </section>
         )}
@@ -173,7 +174,7 @@ export function Conta() {
     <div className="container prose" style={{ maxWidth: '52ch' }}>
       <p className="eyebrow">Conta · account</p>
       <h1>{mode === 'login' ? 'Entrar' : 'Criar conta'}</h1>
-      <p>Nos níveis 0 e 1, a conta é opcional: serve para sincronizar o progresso entre aparelhos. O Premium (níveis 2 a 14 e tutor com IA) exige conta com assinatura ativa e ainda não está à venda; criar uma conta, sozinho, não libera esses conteúdos. Veja a <Link to="/privacidade">política de privacidade</Link>.</p>
+      <p>Nos níveis 0 e 1, a conta é opcional: serve para sincronizar o progresso entre aparelhos. O Premium (níveis 2 a 14 e tutor com IA) exige conta com assinatura ativa e ainda não está à venda; criar uma conta, sozinho, não libera esses conteúdos.{TRANSICAO_ACESSO.niveisPagosAbertos ? ` Até ${CARENCIA.diasDepoisDaVenda} dias depois que a venda começar, os níveis 2 a 14 continuam abertos para todos, com ou sem conta.` : ''} Veja a <Link to="/privacidade">política de privacidade</Link>.</p>
       {notice && (
         <p className="small" role="status">
           {notice}

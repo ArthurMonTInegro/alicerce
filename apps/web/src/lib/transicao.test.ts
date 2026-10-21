@@ -16,7 +16,7 @@ import {
 
 const levels = (catalogo as unknown as { levels: NivelDoCatalogo[] }).levels;
 const indice = indiceDoCatalogo(levels);
-const LIGADO: ConfigTransicao = { ...TRANSICAO_ACESSO, avisoLigado: true, corte: '2026-10-20' };
+const LIGADO: ConfigTransicao = { ...TRANSICAO_ACESSO, avisoLigado: true, corte: '2026-10-20', niveisPagosAbertos: false };
 const CORTE = instanteDoCorte('2026-10-20')!;
 const DIA = 86_400_000;
 
@@ -164,7 +164,9 @@ describe('datas por extenso', () => {
   });
 
   it('sem corte decidido, o corte é null; com corte, vem por extenso', () => {
-    expect(datasDaTransicao()).toEqual({ promessa: '7 de outubro de 2026', decisao: '13 de outubro de 2026', corte: '20 de novembro de 2026', anuncio: '20 de outubro de 2026', abertoAte: '19 de novembro de 2026' });
+    // fechamento adiado: sem data de corte ainda
+    expect(datasDaTransicao()).toEqual({ promessa: '7 de outubro de 2026', decisao: '13 de outubro de 2026', corte: null, anuncio: null, abertoAte: null });
+    expect(datasDaTransicao({ ...TRANSICAO_ACESSO, corte: '2026-11-20' })).toEqual({ promessa: '7 de outubro de 2026', decisao: '13 de outubro de 2026', corte: '20 de novembro de 2026', anuncio: '20 de outubro de 2026', abertoAte: '19 de novembro de 2026' });
     expect(datasDaTransicao({ ...TRANSICAO_ACESSO, corte: null })).toEqual({ promessa: '7 de outubro de 2026', decisao: '13 de outubro de 2026', corte: null, anuncio: null, abertoAte: null });
     // anúncio no dia do corte (ou depois) não é carência
     expect(datasDaTransicao({ ...TRANSICAO_ACESSO, anunciadaEm: '2026-11-20' })).toMatchObject({ anuncio: null, abertoAte: null });

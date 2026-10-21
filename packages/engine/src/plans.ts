@@ -1,3 +1,5 @@
+import { TRANSICAO_ACESSO } from './transicao.ts';
+
 /** Política comercial v3: fundamentos gratuitos, continuidade por assinatura. */
 export type PlanId = 'free' | 'premium';
 
@@ -108,8 +110,14 @@ export function yearlyDeal(price: PlanPrice) {
 export const FREE_FEATURES: readonly Feature[] = ['trilha-inicial', 'exercicios-e-revisao', 'laboratorio', 'tutor-offline'];
 
 export const FREE_MAX_LEVEL = 1;
-export function canAccessLevel(plan: PlanId, level: number): boolean {
-  return Number.isInteger(level) && level >= 0 && level <= 14 && (level <= FREE_MAX_LEVEL || plan === 'premium');
+/** Nível gratuito pela estratégia (0 e 1): o corpo fica no repositório público. Não muda com a transição. */
+export const isFreeLevel = (level: number) => Number.isInteger(level) && level >= 0 && level <= FREE_MAX_LEVEL;
+/**
+ * Quem pode abrir as aulas de um nível agora. Enquanto os níveis 2 a 14 estiverem
+ * abertos na transição (TRANSICAO_ACESSO.niveisPagosAbertos), todos podem.
+ */
+export function canAccessLevel(plan: PlanId, level: number, abertos = TRANSICAO_ACESSO.niveisPagosAbertos): boolean {
+  return Number.isInteger(level) && level >= 0 && level <= 14 && (level <= FREE_MAX_LEVEL || plan === 'premium' || abertos);
 }
 
 export const isPlanId = (x: unknown): x is PlanId => x === 'free' || x === 'premium';

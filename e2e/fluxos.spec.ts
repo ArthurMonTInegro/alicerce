@@ -155,7 +155,7 @@ test('tutor responde sem entregar a solução', async ({ page, request }) => {
   expect(errors).toEqual([]);
 });
 
-test('planos: estratégia vigente, seção "O que mudou", sem botão de compra, e o rodapé leva até lá', async ({ page }) => {
+test('planos: preço previsto, seção "O que vai mudar", sem botão de compra, e o rodapé leva até lá', async ({ page }) => {
   const errors = watchConsole(page);
   await page.goto('/');
   await page.getByRole('contentinfo').getByRole('link', { name: 'Planos' }).click();
@@ -167,15 +167,67 @@ test('planos: estratégia vigente, seção "O que mudou", sem botão de compra, 
   await expect(main).toContainText(/R\$\s19,90 \/ mês/);
   await expect(main).toContainText(/R\$\s149,00/);
   await expect(main).toContainText('ainda não está à venda');
-  // a promessa anterior (trilha inteira gratuita para sempre) só aparece na seção que explica a mudança
-  const mudou = main.getByRole('region', { name: 'O que mudou' });
-  await expect(mudou).toContainText('Esta página prometia a trilha inteira gratuita, e isso mudou.');
-  await expect(mudou).toContainText('Ninguém foi cobrado.');
-  await expect(mudou).toContainText('Seu progresso continua no seu aparelho.');
+  // enquanto o Premium não estiver à venda, os níveis 2 a 14 continuam abertos: a seção
+  // explica a mudança e o adiamento, sem data de corte (a seção "O que mudou" é a do corte)
   await expect(main.getByText('grátis para sempre')).toHaveCount(0);
+  await expect(main).not.toContainText('ficam gratuitos para sempre');
+  await expect(main.getByRole('region', { name: 'O que mudou' })).toHaveCount(0);
+  const muda = main.getByRole('region', { name: 'O que vai mudar' });
+  await expect(muda).toContainText('todos os níveis continuam abertos');
+  await expect(muda).toContainText('Os níveis 2 a 14 só passam para a assinatura Premium 30 dias depois que ela começar a ser vendida');
+  await expect(muda).toContainText('anunciar o fechamento dos níveis 2 a 14 para 20/11/2026. No mesmo dia, a data foi adiada');
+  await expect(muda).not.toContainText('19/11/2026');
+  await expect(muda).toContainText('Ninguém foi cobrado');
+  await expect(muda).not.toContainText(/restam|últimos dias|corra|aproveite|assine já/i);
+  // o aviso único não aparece em /planos, que já tem a seção completa
+  await expect(page.getByRole('region', { name: 'O acesso gratuito vai mudar' })).toHaveCount(0);
   await expect(main.getByRole('button')).toHaveCount(0);
   await expect(main.getByRole('link', { name: /assin|compr|pagar|checkout/i })).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test('aviso da carência: aparece depois da hidratação, leva a /planos, fecha e não volta', async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto('/');
+  const aviso = page.getByRole('region', { name: 'O acesso gratuito vai mudar' });
+  await expect(aviso).toBeVisible();
+  await expect(aviso).toContainText('O fechamento anunciado para 20/11/2026 foi adiado, e todos os níveis continuam abertos');
+  await expect(aviso).toContainText('os níveis 2 a 14 passam para o Premium 30 dias depois');
+  await expect(aviso.getByRole('link', { name: 'Exportar meu progresso' })).toHaveAttribute('href', /\/progresso#h-data$/);
+  await aviso.getByRole('button', { name: 'Fechar aviso' }).click();
+  await expect(aviso).toHaveCount(0);
+  await expect(page.locator('#conteudo')).toBeFocused();
+  await page.goto('/trilha');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'O acesso gratuito vai mudar' })).toHaveCount(0);
+  // o HTML pré-renderizado nunca traz o aviso
+  const html = await (await page.request.get('/')).text();
+  expect(html).not.toContain('O acesso gratuito vai mudar');
+  expect(errors).toEqual([]);
+});
+
+test('aviso da carência: "Entenda o que vai mudar" abre a seção em /planos e não volta depois', async ({ page }) => {
+  await page.goto('/sobre');
+  const aviso = page.getByRole('region', { name: 'O acesso gratuito vai mudar' });
+  await aviso.getByRole('link', { name: 'Entenda o que vai mudar' }).click();
+  await expect(page).toHaveURL(/\/planos#o-que-vai-mudar$/);
+  await expect(page.getByRole('heading', { level: 2, name: 'O que vai mudar' })).toBeVisible();
+  await page.goto('/');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'O acesso gratuito vai mudar' })).toHaveCount(0);
+});
+
+test('aviso da carência: quem fechou o aviso anterior (até 19/11) vê uma vez o adiamento', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('alicerce:aviso-carencia:fechado:v1', '2026-10-20T12:00:00.000Z'));
+  await page.goto('/');
+  const aviso = page.getByRole('region', { name: 'O acesso gratuito vai mudar' });
+  await expect(aviso).toContainText('foi adiado');
+  await aviso.getByRole('button', { name: 'Fechar aviso' }).focus();
+  await page.keyboard.press('Escape');
+  await expect(aviso).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'O acesso gratuito vai mudar' })).toHaveCount(0);
 });
 
 test('página inexistente devolve 404 com página amigável', async ({ page }) => {

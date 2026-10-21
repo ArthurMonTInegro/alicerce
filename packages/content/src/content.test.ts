@@ -33,6 +33,7 @@ import {
   type Block,
 } from './index.ts';
 import { describeCurriculum, loadCurriculum } from './completo.ts';
+import { paidCatalog } from './catalogo-pago.ts';
 import idsAntes from './ids-antes-da-separacao.json' with { type: 'json' };
 
 /**
@@ -180,7 +181,10 @@ describe('referências e ligações', () => {
   });
 
   it('toda referência é usada por pelo menos um módulo ou lição', () => {
-    const used = new Set([...modules.flatMap((m) => m.references), ...lessons.flatMap((l) => l.references)]);
+    // inclui o mapa das aulas pagas completas (catalogo-pago.ts): com os níveis 2 a 14 abertos, o mapa
+    // em vigor vem das aulas como foram publicadas, e as referências do aprofundamento ficam só nele
+    const paid = paidCatalog.flatMap((l) => l.modules);
+    const used = new Set([...modules.flatMap((m) => m.references), ...lessons.flatMap((l) => l.references), ...paid.flatMap((m) => [...m.references, ...m.lessons.flatMap((l) => l.references)])]);
     expect(references.filter((r) => !used.has(r.id)).map((r) => r.id)).toEqual([]);
   });
 
@@ -260,8 +264,10 @@ describe('separação público × privado', () => {
   });
 
   it('cada corpo carregado bate com o mapa público (ids de exercícios, cartões, etapas, títulos)', () => {
+    // as pagas comparadas com catalogo-pago.ts: com os níveis 2 a 14 abertos, o mapa em vigor vem das aulas como foram publicadas
+    const paidMeta = new Map(paidCatalog.flatMap((l) => l.modules.flatMap((m) => m.lessons)).map((l) => [l.id, l]));
     for (const body of bodies) {
-      const meta = lessonById.get(body.id);
+      const meta = isFreeLesson(body.id) ? lessonById.get(body.id) : paidMeta.get(body.id);
       expect(meta, body.id).toBeDefined();
       expect(toLessonMeta(body), body.id).toEqual(meta);
       expect(body.cards.map((c) => c.id), body.id).toEqual(cardIdsOf(meta!));

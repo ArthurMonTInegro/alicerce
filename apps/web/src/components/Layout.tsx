@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { isDue } from '@alicerce/engine';
+import { isDue, TRANSICAO_ACESSO } from '@alicerce/engine';
 import { Link, useLocation } from '../lib/router.tsx';
 import { useAuth, useProgress } from '../state/store.ts';
 import { openTutor, useTutor } from '../features/tutor/context.ts';
 import { TutorPanel } from '../features/tutor/TutorPanel.tsx';
 import { STATIC_SITE } from '../lib/base.ts';
 import { SaveStatus } from './SaveStatus.tsx';
+import { AvisoCarencia } from './AvisoCarencia.tsx';
 import { AvisoTransicao } from './TransicaoAcesso.tsx';
 
 function Logo() {
@@ -92,7 +93,8 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main id="conteudo" tabIndex={-1}>
-        <AvisoTransicao />
+        {/* níveis 2 a 14 abertos até a venda: o aviso do adiamento; depois do corte, o da mudança */}
+        {TRANSICAO_ACESSO.niveisPagosAbertos ? <AvisoCarencia /> : <AvisoTransicao />}
         <SaveStatus />
         <div key={user?.id ?? 'guest'} inert={!authChecked} aria-busy={authChecked ? undefined : true}>{children}</div>
       </main>

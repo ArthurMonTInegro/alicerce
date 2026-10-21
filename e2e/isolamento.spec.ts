@@ -13,6 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { test as base, expect, type APIRequestContext, type BrowserContext, type Cookie, type Page, type Request } from '@playwright/test';
+import { TRANSICAO_ACESSO } from '../packages/engine/src/transicao.ts';
 
 type Conta = { email: string; id: string; cookies: Cookie[] } | null;
 /**
@@ -869,11 +870,12 @@ async function conteudoPagoNoServidor(request: APIRequestContext) {
   return ((await (await request.get('/api/health')).json()) as { conteudoPago?: string }).conteudoPago === 'disponivel';
 }
 
-test('exercício de JavaScript de uma lição Premium (entregue pelo servidor) é corrigido e roda de verdade', async ({ page, conta, request }) => {
-  // Os exercícios de JavaScript estão nas lições Premium, que só o servidor entrega a quem tem o plano.
-  // O plano é concedido no banco descartável do servidor do e2e (DATABASE_PATH de playwright.config.ts).
+test('exercício de JavaScript de uma lição dos níveis 2 a 14 é corrigido e roda de verdade', async ({ page, conta, request }) => {
+  // Os exercícios de JavaScript estão nos níveis 2 a 14. Enquanto eles estão abertos (docs/TRANSICAO-ACESSO.md),
+  // a lição vem do build público; depois, só o servidor a entrega, a quem tem o plano. O plano é concedido no
+  // banco descartável do servidor do e2e (DATABASE_PATH de playwright.config.ts).
   test.skip(
-    !(await conteudoPagoNoServidor(request)),
+    !TRANSICAO_ACESSO.niveisPagosAbertos && !(await conteudoPagoNoServidor(request)),
     'precisa do repositório privado no servidor do e2e: os níveis 0 e 1 não têm exercício de JavaScript. Rode com ALICERCE_PREMIUM_DIR (ou premium/ na raiz). Sem ele, o teste seguinte confere a recusa.',
   );
   const { email } = await criarConta(page, conta);
@@ -900,6 +902,7 @@ test('exercício de JavaScript de uma lição Premium (entregue pelo servidor) �
 });
 
 test('sem o conteúdo pago no servidor, quem tem Premium ativo vê o aviso de indisponível, e nenhum exercício', async ({ page, conta, request }) => {
+  test.skip(TRANSICAO_ACESSO.niveisPagosAbertos, 'os níveis 2 a 14 estão abertos: a lição vem do build público, sem pedir ao servidor');
   test.skip(await conteudoPagoNoServidor(request), 'o servidor do e2e tem o conteúdo pago: o teste anterior abre a lição de verdade');
   const { email } = await criarConta(page, conta);
   execFileSync(process.execPath, ['--disable-warning=ExperimentalWarning', 'apps/api/scripts/plano.ts', email, 'premium', '1'], {

@@ -3,7 +3,7 @@ import { renderToString } from 'react-dom/server';
 import { App } from './App.tsx';
 import { HeadProvider, type HeadData } from './lib/head.tsx';
 import { RouterProvider } from './lib/router.tsx';
-import { glossary, publicLessons } from '@alicerce/content';
+import { bodiedLessons, glossary } from '@alicerce/content';
 import { cardsResource, glossaryResource, seedLessons } from './content.ts';
 import { seedPages } from './routes.tsx';
 import * as ingles from './pages/Ingles.tsx';
@@ -32,8 +32,8 @@ import * as planos from './pages/Planos.tsx';
 
 // No build, tudo já está em memória: cada página sai completa, sem "Carregando".
 // O pacote público só tem o corpo das lições gratuitas; as pagas saem como prévia.
-seedLessons(publicLessons);
-cardsResource.seed(Object.fromEntries(publicLessons.map((l) => [l.id, l.cards])));
+seedLessons(bodiedLessons);
+cardsResource.seed(Object.fromEntries(bodiedLessons.map((l) => [l.id, l.cards])));
 glossaryResource.seed(glossary);
 seedPages({ tutor, ingles, evolucao, autonomia, home, trilha, nivel, modulo, licao, revisao, diagnostico, laboratorio, projetos, carreira, glossario, visualizacoes, progresso, conta, metodologia, referencias, sobre, privacidade, planos });
 

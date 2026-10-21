@@ -1,5 +1,5 @@
 import type { Lesson } from './types.ts';
-import { publicLessons } from './curriculum.ts';
+import { bodiedLessons } from './curriculum.ts';
 
 export interface TutorDoc {
   id: string;
@@ -19,5 +19,5 @@ export const buildTutorKnowledge = (lessons: Lesson[]): TutorDoc[] =>
       .slice(0, 2400),
   }));
 
-/** Base do tutor das aulas gratuitas. A das aulas pagas é montada só no servidor, a partir do repositório privado. */
-export const tutorKnowledge: TutorDoc[] = buildTutorKnowledge(publicLessons);
+/** Base do tutor das aulas com corpo público (gratuitas e, na transição, as abertas). A das aulas pagas é montada só no servidor, a partir do repositório privado. */
+export const tutorKnowledge: TutorDoc[] = buildTutorKnowledge(bodiedLessons);

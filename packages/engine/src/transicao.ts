@@ -38,17 +38,30 @@ export interface ConfigTransicao {
   readonly anunciadaEm?: string | null;
   /** Liga o aviso único. Sem uma data de corte válida, o aviso continua desligado. */
   readonly avisoLigado: boolean;
+  /**
+   * Níveis 2 a 14 abertos para todos, sem assinatura, como estavam antes da
+   * mudança. Fica ligado enquanto o Premium não estiver à venda e até o corte,
+   * 30 dias depois que a venda abrir. Com ele ligado, o site público leva o corpo
+   * das aulas desses níveis já publicadas (packages/content/src/aberto/), sem o
+   * aprofundamento teórico e a avaliação de autonomia, que são novos e ficam só no
+   * repositório privado. Desligar junto com a data de corte e o aviso.
+   */
+  readonly niveisPagosAbertos: boolean;
 }
 
 export const TRANSICAO_ACESSO: ConfigTransicao = {
   promessaPublicadaEm: '2026-10-07',
   estrategiaRegistradaEm: '2026-10-10',
   estrategiaConfirmadaEm: '2026-10-13',
-  // Carência de 30 dias, decidida pelo Arthur em 20/10/2026: o aviso de que ia mudar
-  // foi publicado em 20/10, e esta versão vai ao ar no corte, 20/11/2026.
+  // Em 20/10/2026 o Arthur decidiu uma carência de 30 dias e o aviso anunciou o
+  // fechamento para 20/11/2026. No mesmo dia, ele adiou o fechamento: como o Premium
+  // ainda não está à venda, ninguém conseguiria assinar. Os níveis 2 a 14 ficam
+  // abertos até 30 dias depois que a venda abrir; a data de corte entra aqui quando
+  // a venda tiver data (veja docs/TRANSICAO-ACESSO.md, "Como fechar").
   anunciadaEm: '2026-10-20',
-  corte: '2026-11-20',
-  avisoLigado: true,
+  corte: null,
+  avisoLigado: false,
+  niveisPagosAbertos: true,
 };
 
 /** Níveis que a promessa antiga dizia gratuitos e que a estratégia nova põe na assinatura. */
@@ -70,9 +83,9 @@ export function instanteDoCorte(corte: string | null | undefined): number | null
   return t;
 }
 
-/** O aviso só aparece com a chave ligada E uma data de corte válida. */
+/** O aviso da mudança só aparece com a chave ligada, uma data de corte válida e os níveis 2 a 14 já fechados. */
 export function avisoDeTransicaoAtivo(cfg: ConfigTransicao): boolean {
-  return cfg.avisoLigado === true && instanteDoCorte(cfg.corte) !== null;
+  return cfg.avisoLigado === true && instanteDoCorte(cfg.corte) !== null && cfg.niveisPagosAbertos !== true;
 }
 
 /* ---------------- índice de níveis ---------------- */

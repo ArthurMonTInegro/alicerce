@@ -32,6 +32,12 @@
  * reprova. --rascunho <arquivo> grava as ocorrências não revisadas no formato da
  * lista, para uma pessoa revisar e justificar.
  *
+ * Enquanto os níveis 2 a 14 estão abertos na transição
+ * (TRANSICAO_ACESSO.niveisPagosAbertos), as aulas deles como foram publicadas
+ * antes da separação (packages/content/src/aberto/) também são públicas. O que
+ * continua protegido é o que só o privado tem: o aprofundamento teórico, a
+ * avaliação de autonomia e as revisões feitas nas aulas depois da separação.
+ *
  * Antes de procurar, o script prova que o detector funciona (controles
  * positivos: um JSON, um HTML escapado, um bundle com escapes \u e um
  * arquivo-fonte do privado têm de ser acusados). Sai com 1 se achar trecho pago
@@ -43,7 +49,7 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from '
 import { join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import * as pub from '../../packages/content/src/index.ts';
-import { paidTerms } from '../../packages/content/src/catalogo-pago.ts';
+import { paidCatalog, paidTerms } from '../../packages/content/src/catalogo-pago.ts';
 import { loadPaidModule, PREMIUM_ENV, REPO_ROOT, resolvePremiumDir } from '../../packages/content/src/privado.ts';
 import type { Exercise, Lesson } from '../../packages/content/src/types.ts';
 
@@ -194,7 +200,11 @@ const allowText = (s: string) => {
 };
 const publicData = {
   mapa: pub.levels,
+  // o mapa dos níveis pagos completos (catalogo-pago.ts) é público mesmo quando o mapa em vigor vem das aulas abertas
+  mapaPago: paidCatalog,
   aulasGratuitas: pub.publicLevels,
+  // vazio com os níveis 2 a 14 fechados
+  aulasAbertasNaTransicao: pub.openLevels,
   glossario: pub.glossary,
   projetos: pub.projects,
   referencias: pub.references,
@@ -210,7 +220,11 @@ const publicData = {
 const str = (x: unknown) => (typeof x === 'string' ? x : '');
 const walkStrings = (v: unknown): void => {
   if (typeof v === 'string') allowText(v);
-  else if (Array.isArray(v)) v.forEach(walkStrings);
+  else if (Array.isArray(v)) {
+    // lista de textos (linhas de um Parsons, lacunas, células de uma linha de tabela): o build as escreve em sequência
+    if (v.length > 1 && v.every((x) => typeof x === 'string')) allowText(v.join(' '));
+    v.forEach(walkStrings);
+  }
   else if (v && typeof v === 'object') {
     const o = v as Record<string, unknown>;
     // Termo bilíngue: o glossário (página pública) e a sintaxe {{pt|en}} mostram os campos em sequência.
@@ -291,13 +305,20 @@ const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).fl
 
 /* ---------- controles positivos: o detector precisa acusar conteúdo pago ---------- */
 
-const probe = paidLessons.find((l) => l.cards.length && l.sections.some((s) => s.blocks.some((b) => b.type === 'exercise')))!;
+// Com os níveis 2 a 14 abertos, o corpo publicado das aulas é público: os controles usam o que só o privado tem.
+const openIds = new Set(pub.openLevels.flatMap((l) => l.modules.flatMap((m) => m.lessons.map((x) => x.id))));
+/** A aula tem algo que só o privado traz: ela não está aberta, ou tem aprofundamento ou autonomia. */
+const onlyPrivate = (l: Lesson) => !openIds.has(l.id) || theoryByLesson.has(l.id) || !!l.autonomy?.length;
+const probe = paidLessons.find((l) => l.cards.length && l.sections.some((s) => s.blocks.some((b) => b.type === 'exercise')) && onlyPrivate(l))!;
+const probeOpen = openIds.has(probe.id);
+const probeBody: unknown = probeOpen ? { aprofundamento: theoryByLesson.get(probe.id), autonomia: probe.autonomy } : probe.sections;
+const probeExtra: unknown = probeOpen ? probe.autonomy ?? theoryByLesson.get(probe.id) : probe.cards;
 const controls: Array<[string, string, string]> = [
   ['JSON de uma aula paga', `${probe.id}.json`, JSON.stringify(probe)],
-  ['HTML com o corpo escapado', 'pagina.html', `<p>${JSON.stringify(probe.sections).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')}</p>`],
-  ['bundle JS com \\u escapes', 'bundle.js', `var x=${JSON.stringify(JSON.stringify(probe.cards)).replace(/[^\x00-\x7f]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'))};`],
+  ['HTML com o corpo escapado', 'pagina.html', `<p>${JSON.stringify(probeBody).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')}</p>`],
+  ['bundle JS com \\u escapes', 'bundle.js', `var x=${JSON.stringify(JSON.stringify(probeExtra)).replace(/[^\x00-\x7f]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'))};`],
 ];
-const sourceFile = walk(join(dir, 'src', 'levels')).find((f) => f.endsWith('.ts'))!;
+const sourceFile = walk(join(dir, 'src', openIds.size && existsSync(join(dir, 'src', 'aprofundamento')) ? 'aprofundamento' : 'levels')).find((f) => f.endsWith('.ts'))!;
 controls.push(['arquivo-fonte do privado', relative(dir, sourceFile), readFileSync(sourceFile, 'utf8')]);
 for (const [label, name, text] of controls) {
   if (!scanText(text, name, 1).length) {
@@ -321,8 +342,10 @@ for (const c of CATS) {
   say(`  ${c.padEnd(22)} ${String(st.texts).padStart(5)} textos  ${String(st.shingles).padStart(7)} sequências  ${String(st.lessons.size).padStart(3)} aulas  (curtos: ${st.short}; comuns ao público: ${st.dropped}; pouco informativas: ${st.weak})`);
 }
 const withSamples = new Set([...samples.values()].map((s) => s.lessonId));
-const missing = paidLessons.filter((l) => !withSamples.has(l.id)).map((l) => l.id);
-say(`  aulas pagas com amostra: ${withSamples.size} de ${paidLessons.length}${missing.length ? ` (sem amostra: ${missing.join(', ')})` : ''}`);
+// Com os níveis abertos, só precisa de amostra a aula que tem algo que só o privado traz.
+const mustHave = paidLessons.filter(onlyPrivate);
+const missing = mustHave.filter((l) => !withSamples.has(l.id)).map((l) => l.id);
+say(`  aulas pagas com amostra: ${withSamples.size} de ${paidLessons.length}${openIds.size ? ` (níveis 2 a 14 abertos na transição: exigida nas ${mustHave.length} que têm algo só do privado)` : ''}${missing.length ? ` (sem amostra: ${missing.join(', ')})` : ''}`);
 
 interface Reviewed {
   onde: string;

@@ -8,7 +8,7 @@
  * pedido antes de pedir qualquer corpo pago daqui. Mesmo assim, `isPaid` decide
  * pelo mapa público E pelo nível em que o corpo foi carregado (o mais restritivo).
  */
-import { canAccessLevel, type PlanId } from '@alicerce/engine';
+import { isFreeLevel, type PlanId } from '@alicerce/engine';
 import { buildTutorKnowledge, isFreeLesson, lessonById, publicLevels, type ExerciseRef, type Flashcard, type Lesson, type TutorDoc } from '@alicerce/content';
 import { assembleCurriculum, describeCurriculum, loadCurriculum, PremiumLoadError, premiumRequired, type Curriculum } from '@alicerce/content/completo';
 
@@ -17,7 +17,11 @@ export interface ContentStore {
   readonly premium: 'disponivel' | 'indisponivel';
   /** uma linha para o log de inicialização */
   readonly description: string;
-  /** Aula paga? (mapa público ou nível do corpo carregado; na dúvida, paga). Lição inexistente também conta como paga. */
+  /**
+   * Aula paga? (mapa público ou nível do corpo carregado; na dúvida, paga). Lição inexistente também conta como paga.
+   * Os níveis 2 a 14 contam como pagos mesmo enquanto estão abertos na transição: o corpo daqui é o do
+   * privado, com o aprofundamento e a avaliação de autonomia. A versão aberta vai no build público.
+   */
   isPaid(lessonId: string): boolean;
   /** Corpo da lição, se carregado. Quem chama já conferiu o acesso. */
   lesson(id: string): Lesson | undefined;
@@ -34,7 +38,7 @@ export function contentStore(c: Curriculum): ContentStore {
   const docs = buildTutorKnowledge(c.lessons);
   const isPaid = (id: string) => {
     const n = levelOfBody.get(id);
-    return !isFreeLesson(id) || (n !== undefined && !canAccessLevel('free', n));
+    return !isFreeLesson(id) || (n !== undefined && !isFreeLevel(n));
   };
   const readable = (plan: PlanId, id: string) => lessonById.has(id) && (plan === 'premium' || !isPaid(id));
   return {

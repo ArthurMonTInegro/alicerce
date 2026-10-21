@@ -1,4 +1,6 @@
 import { countryCurricula, referenceById, universityPrograms, usUniversityRefs, type ResearchSource } from '../content.ts';
+import { TRANSICAO_ACESSO } from '@alicerce/engine';
+import { CARENCIA, ID_O_QUE_VAI_MUDAR } from '../components/AvisoCarencia.tsx';
 import { useHead } from '../lib/head.tsx';
 import { Link } from '../lib/router.tsx';
 
@@ -8,7 +10,11 @@ export function Sobre() {
     <div className="container prose" style={{ maxWidth: '84ch' }}>
       <p className="eyebrow">Sobre · about</p>
       <h1>Uma formação em computação, do zero ao avançado</h1>
-      <p className="lead">A Alicerce funciona no navegador (inclusive no celular, sem instalar nada) e foi desenhada para quem nunca programou construir, passo a passo, uma base sólida em ciência da computação. Os níveis 0 e 1 são gratuitos; do nível 2 ao 14, a continuação faz parte da assinatura Premium, que ainda não está à venda. Detalhes em <Link to="/planos">Planos</Link>.</p>
+      {TRANSICAO_ACESSO.niveisPagosAbertos ? (
+        <p className="lead">A Alicerce funciona no navegador (inclusive no celular, sem instalar nada) e foi desenhada para quem nunca programou construir, passo a passo, uma base sólida em ciência da computação. Os níveis 0 e 1 são gratuitos. Os níveis 2 a 14 também estão abertos por enquanto; eles passam a fazer parte da assinatura Premium {CARENCIA.diasDepoisDaVenda} dias depois que ela começar a ser vendida. Detalhes em <Link to={`/planos#${ID_O_QUE_VAI_MUDAR}`}>Planos</Link>.</p>
+      ) : (
+        <p className="lead">A Alicerce funciona no navegador (inclusive no celular, sem instalar nada) e foi desenhada para quem nunca programou construir, passo a passo, uma base sólida em ciência da computação. Os níveis 0 e 1 são gratuitos; do nível 2 ao 14, a continuação faz parte da assinatura Premium, que ainda não está à venda. Detalhes em <Link to="/planos">Planos</Link>.</p>
+      )}
 
       <h2>O que muda em relação a assistir vídeos</h2>
       <ul>

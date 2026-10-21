@@ -1,6 +1,20 @@
 # Transição de acesso: da trilha inteira gratuita para níveis 0 e 1 gratuitos
 
-Situação em 20/10/2026: **o Arthur escolheu a carência de 30 dias** (opção 2 de [Para o Arthur decidir](#para-o-arthur-decidir)). Em 20/10/2026, a demonstração recebe só o aviso de que o acesso vai mudar e a seção "O que vai mudar" em `/planos`, com todos os níveis ainda abertos (branch `carencia/aviso`, sobre a `main` publicada). Esta versão, com os níveis 2 a 14 fechados, vai ao ar no corte, **20/11/2026**, pelo PR #1. A configuração já está em `TRANSICAO_ACESSO`: `anunciadaEm: '2026-10-20'`, `corte: '2026-11-20'` e `avisoLigado: true`. Nenhuma cobrança foi ativada.
+Situação em 21/10/2026: **o fechamento foi adiado até a venda abrir.** Em 20/10/2026 o Arthur escolheu a carência de 30 dias, e a demonstração passou a avisar que os níveis 2 a 14 fechariam em 20/11/2026 (PR #2). No mesmo dia ele adiou o fechamento ("Adiar até a venda abrir"), porque o Premium ainda não está à venda e ninguém conseguiria assinar. Agora os níveis 2 a 14 fecham **30 dias depois que a venda abrir**, com a data avisada com essa antecedência. O aviso de adiamento está no PR #3 e espera a aprovação do texto. Esta versão (PR #1) pode entrar antes, com os níveis abertos: `TRANSICAO_ACESSO` está com `anunciadaEm: '2026-10-20'`, `corte: null`, `avisoLigado: false` e `niveisPagosAbertos: true`. Nenhuma cobrança foi ativada.
+
+### Níveis 2 a 14 abertos até a venda
+
+- `niveisPagosAbertos: true` faz `canAccessLevel` liberar os níveis 2 a 14 para todos. O site mostra as aulas desses níveis **como foram publicadas na `main` em `cb86308`**, copiadas em `packages/content/src/aberto/` (`aberto.ts` monta os níveis). Nada sai do repositório privado para o público.
+- Continua só no privado o que é novo e pago: o aprofundamento teórico (`src/aprofundamento/`), a avaliação de autonomia (`src/autonomia.ts`) e as revisões das aulas feitas depois da separação (por exemplo, a correção sobre o TCP em `l9-camadas-tcp-udp`). O mapa desses níveis, enquanto abertos, vem das aulas publicadas, sem `theoryTitle`.
+- O servidor continua tratando os níveis 2 a 14 como pagos (`ContentStore.isPaid`): a versão completa, com aprofundamento e autonomia, só sai com sessão válida e Premium ativo. A versão aberta vai no build público.
+- O que confere isso: `scripts/verify-access-build.ts` (as aulas abertas saem sem `theoryTitle`, `autonomy` nem o título "Aprofundamento teórico"); `packages/content/src/sem-conteudo-pago.test.ts` (`aberto/` sem definição de aprofundamento ou autonomia e com os mesmos ids de lições, exercícios, cartões e etapas do mapa, para o progresso continuar valendo); `scripts/premium/verificar-vazamento.ts` com o privado (nenhum trecho que só o privado tem no repositório nem nos builds); `npm run test:solutions` sem o privado confere também as 430 soluções das aulas abertas.
+- O aviso no topo das páginas, enquanto abertos, é o do adiamento (`components/AvisoCarencia.tsx`, chave `alicerce:aviso-carencia:fechado:v2`). O aviso da mudança (`AvisoTransicao`) só aparece com os níveis fechados.
+
+### Como fechar, quando a venda abrir
+
+1. Defina a data de corte: 30 dias depois do primeiro dia de venda. Atualize o aviso de adiamento para mostrar essa data com 30 dias de antecedência e peça ao Arthur para aprovar o texto.
+2. No corte, em `packages/engine/src/transicao.ts`: `corte: 'AAAA-MM-DD'`, `avisoLigado: true` e `niveisPagosAbertos: false`. Apague `packages/content/src/aberto/` e `aberto.ts`, e tire o import de `curriculum.ts`.
+3. Os testes da configuração vão falhar de propósito; atualize-os na mesma mudança. Revise o texto de "O que mudou" (datas do anúncio, do adiamento e da venda) e peça a aprovação do Arthur antes de publicar.
 
 ## O que aconteceu
 
@@ -52,11 +66,9 @@ O nível vem dos metadados (ids de lição, módulo e exercício do catálogo). 
 - Nunca entra no HTML pré-renderizado. Só o navegador decide, depois de carregar a página, e nada é enviado ao servidor.
 - **Não libera nada.** O progresso local só decide se um texto aparece. Acesso a conteúdo pago continua decidido apenas pelo servidor: sessão válida e assinatura ativa no banco, a cada pedido.
 
-### Como ligar, quando o Arthur decidir
+### Como ligar
 
-1. Em `packages/engine/src/transicao.ts`, preencha `corte: 'AAAA-MM-DD'` e mude `avisoLigado` para `true`. A data de corte é o dia (00:00 em Brasília) em que os níveis 2 a 14 deixam de abrir no site público, ou seja, o dia em que a versão nova entra no ar.
-2. O teste "vem desligada e sem data de corte" vai falhar de propósito. Atualize-o na mesma mudança, para que ligar o aviso seja uma decisão registrada.
-3. Publique o aviso junto com a troca de `/planos`, nunca antes.
+Veja [Como fechar, quando a venda abrir](#como-fechar-quando-a-venda-abrir). O aviso da mudança só aparece com `avisoLigado: true`, uma data de corte válida e `niveisPagosAbertos: false`.
 
 ## Quando houver servidor
 

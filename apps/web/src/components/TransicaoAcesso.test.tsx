@@ -3,9 +3,12 @@ import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PLANS, TRANSICAO_ACESSO, type ConfigTransicao } from '@alicerce/engine';
 import { Planos } from '../pages/Planos.tsx';
+import { AvisoCarencia, ID_AVISO_CARENCIA, ID_O_QUE_VAI_MUDAR } from './AvisoCarencia.tsx';
 import { AvisoTransicao, AvisoTransicaoCaixa, ID_AVISO, ID_O_QUE_MUDOU, OQueMudou } from './TransicaoAcesso.tsx';
 
-const LIGADO: ConfigTransicao = { ...TRANSICAO_ACESSO, avisoLigado: true, corte: '2026-10-20' };
+const LIGADO: ConfigTransicao = { ...TRANSICAO_ACESSO, avisoLigado: true, corte: '2026-10-20', niveisPagosAbertos: false };
+/** Exemplo de configuração no corte (a data real só existe quando a venda abrir): níveis 2 a 14 fechados. */
+const NO_CORTE: ConfigTransicao = { ...TRANSICAO_ACESSO, avisoLigado: true, corte: '2026-12-20', niveisPagosAbertos: false };
 
 /** Texto visível de um trecho de HTML, sem as marcações. */
 const texto = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
@@ -62,8 +65,45 @@ function secao(html: string, id: string): string {
   return html.slice(abre, html.indexOf('</section>', inicio) + '</section>'.length);
 }
 
-describe('/planos: seção "O que mudou" (texto obrigatório)', () => {
+describe('/planos enquanto os níveis 2 a 14 estão abertos: seção "O que vai mudar"', () => {
   const html = renderToStaticMarkup(<Planos />);
+  const bloco = secao(html, ID_O_QUE_VAI_MUDAR);
+  const t = texto(bloco);
+
+  it('é a configuração em vigor: sem data de corte, níveis abertos, aviso da mudança desligado', () => {
+    expect(TRANSICAO_ACESSO).toMatchObject({ corte: null, avisoLigado: false, niveisPagosAbertos: true });
+    expect(html).not.toContain(`aria-labelledby="${ID_O_QUE_MUDOU}"`);
+    expect(html.indexOf(ID_O_QUE_VAI_MUDAR)).toBeLessThan(html.indexOf('<h2>Gratuito</h2>'));
+    expect(texto(html)).toContain('Hoje, tudo o que existe na Alicerce está aberto.');
+  });
+
+  it('diz o que a página prometia, que isso vai mudar, quando, e que o fechamento anunciado foi adiado', () => {
+    expect(t).toContain('Esta página prometia a trilha inteira gratuita para sempre, e isso vai mudar.');
+    expect(t).toContain('De 07/10/2026 a 20/10/2026, ela dizia que a trilha completa, do nível 0 ao 14, ficaria gratuita para sempre');
+    expect(t).toContain('todos os níveis continuam abertos');
+    expect(t).toContain('Os níveis 2 a 14 só passam para a assinatura Premium 30 dias depois que ela começar a ser vendida');
+    expect(t).toContain('chegou a anunciar o fechamento dos níveis 2 a 14 para 20/11/2026. No mesmo dia, a data foi adiada');
+    expect(t).toContain('anunciava o tutor com IA no plano gratuito, com até 60 perguntas por dia');
+    expect(t).toContain('Ninguém foi cobrado.');
+    expect(bloco).toContain('href="/progresso#h-data"');
+  });
+
+  it('não tem linguagem de urgência nem chamada para assinar ou pagar, nem fora da seção promete gratuito para sempre', () => {
+    expect(semUrgencia(t)).toEqual([]);
+    expect(chamadasParaPagar(bloco)).toEqual([]);
+    const fora = texto(html.replace(bloco, ''));
+    expect(fora).not.toMatch(/para sempre/i);
+    expect(fora).not.toMatch(/trilha (inteira|completa)[^.]*gratuit/i);
+  });
+
+  it('o aviso do adiamento: curto, sem urgência, sem chamada para pagar e nunca no HTML pré-renderizado', () => {
+    expect(renderToStaticMarkup(<AvisoCarencia />)).toBe('');
+    expect(ID_AVISO_CARENCIA).toBe('aviso-carencia-titulo');
+  });
+});
+
+describe('/planos no corte: seção "O que mudou" (texto obrigatório)', () => {
+  const html = renderToStaticMarkup(<Planos cfg={NO_CORTE} />);
   const bloco = secao(html, ID_O_QUE_MUDOU);
   const t = texto(bloco);
 
@@ -80,8 +120,8 @@ describe('/planos: seção "O que mudou" (texto obrigatório)', () => {
     expect(t).toContain('a frase “A Alicerce é gratuita”, da página Sobre, também foi corrigida');
     // carência decidida em 20/10/2026: a promessa saiu do ar no anúncio, e os níveis ficaram abertos até a véspera do corte
     expect(t).toContain('De 7 de outubro de 2026 até 20 de outubro de 2026, ela dizia');
-    expect(t).toContain('Em 20 de outubro de 2026, a mudança foi anunciada aqui, e os níveis 2 a 14 continuaram abertos até 19 de novembro de 2026.');
-    expect(t).toContain('vale desde 20 de novembro de 2026');
+    expect(t).toContain('Em 20 de outubro de 2026, a mudança foi anunciada aqui, e os níveis 2 a 14 continuaram abertos até 19 de dezembro de 2026.');
+    expect(t).toContain('vale desde 20 de dezembro de 2026');
     expect(t).toContain('confirmada em 13 de outubro de 2026');
     // sem data de corte, o texto não inventa uma
     const semData = texto(renderToStaticMarkup(<OQueMudou cfg={{ ...TRANSICAO_ACESSO, corte: null }} />));

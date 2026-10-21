@@ -11,7 +11,12 @@
  *
  * O corpo das lições pagas só existe no repositório privado; ferramentas e
  * servidor o carregam com loadCurriculum() (completo.ts).
+ *
+ * Exceção da transição: enquanto os níveis 2 a 14 estão abertos, `openLevels`
+ * (aberto.ts) traz o corpo dessas lições como foi publicado antes da separação,
+ * e o mapa desses níveis sai dele (sem o aprofundamento, que é pago).
  */
+import { openLevels } from './aberto.ts';
 import { autonomyByLesson } from './autonomy.ts';
 import { paidCatalog } from './catalogo-pago.ts';
 import { toLevelMeta } from './catalog.ts';
@@ -42,9 +47,18 @@ export const exercisesOf = (lessons: Lesson[]): ExerciseRef[] =>
 export const publicExercises: ExerciseRef[] = exercisesOf(publicLessons);
 export const publicExerciseById = new Map(publicExercises.map((e) => [e.exercise.id, e]));
 
+/* ---------- níveis 2 a 14 abertos na transição ---------- */
+
+export { openLevels };
+export const openLessons: Lesson[] = openLevels.flatMap((l) => l.modules.flatMap((m) => m.lessons));
+export const openExercises: ExerciseRef[] = exercisesOf(openLessons);
+/** Tudo o que tem corpo público agora: as lições gratuitas e, na transição, as abertas. */
+export const bodiedLessons: Lesson[] = [...publicLessons, ...openLessons];
+
 /* ---------- mapa do currículo inteiro (metadados) ---------- */
 
-export const levels: LevelMeta[] = [...publicLevels.map(toLevelMeta), ...paidCatalog].sort((a, b) => a.number - b.number);
+const openNumbers = new Set(openLevels.map((l) => l.number));
+export const levels: LevelMeta[] = [...publicLevels.map(toLevelMeta), ...openLevels.map(toLevelMeta), ...paidCatalog.filter((l) => !openNumbers.has(l.number))].sort((a, b) => a.number - b.number);
 export const modules: ModuleMeta[] = levels.flatMap((l) => l.modules);
 export const lessons: LessonMeta[] = modules.flatMap((m) => m.lessons);
 

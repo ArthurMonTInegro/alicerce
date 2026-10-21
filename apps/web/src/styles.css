@@ -301,6 +301,8 @@ a.card:hover { border-color: var(--accent); transform: translateY(-2px); }
 /* aviso único da transição de acesso (TransicaoAcesso.tsx): informativo, sem cor de alerta */
 .aviso-transicao { margin-top: 1rem; }
 .aviso-transicao > p { margin: 0 0 0.5rem; }
+.aviso-carencia { margin-top: 1rem; }
+.aviso-carencia > p { margin: 0 0 0.5rem; }
 
 /* termo bilíngue: {{pt|en}} */
 .term { border-bottom: 1px dashed var(--accent); cursor: help; background: none; border-top: 0; border-left: 0; border-right: 0; padding: 0; font: inherit; color: inherit; }

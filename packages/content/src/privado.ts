@@ -21,7 +21,7 @@ import { existsSync, realpathSync, statSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { canAccessLevel } from '@alicerce/engine';
+import { isFreeLevel } from '@alicerce/engine';
 import type { TheoryExpansion } from './theory-types.ts';
 import type { AutonomyQuestion, Level } from './types.ts';
 
@@ -105,7 +105,7 @@ export async function loadPaidModule(dir: string): Promise<{ levels: Level[]; fo
   const levels = mod.levels as Level[];
   for (const l of levels) {
     if (!l || typeof l.number !== 'number' || !Array.isArray(l.modules)) throw new PremiumLoadError('Nível malformado no repositório privado.');
-    if (canAccessLevel('free', l.number)) throw new PremiumLoadError(`O nível ${l.number} é gratuito e deve ficar no repositório público.`);
+    if (isFreeLevel(l.number)) throw new PremiumLoadError(`O nível ${l.number} é gratuito e deve ficar no repositório público.`);
   }
   return { levels, fontes: mod.fontes && typeof mod.fontes === 'object' ? (mod.fontes as PaidSources) : {} };
 }

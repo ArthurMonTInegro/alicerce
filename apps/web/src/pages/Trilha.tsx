@@ -1,7 +1,8 @@
 import {useAccessPlan} from '../lib/access.ts';
 import { useMemo, useState } from 'react';
 import { levels, moduleById, modules, type Module } from '../content.ts';
-import { ancestors,canAccessLevel } from '@alicerce/engine';
+import { ancestors,canAccessLevel,TRANSICAO_ACESSO } from '@alicerce/engine';
+import { CARENCIA, ID_O_QUE_VAI_MUDAR } from '../components/AvisoCarencia.tsx';
 import { useHead } from '../lib/head.tsx';
 import { Link, navigate } from '../lib/router.tsx';
 import { withBase } from '../lib/base.ts';
@@ -63,7 +64,7 @@ export function Trilha() {
   return (
     <div className="container">
       <p className="eyebrow">Sua trilha</p>
-      <h1>Mapa da formação</h1><p className="callout"><strong>Comece gratuitamente:</strong> níveis 0 e 1, com 15 lições e 54 exercícios. A partir do nível 2, continue com Premium. <Link to="/planos">Comparar os planos →</Link></p>
+      <h1>Mapa da formação</h1>{TRANSICAO_ACESSO.niveisPagosAbertos?<p className="callout"><strong>Hoje, todos os níveis estão abertos.</strong> Os níveis 0 e 1, com 15 lições e 54 exercícios, continuam gratuitos. Os níveis 2 a 14 passam para o Premium {CARENCIA.diasDepoisDaVenda} dias depois que ele começar a ser vendido. <Link to={`/planos#${ID_O_QUE_VAI_MUDAR}`}>Entenda o que vai mudar →</Link></p>:<p className="callout"><strong>Comece gratuitamente:</strong> níveis 0 e 1, com 15 lições e 54 exercícios. A partir do nível 2, continue com Premium. <Link to="/planos">Comparar os planos →</Link></p>}
       <p className="lead">Cada caixa é um módulo; as linhas ligam um módulo aos seus pré-requisitos. Passe o mouse ou o foco sobre um módulo para ver tudo o que vem antes dele.</p>
 
       <section aria-labelledby="h-next">

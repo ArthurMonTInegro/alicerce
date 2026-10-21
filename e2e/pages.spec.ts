@@ -69,7 +69,7 @@ test('o servidor imita o Pages: sem CSP, com Access-Control-Allow-Origin: *', as
 test('exercício de Python roda e é corrigido', async ({ page }) => {
   test.setTimeout(120_000);
   const erros = vigiarConsole(page);
-  // No build público só as lições gratuitas (níveis 0 e 1) têm o corpo; as outras mostram só a prévia.
+  // Uma lição gratuita (nível 1): tem o corpo no build público, com os níveis 2 a 14 abertos ou não.
   await exercicios(page, 'l1-funcoes');
   const ex = page.locator('section.exercise#e1-fn-2');
   // o código inicial (pass) devolve None: nenhum teste passa
@@ -83,8 +83,8 @@ test('exercício de Python roda e é corrigido', async ({ page }) => {
 });
 
 test('JavaScript roda de verdade no laboratório estático', async ({ page }) => {
-  // O build público não tem exercício de JavaScript (os de JavaScript estão nas lições Premium, que só
-  // o servidor entrega); a correção de um deles está em isolamento.spec.ts, no servidor.
+  // Os exercícios de JavaScript estão nos níveis 2 a 14, que deixam o build público quando fecharem; a
+  // correção de um deles está em isolamento.spec.ts, no servidor.
   const erros = vigiarConsole(page);
   const code = 'const xs = [1, 2, 3].map((x) => x * 10);\nsetTimeout(() => console.log("depois", xs.join(",")), 50);\nconsole.log("antes", xs.reduce((a, b) => a + b, 0));';
   await page.goto(srv.url('laboratorio/#codigo=' + Buffer.from(JSON.stringify({ lang: 'javascript', code })).toString('base64url')));

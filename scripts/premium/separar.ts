@@ -30,7 +30,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { canAccessLevel } from '@alicerce/engine';
+import { isFreeLevel } from '@alicerce/engine';
 import { attachAutonomy, deepenLevels } from '../../packages/content/src/montagem.ts';
 import { loadPaidLevels, REPO_ROOT } from '../../packages/content/src/privado.ts';
 import type { TheoryExpansion } from '../../packages/content/src/theory-types.ts';
@@ -75,7 +75,7 @@ const SRC = join(tmp, CONTENT);
 const load = async <T>(rel: string) => (await import(pathToFileURL(join(SRC, rel)).href)) as T;
 
 const old = await load<{ levels: Level[] }>('curriculum.ts');
-const isFree = (n: number) => canAccessLevel('free', n);
+const isFree = (n: number) => isFreeLevel(n);
 const oldFree = old.levels.filter((l) => isFree(l.number));
 const oldPaid = old.levels.filter((l) => !isFree(l.number));
 const levelOfLesson = new Map(old.levels.flatMap((l) => l.modules.flatMap((m) => m.lessons.map((x) => [x.id, l.number] as const))));
