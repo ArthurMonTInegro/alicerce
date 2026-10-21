@@ -1,0 +1,2 @@
+var e=[`conceito`,`explicacao`,`exemplo`,`codigo`,`exercicio`,`desafio`,`projeto`,`revisao`],t={conceito:{pt:`Conceito`,en:`Concept`},explicacao:{pt:`Explicação`,en:`Explanation`},exemplo:{pt:`Exemplo`,en:`Example`},codigo:{pt:`Código`,en:`Code`},exercicio:{pt:`Exercícios`,en:`Practice`},desafio:{pt:`Desafio`,en:`Challenge`},projeto:{pt:`Projeto`,en:`Project`},revisao:{pt:`Revisão`,en:`Review`}};export{t as n,e as t};
+//# sourceMappingURL=types-qCCr2WFW.js.map
