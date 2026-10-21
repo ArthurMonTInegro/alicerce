@@ -44,7 +44,7 @@ Na ordem em que um destrava o outro. Os três primeiros dependem do Arthur.
 6. **Custo da IA**: medir com o provedor e validar se 20 por dia dentro de 200 por mês e o teto global de 300 por dia cabem no orçamento, antes de oferecer o Premium (UP04).
 7. **Provedor de pagamento**: escolher, contratar e escrever o adaptador; a lista está em [PAGAMENTO.md](PAGAMENTO.md) (UP27).
 8. **Isolamento no Firefox e no Safari** (UP03).
-9. **Pessoas reais**: observações de uso (UP18), entrevistas (UP20) e piloto (UP21). Sem isso, nenhum portão de fase é cumprido.
+9. **Pessoas reais**: observações de uso (UP18), entrevistas (UP20) e piloto (UP21). Sem isso, nenhum portão de fase é cumprido. A primeira rodada, com 8 a 12 pessoas na demonstração pública e sem custo, está pronta em [PILOTO.md](PILOTO.md) desde 21/10/2026; falta recrutar e conduzir.
 
 Só depois desses passos a liberação paga (UP29) pode ser avaliada.
 

@@ -19,3 +19,5 @@ packages/content/src/levels/modulos/_rascunho-*
 __pycache__/
 # clone do repositório privado (conteúdo pago); ver docs/PREMIUM.md
 /premium
+# dados do piloto (progresso exportado e anotações dos participantes); ver docs/PILOTO.md
+piloto-dados/

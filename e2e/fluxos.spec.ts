@@ -1,3 +1,6 @@
+import { spawnSync } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
 /** Falha o teste se a página registrar erro no console (inclui violações de CSP e erros de hidratação). */
@@ -228,6 +231,30 @@ test('aviso da carência: quem fechou o aviso anterior (até 19/11) vê uma vez 
   await page.reload();
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(page.getByRole('region', { name: 'O acesso gratuito vai mudar' })).toHaveCount(0);
+});
+
+test('o arquivo de "Exportar JSON" é lido pela análise do piloto (docs/PILOTO.md)', async ({ page }) => {
+  const errors = watchConsole(page);
+  page.on('dialog', (d) => d.accept());
+  await page.goto('/licao/l0-o-que-e-computador');
+  await page.getByRole('navigation', { name: 'Etapas da lição' }).getByRole('link', { name: /Exercícios/ }).click();
+  const ex = page.locator('section.exercise').first();
+  const hint = ex.getByRole('button', { name: /Dica/ });
+  while (await hint.count()) await hint.click();
+  await ex.getByRole('button', { name: 'Ver solução' }).click();
+  await expect(ex.getByText('Solução', { exact: true })).toBeVisible();
+  await page.goto('/progresso');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exportar JSON' }).click();
+  const pasta = test.info().outputPath('piloto');
+  mkdirSync(pasta, { recursive: true });
+  await (await download).saveAs(join(pasta, 'P01.json'));
+  const r = spawnSync(process.execPath, ['scripts/piloto/analisar.ts', pasta], { encoding: 'utf8' });
+  expect(r.status, r.stderr).toBe(0);
+  expect(r.stdout).toContain('Participantes: 1');
+  expect(r.stdout).toContain('| Abriu a primeira lição | 1 | 100% |');
+  expect(r.stdout).toContain('Fora da tabela: 1 exercício(s) tentados por menos de 3 pessoas');
+  expect(errors).toEqual([]);
 });
 
 test('página inexistente devolve 404 com página amigável', async ({ page }) => {

@@ -1,0 +1,2 @@
+participante,data,licao,exercicio,tipo,descricao,o_que_destravou,gravidade
+exemplo,2026-11-03,l1-loops,3,conceito,"Achou que range(1, 5) incluía o 5: ""mas eu pedi até 5""",dica 2,media
