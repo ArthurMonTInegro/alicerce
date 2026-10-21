@@ -10,7 +10,6 @@
  * único do Layout. Sem contagem regressiva, urgência ou chamada para assinar.
  */
 import { useEffect, useState, type KeyboardEvent } from 'react';
-import { DEFAULT_TUTOR_DAILY_LIMIT } from '@alicerce/engine';
 import { Link, useLocation } from '../lib/router.tsx';
 
 export const CARENCIA = {
@@ -37,7 +36,7 @@ export function OQueVaiMudar() {
         Em {anunciadaEm}, esta página chegou a anunciar o fechamento dos níveis 2 a 14 para {corteAdiado}. {adiadaEm === anunciadaEm ? 'No mesmo dia' : `Em ${adiadaEm}`}, a data foi adiada: como o Premium ainda não está à venda, ninguém conseguiria assinar.
       </p>
       <p>
-        A página também anunciava o tutor com IA no plano gratuito, com até {DEFAULT_TUTOR_DAILY_LIMIT} perguntas por dia, embora ele esteja desligado nesta demonstração. Quando o Premium abrir, o tutor com IA vai ficar só no Premium, com até 20 perguntas por dia dentro de 200 por mês.
+        A página também anunciava o tutor com IA no plano gratuito, com até 60 perguntas por dia, embora ele esteja desligado nesta demonstração. Quando o Premium abrir, o tutor com IA vai ficar só no Premium, com até 20 perguntas por dia dentro de 200 por mês.
       </p>
       <ul>
         <li>
