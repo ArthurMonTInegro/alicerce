@@ -114,8 +114,9 @@ export function yearlyDeal(price: PlanPrice) {
 
 /**
  * Gratuitos em todos os planos, decisão do Arthur em 07/10/2026. A promessa pública
- * de "gratuito para sempre" foi retirada de /planos em 20/10/2026, com carência até
- * 19/11/2026 (veja apps/web/src/components/AvisoCarencia.tsx). Nenhum plano pode
+ * de "gratuito para sempre" foi retirada de /planos em 20/10/2026; os níveis 2 a 14
+ * continuam abertos até 30 dias depois que o Premium começar a ser vendido (veja
+ * apps/web/src/components/AvisoCarencia.tsx). Nenhum plano pode
  * deixar de ter estes recursos enquanto este arquivo valer (um teste cobra isso).
  * O tutor com IA e a sincronização têm custo por pessoa e ficaram de fora.
  */
