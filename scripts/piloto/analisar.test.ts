@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { emptyProgress, type AttemptRecord, type ProgressState } from '@alicerce/engine';
-import { analisar, licoesDaJornada, lerParticipantes, lerRegistro, primeiroEncontro, relatorio, type LicaoDaJornada } from './analisar.ts';
+import { analisar, dentroDoRepositorio, licoesDaJornada, lerConversas, lerParticipantes, lerRegistro, primeiroEncontro, relatorio, ultimaAntes, type LicaoDaJornada } from './analisar.ts';
 
 const T0 = Date.UTC(2026, 10, 2, 15); // 02/11/2026, 12h em Fortaleza
 const DIA = 86_400_000;
@@ -60,6 +60,24 @@ describe('primeiro encontro com um exercício', () => {
     expect(primeiroEncontro([tentativa('x', 1, { wrongTries: 1 }), tentativa('x', 2, { wrongTries: 2 })])).toEqual({ desfecho: 'parou', erros: 2, dicas: 0 });
     // a revisão de semanas depois, acertada de primeira, não apaga o tropeço inicial
     expect(primeiroEncontro([tentativa('x', 30 * DIA, { correct: true, score: 1 }), tentativa('x', 1, { revealed: true })]).desfecho).toBe('resposta');
+  });
+
+  it('o tempo de um exercício não inclui os anteriores da mesma etapa', () => {
+    // a etapa abriu em T0 com dois exercícios: o 1º terminou em 3 min; o 2º, 5 min depois
+    const todas = [
+      tentativa('e1', T0 + 3 * 60_000, { correct: true, score: 1, durationMs: 3 * 60_000 }),
+      tentativa('e2', T0 + 6 * 60_000, { wrongTries: 1, durationMs: 6 * 60_000 }),
+      tentativa('e2', T0 + 8 * 60_000, { correct: true, score: 1, wrongTries: 1, durationMs: 8 * 60_000 }),
+    ];
+    expect(ultimaAntes(todas, 'e1')).toBeUndefined();
+    expect(ultimaAntes(todas, 'e2')).toBe(T0 + 3 * 60_000);
+    expect(primeiroEncontro(todas.slice(0, 1), ultimaAntes(todas, 'e1')).ms).toBe(3 * 60_000);
+    expect(primeiroEncontro(todas.slice(1), ultimaAntes(todas, 'e2')).ms).toBe(5 * 60_000);
+    // sem nada antes, ou com algo de antes de a etapa abrir, vale o tempo do site
+    expect(primeiroEncontro(todas.slice(1)).ms).toBe(8 * 60_000);
+    expect(primeiroEncontro(todas.slice(1), T0 - DIA).ms).toBe(8 * 60_000);
+    const a = analisar([{ codigo: 'P01', progresso: progresso({ attempts: todas.map((t) => ({ ...t, exerciseId: t.exerciseId.replace('e', 'l0-a-') })) }) }], [], JORNADA);
+    expect(a.exercicios.map((e) => e.medianaMin)).toEqual([3, 5, null, null]);
   });
 });
 
@@ -138,14 +156,38 @@ describe('análise', () => {
       chave: 'l0-a-2',
       pessoas: 3,
       tipos: { conceito: 2, enunciado: 1 },
+      conceito: 2,
       altas: 2,
     });
-    // só 3 pessoas tentaram: pelos números ainda não entra (mínimo de 5); pelo registro, sim
-    expect(a.candidatos).toEqual([
-      {
-        chave: 'l0-a-2',
-        motivo: '3 pessoas no registro (2 de conceito); 2 registros de gravidade alta (a pessoa parou ali)',
-      },
+    // só 3 pessoas tentaram: pelos números ainda não entra (mínimo de 5); pelo registro, sim,
+    // porque duas pessoas pararam ali. Conceito: só 2 pessoas, abaixo das 3 da regra.
+    expect(a.candidatos).toEqual([{ chave: 'l0-a-2', motivo: '2 pessoas pararam ali (gravidade alta)' }]);
+    expect(a.avisos).toEqual([]);
+  });
+
+  it('a regra conta pessoas: 3 no registro com 1 de conceito não basta, e a mesma pessoa duas vezes conta uma', () => {
+    const cab = 'participante,data,licao,exercicio,tipo,descricao,o_que_destravou,gravidade\n';
+    const um = lerRegistro(cab + 'P01,,l1-b,1,conceito,,,media\nP02,,l1-b,1,interface,,,media\nP03,,l1-b,1,enunciado,,,media\nP01,,l0-a,1,conceito,,,alta\nP01,,l0-a,1,conceito,,,alta\n');
+    expect(analisar(participantes, um, JORNADA).candidatos).toEqual([]);
+    const tres = lerRegistro(cab + 'P01,,l1-b,1,conceito,,,media\nP02,,l1-b,1,conceito,,,baixa\np03,,l1-b,1º,Conceito,,,média\n');
+    expect(analisar(participantes, tres, JORNADA).candidatos).toEqual([{ chave: 'l1-b-1', motivo: '3 pessoas com dificuldade de conceito' }]);
+  });
+
+  it('avisa do que no registro não bate com a jornada ou com os participantes', () => {
+    const r = lerRegistro(
+      'participante,data,licao,exercicio,tipo,descricao,o_que_destravou,gravidade\n' +
+        'P01,,l1-loop,2,conceito,,,media\n' +
+        'P02,,l0-a,7,conceito,,,media\n' +
+        'P09,,l0-a,1,confusao,,,grave\n' +
+        'P01,,,3,conceito,,,baixa\n',
+    );
+    expect(analisar(participantes, r, JORNADA).avisos).toEqual([
+      'registro, linha 2: a lição "l1-loop" não é da jornada do piloto (confira o id no endereço da página).',
+      'registro, linha 3: a lição l0-a tem 2 exercícios; não há o 7º.',
+      'registro, linha 4: tipo "confusao" fora da lista (conceito, enunciado, interface, ambiente, outro).',
+      'registro, linha 4: gravidade "grave" fora da lista (baixa, media, alta).',
+      'registro, linha 4: P09 não tem arquivo de progresso.',
+      'registro, linha 5: exercício sem lição; sem a lição, a posição não diz qual exercício é.',
     ]);
   });
 
@@ -153,7 +195,8 @@ describe('análise', () => {
     const md = relatorio(a);
     expect(md).toContain('**Amostra pequena (3).**');
     expect(md).toContain('| l0-a-2 | l0-a | 3 | 0 | 0 | 0 | 2 | 1 |');
-    expect(md).toContain('- l0-a-2: 3 pessoas no registro');
+    expect(md).toContain('- l0-a-2: 2 pessoas pararam ali');
+    expect(md).toContain('Sem anotações das conversas');
   });
 
   it('o modelo em docs/piloto tem as colunas que a análise lê, e a linha de exemplo não conta', () => {
@@ -231,7 +274,96 @@ describe('pasta de exportações', () => {
     expect(r.stdout).toContain('Participantes: 1');
     expect(r.stdout).toContain('| Concluiu o nível 0 | 0 | 0% |');
     expect(readFileSync(join(saida, 'exercicios.csv'), 'utf8').split('\n')[0]).toBe(
-      'exercicio,licao,tentaram,primeira,sozinho,pista,resposta,parou,erros_mediana,minutos_mediana',
+      'exercicio,licao,tentaram,primeira,sozinho,pista,resposta,parou,erros_mediana,minutos_aproximados_mediana',
     );
+  });
+});
+
+describe('reinício do progresso entre dois arquivos', () => {
+  const pasta = mkdtempSync(join(tmpdir(), 'alicerce-piloto-reinicio-'));
+  afterAll(() => rmSync(pasta, { recursive: true, force: true }));
+  // semana 1 no navegador; depois a pessoa clicou em Reiniciar e recomeçou
+  writeFileSync(join(pasta, 'p04-semana1.json'), JSON.stringify(progresso({ attempts: [tentativa('l0-o-que-e-computador-ex1', T0, { id: 'a1', revealed: true })] })));
+  writeFileSync(
+    join(pasta, 'P04-semana2.json'),
+    JSON.stringify(progresso({ resetAt: T0 + DIA, attempts: [tentativa('l0-o-que-e-computador-ex1', T0 + 2 * DIA, { id: 'a2', correct: true, score: 1 })] })),
+  );
+
+  it('junta os dois (o site guardaria só o de depois) e avisa; o código vale em minúsculas também', () => {
+    const { participantes, avisos } = lerParticipantes(pasta);
+    expect(participantes.map((p) => p.codigo)).toEqual(['P04']);
+    expect(participantes[0]!.progresso.attempts.map((a) => a.id)).toEqual(['a1', 'a2']);
+    expect(primeiroEncontro(participantes[0]!.progresso.attempts).desfecho).toBe('resposta');
+    expect(avisos).toEqual(['P04: os arquivos são de antes e de depois de um reinício do progresso; a análise junta os dois.']);
+  });
+});
+
+describe('conversas: tarefas de transferência e intenção declarada', () => {
+  const p = (concluiu: boolean) =>
+    progresso({ lessons: Object.fromEntries(JORNADA.filter((l) => l.trecho === 'gratuita').map((l) => [l.id, concluiu ? { visited: ['x'], completedAt: T0 } : { visited: ['x'] }])) });
+  const participantes = [
+    { codigo: 'P01', progresso: p(true) },
+    { codigo: 'P02', progresso: p(false) },
+    { codigo: 'P03', progresso: p(true) },
+  ];
+  const conversas = lerConversas(
+    'participante,aparelho,ja_programou,horas_semana_declaradas,transferencia_1,transferencia_1_min,transferencia_2,transferencia_2_min,pagaria_declarado,observacao\n' +
+      'exemplo,celular,nunca,3,sozinha,12,,,talvez,linha de exemplo\n' +
+      'P01,Celular,nunca,"2,5",sozinha,14,com perguntas,20,sim,\n' +
+      'P02,computador,tentei e parei,4,não resolveu,25,não fez,,Não,"achou caro, prefere vídeo"\n' +
+      'P03,celular,um pouco,6,com perguntas,18,sozinha,11,talvez,\n',
+  );
+
+  it('lê as anotações sem acento nem maiúscula fazendo diferença', () => {
+    expect(conversas).toHaveLength(3);
+    expect(conversas[0]).toMatchObject({ participante: 'P01', aparelho: 'celular', horasDeclaradas: 2.5, pagariaDeclarado: 'sim' });
+    expect(conversas[1]!.transferencias).toEqual([
+      { resultado: 'nao resolveu', min: 25 },
+      { resultado: 'nao fez', min: null },
+    ]);
+  });
+
+  it('o relatório separa intenção declarada de compra e conta a trilha por aparelho', () => {
+    const a = analisar(participantes, [], JORNADA, conversas);
+    expect(a.avisos).toEqual([]);
+    expect(a.conversas!.transferencias[0]).toEqual({ tarefa: 1, resultados: { sozinha: 1, 'com perguntas': 1, 'nao resolveu': 1, 'nao fez': 0 }, medianaMin: 18 });
+    expect(a.conversas!.nivel1PorAparelho).toEqual([
+      { aparelho: 'celular', pessoas: 2, concluiram: 2 },
+      { aparelho: 'computador', pessoas: 1, concluiram: 0 },
+    ]);
+    const md = relatorio(a);
+    expect(md).toContain('| 1 | 1 | 1 | 1 | 0 | 18 |');
+    expect(md).toContain('não é compra):** sim: 1, talvez: 1, nao: 1, nao perguntado: 0.');
+    expect(md).toContain('**Compras: nenhuma.**');
+    expect(md).toContain('mediana 4 (declarado, não medido)');
+  });
+
+  it('avisa de resposta fora da lista e de quem não tem arquivo', () => {
+    const c = lerConversas(
+      'participante,aparelho,ja_programou,horas_semana_declaradas,transferencia_1,transferencia_1_min,transferencia_2,transferencia_2_min,pagaria_declarado\n' +
+        'P07,celular,nunca,3,quase,,,,depende\n',
+    );
+    expect(analisar(participantes, [], JORNADA, c).avisos).toEqual([
+      'conversas: P07 não tem arquivo de progresso.',
+      'conversas: P07 com pagaria_declarado "depende" fora da lista (sim, talvez, nao, nao perguntado).',
+      'conversas: P07 com transferencia_1 "quase" fora da lista (sozinha, com perguntas, nao resolveu, nao fez).',
+    ]);
+  });
+
+  it('o modelo em docs/piloto tem as colunas, e a linha de exemplo não conta', () => {
+    expect(lerConversas(readFileSync(new URL('../../docs/piloto/conversas.csv', import.meta.url), 'utf8'))).toEqual([]);
+  });
+});
+
+describe('dados do piloto dentro do repositório', () => {
+  const raiz = fileURLToPath(new URL('../..', import.meta.url));
+  it('avisa fora de piloto-dados/, que é a única pasta que o .gitignore cobre', () => {
+    expect(dentroDoRepositorio(join(raiz, 'docs', 'piloto'))).toBe(true);
+    expect(dentroDoRepositorio(raiz)).toBe(true);
+    expect(dentroDoRepositorio(join(raiz, 'piloto-dados'))).toBe(false);
+    expect(dentroDoRepositorio(join(raiz, 'piloto-dados', 'rodada1'))).toBe(false);
+    expect(dentroDoRepositorio(join(raiz, 'piloto-dados-velho'))).toBe(true);
+    expect(dentroDoRepositorio(tmpdir())).toBe(false);
+    expect(readFileSync(join(raiz, '.gitignore'), 'utf8')).toMatch(/^\/?piloto-dados\/?$/m);
   });
 });

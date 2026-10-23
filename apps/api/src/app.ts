@@ -8,16 +8,22 @@ import { join, normalize, sep } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
+import type Anthropic from '@anthropic-ai/sdk';
 import { exerciseById, lessonById } from '@alicerce/content';
-import { emptyProgress, mergeProgress, sanitizeProgress } from '@alicerce/engine';
+import { emptyProgress, mergeProgress, PREMIUM_FOR_SALE, sanitizeProgress } from '@alicerce/engine';
 import {
   applyPaymentEvent,
   canWithdraw,
   createSubscription,
   currentSubscription,
   getSubscription,
+  openAttempts,
   PERIODS,
   periodPrice,
+  ProviderUnavailable,
+  recordProviderRef,
+  recordWithdrawalRequest,
+  renewingSubscriptions,
   subscriptionView,
   TEST_RESULTS,
   TestPaymentProvider,
@@ -46,6 +52,9 @@ import {
 } from './auth.ts';
 import { FileMailer, type Mailer } from './email.ts';
 import type { Config } from './config.ts';
+import { drainOutbox, type DrainReport } from './avisos.ts';
+import { AsaasPaymentProvider, asaasRefs } from './asaas.ts';
+import { reconcile, reconcileOne, type ReconcileReport } from './conciliacao.ts';
 import { getEntitlements } from './plans.ts';
 import { RateLimiter, securityHeaders } from './security.ts';
 import { publicContent, type ContentStore } from './conteudo.ts';
@@ -61,12 +70,22 @@ export interface AppDeps {
   logger?: boolean;
   /** injetável nos testes; padrão: FileMailer em config.emailLogPath, ou nenhum */
   mailer?: Mailer | null;
+  /** fetch usado pelo adaptador do Asaas; os testes passam a simulação local da API */
+  paymentFetch?: typeof fetch;
+  /** cliente da API da Anthropic do tutor com IA; os testes e a avaliação local passam um falso, que não sai para a rede */
+  anthropicClient?: Anthropic;
 }
 
 declare module 'fastify' {
   interface FastifyRequest {
     /** corpo JSON como chegou (a assinatura do webhook é conferida sobre ele) */
     rawBody?: string;
+  }
+  interface FastifyInstance {
+    /** o provedor de pagamento em uso (null = Premium sem venda); os testes o manipulam */
+    pagamentos: PaymentProvider | null;
+    /** rotinas que o servidor roda de tempos em tempos (main.ts) */
+    rotinas: { conciliar(): Promise<ReconcileReport | null>; enviarEmails(): Promise<DrainReport> };
   }
 }
 
@@ -93,8 +112,13 @@ export const PROGRESS_BODY_LIMIT = 4 * 1024 * 1024;
  */
 export const PROGRESS_SYNCS_PER_MINUTE = 60;
 
-export async function buildApp({ config, db, tutor, content = publicContent, logger = false, mailer = config.emailLogPath ? new FileMailer(config.emailLogPath) : null }: AppDeps) {
+export async function buildApp({ config, db, tutor, content = publicContent, logger = false, mailer = config.emailLogPath ? new FileMailer(config.emailLogPath) : null, paymentFetch, anthropicClient }: AppDeps) {
   if (config.production && config.paymentProvider === 'teste') throw new Error('O provedor de pagamento de teste (PAGAMENTO_PROVEDOR=teste) não pode rodar com NODE_ENV=production.');
+  if (config.paymentProvider === 'asaas') {
+    if (!config.asaas?.apiKey || !config.asaas.webhookToken) throw new Error('PAGAMENTO_PROVEDOR=asaas precisa de ASAAS_API_KEY e ASAAS_WEBHOOK_TOKEN no ambiente.');
+    // Cobrança real só depois da decisão de vender, que liga PREMIUM_FOR_SALE no código (e exige as datas da transição).
+    if (config.asaas.environment === 'producao' && !PREMIUM_FOR_SALE) throw new Error('Cobrança real bloqueada: ASAAS_AMBIENTE=producao só sobe com PREMIUM_FOR_SALE ligado em packages/engine/src/plans.ts.');
+  }
   const app = Fastify({
     logger: logger ? { level: 'info', redact: ['req.headers.cookie', 'req.headers.authorization'] } : false,
     bodyLimit: BODY_LIMIT,
@@ -119,7 +143,10 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
       .prepare('INSERT INTO tutor_ai_daily (day, calls, failures, input_tokens, output_tokens) VALUES (?, ?, ?, ?, ?) ON CONFLICT(day) DO UPDATE SET calls = calls + excluded.calls, failures = failures + excluded.failures, input_tokens = input_tokens + excluded.input_tokens, output_tokens = output_tokens + excluded.output_tokens')
       .run(today(), calls, failures, input, output);
   const ai: TutorProvider | null =
-    tutor ?? (config.anthropicApiKey ? new ClaudeTutor(config.anthropicApiKey, config.tutorModel, undefined, (u) => aiDaily(0, 0, u.input, u.output)) : null);
+    tutor ??
+    (config.anthropicApiKey
+      ? new ClaudeTutor(config.anthropicApiKey, config.tutorModel, anthropicClient, (u) => aiDaily(0, 0, u.input, u.output), config.tutorEffort)
+      : null);
 
   const limits = {
     global: new RateLimiter(600, 60_000),
@@ -127,7 +154,7 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     tutor: new RateLimiter(12, 60_000),
     progress: new RateLimiter(PROGRESS_SYNCS_PER_MINUTE, 60_000),
   };
-  // Provedor de pagamento (só o de teste existe). Os webhooks dele passam pela mesma rota
+  // Provedor de pagamento: o simulado ou o Asaas. Os webhooks do simulado passam pela mesma rota
   // de um provedor real (app.inject), com a assinatura conferida do mesmo jeito.
   const payments: PaymentProvider | null =
     config.paymentProvider === 'teste'
@@ -135,7 +162,30 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
           const r = await app.inject({ method: 'POST', url: WEBHOOK_ROUTE, headers, payload });
           if (r.statusCode !== 200) throw new Error(`webhook de teste recusado (${r.statusCode})`);
         })
-      : null;
+      : config.paymentProvider === 'asaas'
+        ? new AsaasPaymentProvider({ ...config.asaas!, appUrl: config.appUrl }, asaasRefs(db), paymentFetch)
+        : null;
+  /** Depois de cancelar ou estornar: aplica já o que o provedor confirmou, sem esperar o webhook. */
+  const settle = async (id: string, log: FastifyRequest['log']) => {
+    if (!payments) return;
+    try {
+      await reconcileOne(db, payments, id);
+    } catch (e) {
+      log.warn({ err: e, assinatura: id }, 'não consegui conferir agora; o webhook do provedor atualiza depois');
+    }
+  };
+  /** Para no provedor a renovação de todas as assinaturas da conta que ainda renovam; false se alguma não parou. */
+  const stopRenewals = async (userId: string) => {
+    for (const sub of renewingSubscriptions(db, userId)) {
+      try {
+        if (payments?.name !== sub.provider) throw new Error('provedor indisponível');
+        await payments.cancel(sub.id);
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  };
   const tooMany = (reply: FastifyReply, retry: number) => reply.code(429).header('retry-after', String(retry)).send({ error: 'Muitas requisições. Tente de novo em instantes.' });
 
   /* ---------- ganchos globais ---------- */
@@ -245,17 +295,8 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     // Mesmo cálculo e comparação em tempo constante do login.
     const ok = await verifyPassword(password, row?.password_hash ?? (await getDummyHash()));
     if (!row || !ok) return reply.code(403).send({ error: 'Senha incorreta. A conta não foi excluída.' });
-    // Assinatura que ainda renova: para a renovação no provedor antes de apagar a conta.
-    const sub = currentSubscription(db, u.id);
-    if (sub?.status === 'ativa') {
-      const provider = payments?.name === sub.provider ? payments : null;
-      try {
-        if (!provider) throw new Error('provedor indisponível');
-        await provider.cancel(sub.id);
-      } catch {
-        return reply.code(502).send({ error: 'Não consegui cancelar a renovação da assinatura agora, então a conta não foi excluída. Tente de novo em instantes.' });
-      }
-    }
+    // Assinatura que ainda renova (todas, não só a mais recente): para a renovação no provedor antes de apagar a conta.
+    if (!(await stopRenewals(u.id))) return reply.code(502).send({ error: 'Não consegui cancelar a renovação da assinatura agora, então a conta não foi excluída. Tente de novo em instantes.' });
     db.prepare('DELETE FROM users WHERE id = ?').run(u.id); // ON DELETE CASCADE apaga sessões, progresso, uso e assinaturas
     return reply.header('set-cookie', clearCookie(config.secureCookies)).code(204).send();
   });
@@ -399,7 +440,8 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     if (!u) return reply;
     reply.headers(PRIVATE);
     return {
-      venda: payments ? { provedor: payments.name, teste: payments.name === 'teste', precos: { mensal: periodPrice('mensal'), anual: periodPrice('anual') } } : null,
+      // teste: o provedor simulado, ou o sandbox do Asaas; nos dois, nada é cobrado
+      venda: payments ? { provedor: payments.name, teste: payments.name === 'teste' || config.asaas?.environment === 'sandbox', precos: { mensal: periodPrice('mensal'), anual: periodPrice('anual') } } : null,
       assinatura: subscriptionView(currentSubscription(db, u.id)),
       plano: ent(u.id),
     };
@@ -413,11 +455,31 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     if (!payments) return salesOff(reply);
     const period = (req.body as { periodo?: unknown } | null)?.periodo as Period;
     if (!PERIODS.includes(period)) return reply.code(400).send({ error: 'Escolha mensal ou anual.' });
+    // Uma tentativa anterior pode ter sido paga sem o webhook ter chegado: confere antes de abrir outra.
+    for (const old of openAttempts(db, u.id)) await settle(old.id, req.log);
     const cur = currentSubscription(db, u.id);
     if (cur && (cur.status === 'ativa' || cur.status === 'cancelada') && (cur.paid_until ?? 0) > Date.now()) return reply.code(409).send({ error: 'Você já tem uma assinatura em vigor.' });
+    // Uma assinatura vencida que o provedor ainda tenta renovar seria cobrada junto com a nova: para a renovação dela antes.
+    if (!(await stopRenewals(u.id))) return reply.code(502).send({ error: 'Não consegui encerrar a renovação da assinatura anterior agora. Tente de novo em instantes.' });
+    // A página da tentativa anterior fecha no provedor, para não ser paga junto com a nova.
+    for (const old of openAttempts(db, u.id)) {
+      try {
+        await payments.abandon?.(old.id);
+      } catch (e) {
+        req.log.warn({ err: e, assinatura: old.id }, 'não consegui fechar a página de pagamento anterior');
+      }
+    }
     const sub = createSubscription(db, u.id, payments.name, period);
-    const { url } = await payments.checkout({ id: sub.id, email: u.email, period, price: sub.price });
-    return { url };
+    let checkout;
+    try {
+      checkout = await payments.checkout({ id: sub.id, email: u.email, period, price: sub.price });
+    } catch (e) {
+      // a assinatura fica pendente, sem dar acesso; a pessoa tenta de novo
+      req.log.error({ err: e, assinatura: sub.id }, 'falha ao abrir o pagamento no provedor');
+      return reply.code(502).send({ error: 'Não consegui abrir a página de pagamento agora. Nada foi cobrado. Tente de novo em instantes.' });
+    }
+    if (checkout.ref) recordProviderRef(db, sub.id, checkout.ref);
+    return { url: checkout.url };
   });
 
   app.post('/api/assinatura/cancelar', async (req, reply) => {
@@ -426,7 +488,14 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     if (!payments) return salesOff(reply);
     const sub = currentSubscription(db, u.id);
     if (sub?.status !== 'ativa' || sub.provider !== payments.name) return reply.code(409).send({ error: 'Não há assinatura renovando para cancelar.' });
-    await payments.cancel(sub.id);
+    // Nada muda aqui até o provedor confirmar pelo webhook; se ele não responder, a pessoa tenta de novo.
+    try {
+      await payments.cancel(sub.id);
+    } catch (e) {
+      req.log.error({ err: e, assinatura: sub.id }, 'falha ao cancelar no provedor');
+      return reply.code(502).send({ error: 'Não consegui falar com o provedor de pagamento agora, então a renovação continua ligada. Tente de novo em instantes.' });
+    }
+    await settle(sub.id, req.log);
     return { assinatura: subscriptionView(getSubscription(db, sub.id)), plano: ent(u.id) };
   });
 
@@ -437,18 +506,44 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     if (!payments) return salesOff(reply);
     const sub = currentSubscription(db, u.id);
     if (!sub || sub.provider !== payments.name || !canWithdraw(sub)) return reply.code(409).send({ error: 'O prazo de 7 dias para desistir com estorno já passou, ou não há pagamento para estornar.' });
-    await payments.refund(sub.id);
+    // O pedido fica registrado antes: se o provedor só responder depois dos 7 dias, o direito continua.
+    // O estorno no provedor é idempotente: tentar de novo depois de uma falha não estorna duas vezes.
+    recordWithdrawalRequest(db, sub.id);
+    try {
+      await payments.refund(sub.id);
+    } catch (e) {
+      req.log.error({ err: e, assinatura: sub.id }, 'falha ao pedir o estorno no provedor');
+      return reply.code(502).send({ error: 'Não consegui falar com o provedor de pagamento agora, então o estorno ainda não foi pedido. Seu pedido de desistência ficou registrado dentro do prazo: tente de novo em instantes, mesmo que os 7 dias acabem antes.' });
+    }
+    await settle(sub.id, req.log);
     return { assinatura: subscriptionView(getSubscription(db, sub.id)), plano: ent(u.id) };
   });
 
   app.post(WEBHOOK_ROUTE, async (req, reply) => {
     if (!payments) return reply.code(404).send({ error: 'Rota não encontrada.' });
-    let result;
+    let ev;
     try {
-      result = applyPaymentEvent(db, payments.name, payments.parseWebhook(req.rawBody ?? '', req.headers, Date.now()));
-    } catch {
+      ev = await payments.parseWebhook(req.rawBody ?? '', req.headers, Date.now());
+    } catch (e) {
+      // sem conseguir conferir na API do provedor agora: 503, e ele entrega de novo
+      if (e instanceof ProviderUnavailable) {
+        req.log.warn({ err: e }, 'webhook não conferido: provedor indisponível');
+        return reply.code(503).send({ error: 'Não consegui conferir o evento agora.' });
+      }
       return reply.code(400).send({ error: 'Webhook inválido.' });
     }
+    if (!ev) return { ok: true, result: 'ignorado' };
+    // Falha ao gravar: nada fica (applyPaymentEvent desfaz a transação inteira) e a resposta é 500,
+    // para o provedor entregar o mesmo evento de novo.
+    let result;
+    try {
+      result = applyPaymentEvent(db, payments.name, ev);
+    } catch (e) {
+      req.log.error({ err: e, evento: ev.id }, 'falha ao aplicar evento de pagamento');
+      return reply.code(500).send({ error: 'Não consegui registrar o evento agora.' });
+    }
+    // E-mails que o evento pôs na fila: saem logo, sem segurar a resposta ao provedor.
+    if (result === 'aplicado') setImmediate(() => void sendEmails().catch((e) => app.log.error({ err: e }, 'falha ao enviar os e-mails da fila')));
     return { ok: true, result };
   });
 
@@ -509,12 +604,17 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
           // também conta (docs/ESTRATEGIA_ASSINATURA.md): o provedor pode ter cobrado.
           db.prepare('INSERT INTO tutor_usage (user_id, day, count) VALUES (?, ?, 1) ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1').run(u.id, day);
           aiDaily(1, 0, 0, 0);
+          // Latência de cada chamada no log (sem o conteúdo da conversa), para medir p50 e p95 no uso real.
+          const started = performance.now();
+          const ms = () => Math.round(performance.now() - started);
           try {
-            return { reply: await ai.answer(parsed, sources), mode: 'ia' };
-          } catch (err) {
+            const text = await ai.answer(parsed, sources);
+            req.log.info({ tutorIa: { ms: ms(), ok: true } }, 'tutor IA respondeu');
+            return { reply: text, mode: 'ia' };
+          } catch {
             reason='provider_unavailable';
             aiDaily(0, 1, 0, 0);
-            req.log.warn('tutor IA indisponível; usando apoio local');
+            req.log.warn({ tutorIa: { ms: ms(), ok: false } }, 'tutor IA indisponível; usando apoio local');
           }
         }
       }
@@ -550,5 +650,16 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     });
   }
 
+  let sending: Promise<DrainReport> | null = null;
+  // Uma rodada por vez neste processo; entre processos, a reserva de cada aviso (avisos.ts) evita envio duplo.
+  const sendEmails = () =>
+    (sending ??= drainOutbox(db, mailer, { appUrl: config.appUrl, seller: config.sellerIdentification }).finally(() => {
+      sending = null;
+    }));
+  app.decorate('pagamentos', payments);
+  app.decorate('rotinas', {
+    conciliar: async () => (payments ? reconcile(db, payments) : null),
+    enviarEmails: sendEmails,
+  });
   return app;
 }

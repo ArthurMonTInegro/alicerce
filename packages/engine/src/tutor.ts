@@ -13,7 +13,8 @@ export interface TutorInput {
   lessonTitle?: string | undefined;
 }
 
-const WANTS_ANSWER = /(resposta|solu[cç][aã]o|resolve|resolva|c[oó]digo pronto|faz pra mim|fa[cç]a por mim|me d[aá] o c[oó]digo|answer|solution)/i;
+/** Pedido da solução pronta (também decide, no apoio local, quando um exercício aberto vira recusa com a próxima pista). */
+export const WANTS_ANSWER = /(resposta|solu[cç][aã]o|resolve|resolva|c[oó]digo pronto|faz pra mim|fa[cç]a por mim|me d[aá] o c[oó]digo|answer|solution)/i;
 const WANTS_HINT = /(dica|hint|ajuda|socorro|travei|n[aã]o sei (por onde|como) come[cç]ar|empaquei)/i;
 const CONFUSED = /(n[aã]o entendi|n[aã]o entendo|confus|o que [ée]|o que significa|explica|explique)/i;
 const WHY_WRONG = /(por que|porque).*(errad|falh|n[aã]o funciona|n[aã]o passa)|(errado|n[aã]o funciona|n[aã]o passa)/i;

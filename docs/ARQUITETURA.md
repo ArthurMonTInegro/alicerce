@@ -77,7 +77,7 @@ apps/api/src
   config.ts  db.ts  auth.ts  security.ts  tutor.ts  app.ts  main.ts
   backup.ts  cópia consistente (VACUUM INTO), verificação e restauração do banco
 apps/api/scripts
-  backup.ts  restore.ts  metricas.ts  plano.ts
+  backup.ts  restore.ts  metricas.ts  plano.ts  acesso.ts
 ```
 
 ## Banco de dados
@@ -86,15 +86,17 @@ Migrações versionadas por `PRAGMA user_version` (`apps/api/src/db.ts`). Num ba
 
 | Tabela | Colunas | Observação |
 |---|---|---|
-| `users` | `id`, `email` (único, sem diferenciar maiúsculas), `name`, `password_hash`, `created_at`, `plan`, `plan_expires_at` | Senha em scrypt (N=32768) com sal por usuário; plano `free` por padrão |
+| `users` | `id`, `email` (único, sem diferenciar maiúsculas), `name`, `password_hash`, `created_at`, `plan`, `plan_expires_at` | Senha em scrypt (N=32768) com sal por usuário; `plan` e `plan_expires_at` são a cópia do acesso calculado pelos direitos (`free` por padrão) |
 | `sessions` | `token_hash`, `user_id`, `created_at`, `expires_at` | Guarda só o SHA-256 do token; 30 dias |
 | `progress` | `user_id`, `data` (JSON), `updated_at` | Um documento de progresso por pessoa |
 | `tutor_usage` | `user_id`, `day`, `count` | Uso do tutor com IA por dia; a cota do mês soma os dias do mês |
 | `plan_changes` | `user_id`, `plan`, `expires_at`, `source`, `at` | Histórico auditável de mudanças de plano |
 | `tutor_ai_daily` | `day`, `calls`, `failures`, `input_tokens`, `output_tokens` | Totais da IA no Alicerce todo por dia (UTC), sem ligação com contas: teto global (`TUTOR_GLOBAL_DAILY_LIMIT`) e custo real (migração 4) |
 | `password_resets` | `token_hash`, `user_id`, `created_at`, `expires_at`, `used_at` | Links de troca de senha: só o SHA-256 do código, 30 minutos, uso único (migração 5) |
-| `subscriptions` | `id`, `user_id`, `provider`, `period`, `price`, `status`, `paid_until`, `first_paid_at`, `canceled_at`, `created_at`, `updated_at` | Assinaturas do Premium: `pendente`, `ativa`, `cancelada`, `recusada` ou `reembolsada`; preço em centavos (migração 5) |
+| `subscriptions` | `id`, `user_id`, `provider`, `period`, `price`, `status`, `paid_until`, `first_paid_at`, `canceled_at`, `created_at`, `updated_at`, `withdrawal_requested_at`, `provider_ref`, `provider_subscription` | Assinaturas do Premium: `pendente`, `ativa`, `cancelada`, `recusada` ou `reembolsada`; preço em centavos (migração 5). `withdrawal_requested_at`: quando a pessoa pediu para desistir, para o direito valer mesmo que o provedor só responda depois dos 7 dias (migração 7). `provider_ref` e `provider_subscription`: os ids da cobrança aberta e da assinatura no provedor (no Asaas, o Checkout e a assinatura criada por ele; migração 8) |
 | `payment_events` | `id`, `provider`, `type`, `subscription_id`, `received_at` | Eventos do provedor já aplicados: o mesmo webhook entregue duas vezes só vale uma (migração 5) |
+| `access_grants` | `id`, `user_id`, `plan`, `source`, `starts_at`, `expires_at`, `revoked_at`, `created_at` | Premium concedido fora do pagamento (script de administração, testes, Premium anterior à migração 6 como `legado:<origem>`); `expires_at` nulo é sem fim (migração 6) |
+| `email_outbox` | `id`, `user_id`, `kind`, `dedupe_key`, `to_address`, `data`, `created_at`, `attempts`, `next_attempt_at`, `sent_at`, `last_error` | E-mails da assinatura (compra, renovação recusada, cancelamento, reembolso), gravados na mesma transação do evento de pagamento e enviados depois, com novas tentativas; guarda os fatos em JSON, não o texto; `dedupe_key` única impede o mesmo aviso duas vezes (migração 7) |
 
 Todas as tabelas filhas usam `ON DELETE CASCADE`, então excluir a conta apaga tudo do banco em uso (`tutor_ai_daily` não guarda nada da conta, e `payment_events` só guarda o id da assinatura). Antes de apagar, a renovação de uma assinatura em vigor é cancelada no provedor. Os backups continuam com a conta até saírem da retenção ([Operação](OPERACAO.md)).
 
@@ -185,7 +187,7 @@ Resultado: o JavaScript inicial caiu de 1,09 MB (344 KB com gzip) para 427 KB (1
 
 Transição da promessa anterior (trilha inteira gratuita, publicada em 07/10/2026): `packages/engine/src/transicao.ts` guarda numa constante só (`TRANSICAO_ACESSO`) as datas, a data de corte e a chave do aviso único, que vêm desligadas; `atividadeNosNiveisPagos` diz se um progresso tem atividade nos níveis 2 a 14 antes do corte. O navegador usa isso só para decidir se mostra um aviso (`apps/web/src/components/TransicaoAcesso.tsx`); o servidor, para contar contas afetadas (`apps/api/scripts/afetados-transicao.ts`). Nenhum dos dois concede acesso. Veja TRANSICAO-ACESSO.md.
 
-No servidor, `apps/api/src/plans.ts` lê e muda o plano (`setPlan` grava também em `plan_changes`). A assinatura (`apps/api/src/assinatura.ts`) muda o plano só pelo webhook do provedor, dentro da mesma transação que registra o evento; nenhum dado de cartão passa pelo Alicerce. Só existe o provedor simulado, para testes ([PAGAMENTO.md](PAGAMENTO.md)). Para testes e cortesias: `node apps/api/scripts/plano.ts <email> <free|premium> [dias]`.
+No servidor, `apps/api/src/plans.ts` calcula o plano a cada pedido a partir de todos os direitos da conta: as assinaturas pagas e as concessões manuais (`access_grants`). A conta é Premium enquanto algum direito vale ("Acesso efetivo", em [PAGAMENTO.md](PAGAMENTO.md)); `users.plan` é só uma cópia do resultado, com o histórico em `plan_changes`. A assinatura (`apps/api/src/assinatura.ts`) muda só pelo webhook do provedor, e o plano é recalculado na mesma transação que registra o evento; nenhum dado de cartão passa pelo Alicerce. Existem o provedor simulado, para testes, e o adaptador do Asaas (`apps/api/src/asaas.ts`), testado só contra uma simulação local da API ([PAGAMENTO.md](PAGAMENTO.md), "Asaas"). Para testes e cortesias: `node apps/api/scripts/plano.ts <email> <free|premium> [dias]` (mexe só na concessão manual); para conferir divergências: `node apps/api/scripts/acesso.ts [email | --corrigir]`. O servidor confere as assinaturas com o provedor de tempos em tempos para recuperar webhooks perdidos (`conciliacao.ts`) e manda os e-mails da assinatura por uma fila (`avisos.ts`).
 
 ## Métricas
 

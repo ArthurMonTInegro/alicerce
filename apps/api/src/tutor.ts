@@ -13,6 +13,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { exerciseById, lessonById, type Exercise, type Lesson, type TutorDoc } from '@alicerce/content';
 import { coachReply, retrieveKnowledge, retrievalQuery, redactSecrets, COACH_MODES, type CoachMode, type PlanId, TUTOR_SYSTEM_PROMPT } from '@alicerce/engine';
+import type { TutorEffort } from './config.ts';
 import type { ContentStore } from './conteudo.ts';
 
 export interface TutorRequest {
@@ -38,6 +39,12 @@ export interface TutorProvider {
 }
 
 const LIMITS = { message: 2000, code: 6000, error: 1500, historyItems: 10, historyText: 2000 };
+/**
+ * Teto de saída por resposta, pensamento incluído (no Sonnet 5.5 ele conta aqui). A resposta
+ * pedida tem até 150 palavras (umas 300 a 400 unidades); o resto é folga para o pensamento.
+ * Uma resposta cortada no teto é descartada e vira o apoio local, mas já foi cobrada.
+ */
+export const TUTOR_MAX_TOKENS = 2000;
 
 /** Valida e corta o pedido vindo do cliente. Lança Error com mensagem para o usuário se for inválido. */
 export function parseTutorRequest(body: unknown): TutorRequest {
@@ -100,11 +107,13 @@ export class ClaudeTutor implements TutorProvider {
   private readonly client: Anthropic;
   private readonly model: string;
   private readonly onUsage: ((u: { input: number; output: number }) => void) | undefined;
+  private readonly effort: TutorEffort;
   /** `onUsage` recebe os tokens de cada resposta do modelo, inclusive as descartadas (já custaram). */
-  constructor(apiKey: string, model: string, client?: Anthropic, onUsage?: (u: { input: number; output: number }) => void) {
+  constructor(apiKey: string, model: string, client?: Anthropic, onUsage?: (u: { input: number; output: number }) => void, effort: TutorEffort = 'low') {
     this.model = model;
     this.client = client ?? new Anthropic({ apiKey, timeout: 25_000, maxRetries: 0 });
     this.onUsage = onUsage;
+    this.effort = effort;
   }
 
   /** Instruções fixas + contexto confiável do exercício (vindo do conteúdo do servidor). */
@@ -147,7 +156,8 @@ export class ClaudeTutor implements TutorProvider {
   async answer(req: TutorRequest, sources: TutorSources): Promise<string> {
     const res = await this.client.beta.messages.create({
       model: this.model,
-      max_tokens: 1200,
+      max_tokens: TUTOR_MAX_TOKENS,
+      output_config: { effort: this.effort },
       system: this.system(req, sources),
       messages: this.messages(req),
     });

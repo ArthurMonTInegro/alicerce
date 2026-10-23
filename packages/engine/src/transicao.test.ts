@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { emptyProgress, type AttemptRecord, type ProgressState } from './progress.ts';
-import { FREE_MAX_LEVEL } from './plans.ts';
+import { FREE_MAX_LEVEL, PREMIUM_FOR_SALE } from './plans.ts';
 import {
   atividadeNosNiveisPagos,
   avisoDeTransicaoAtivo,
+  corteDepoisDaVenda,
   indiceDeNiveis,
   instanteDoCorte,
   NIVEIS_DA_TRANSICAO,
@@ -46,6 +47,19 @@ describe('configuração da transição', () => {
     expect(avisoDeTransicaoAtivo({ ...fechado, avisoLigado: false, corte: '2026-10-20' })).toBe(false);
     expect(avisoDeTransicaoAtivo({ ...fechado, avisoLigado: true, corte: '2026-10-20' })).toBe(true);
     expect(avisoDeTransicaoAtivo({ ...fechado, avisoLigado: true, corte: '2026-10-20', niveisPagosAbertos: true })).toBe(false);
+  });
+
+  it('venda e fechamento andam juntos: sem venda, nada fecha; com venda, o corte é 30 dias depois', () => {
+    expect(PREMIUM_FOR_SALE).toBe(TRANSICAO_ACESSO.vendaAbertaEm !== null);
+    if (TRANSICAO_ACESSO.vendaAbertaEm === null) {
+      expect(TRANSICAO_ACESSO).toMatchObject({ corte: null, avisoLigado: false, niveisPagosAbertos: true });
+    } else {
+      expect(TRANSICAO_ACESSO.corte).toBe(corteDepoisDaVenda(TRANSICAO_ACESSO.vendaAbertaEm));
+    }
+    expect(corteDepoisDaVenda('2026-12-01')).toBe('2026-12-31');
+    expect(corteDepoisDaVenda('2027-02-10')).toBe('2027-03-12');
+    expect(corteDepoisDaVenda(null)).toBeNull();
+    expect(corteDepoisDaVenda('01/12/2026')).toBeNull();
   });
 
   it('as datas registradas são as do histórico', () => {

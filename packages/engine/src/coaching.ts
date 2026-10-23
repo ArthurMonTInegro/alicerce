@@ -1,21 +1,40 @@
 /** Shared, deterministic coaching policy and lexical retrieval. No model or code execution. */
-import {offlineTutor,type TutorInput} from './tutor.ts';
+import {offlineTutor,WANTS_ANSWER,type TutorInput} from './tutor.ts';
 export const COACH_MODES=['learn','debug','practice','plan','english'] as const;
 export type CoachMode=typeof COACH_MODES[number];
 export interface Knowledge {id:string;title:string;summary:string;text:string}
 export interface Turn {role:'user'|'tutor';text:string}
 export interface CoachInput extends TutorInput {history?:Turn[];mode?:CoachMode;knowledge?:Knowledge[];lessonId?:string;code?:string}
 const normal=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-const stop=new Set('como para porque sobre esse essa isso uma um que qual quero preciso explique explica entendi nao ajuda pode voce meu minha por favor estudar aprender conceito'.split(' '));
+const stop=new Set(('como para porque sobre esse essa isso uma um que qual quero preciso explique explica entendi nao ajuda pode voce meu minha por favor estudar aprender conceito'
+ // palavras de pedido e de sintoma ("não funciona", "diferença entre", "como faço"): não dizem o assunto
+ +' funciona funcionou funcionar funcionando entre diferenca faco fazer faz resolvo resolver certo certa correto correta confirma confirmar tenho minha esta este isso aqui duas dois mais menos muito pra pro deu saiu sei saber consigo ainda agora sempre serve servir').split(' '));
 const aliases:Record<string,string>={variaveis:'variavel',variables:'variavel',variable:'variavel',funcoes:'funcao',functions:'funcao',function:'funcao',loops:'laco',loop:'laco',lacos:'laco',arrays:'lista',array:'lista',listas:'lista',networks:'rede',network:'rede',redes:'rede',parameters:'parametro',parametros:'parametro'};
-function tokens(s:string){return [...new Set((normal(s).match(/[a-z0-9_]{3,}/g)??[]).filter(t=>!stop.has(t)).map(t=>aliases[t]??t))];}
+/** Plural para singular, igual na pergunta e no material: "dicionários" acha "Dicionário", "tabelas" acha "tabela". */
+const singular=(t:string)=>t.length<5?t:t.replace(/(o|a)es$/,'ao').replace(/eis$/,'el').replace(/ais$/,'al').replace(/([^s])s$/,'$1');
+function tokens(s:string){return [...new Set((normal(s).match(/[a-z0-9_]{3,}/g)??[]).filter(t=>!stop.has(t)).map(t=>singular(aliases[t]??t)))];}
+/** Operadores digitados na pergunta viram o nome do assunto ("= e ==" fala de atribuição e comparação). */
+const operadores=(s:string)=>s.replace(/[=!<>]=/g,' comparacao ').replace(/=/g,' atribuicao ');
 export function retrieveKnowledge(query:string,docs:Knowledge[],lessonId?:string):Knowledge[]{
- const terms=tokens(query);
- return docs.map(d=>{const title=tokens(d.title+' '+d.summary),body=tokens(d.text);const matches=terms.filter(t=>title.includes(t)||body.includes(t));const score=matches.reduce((n,t)=>n+(title.includes(t)?4:1),0);return {d,score:score+(score>0&&d.id===lessonId?2:0)};})
- .filter(x=>x.score>=2).sort((a,b)=>b.score-a.score||a.d.id.localeCompare(b.d.id)).slice(0,2).map(x=>x.d);
+ const terms=tokens(operadores(query));
+ return docs.map(d=>{const name=tokens(d.title),title=tokens(d.title+' '+d.summary),body=tokens(d.text);const matches=terms.filter(t=>title.includes(t)||body.includes(t));const score=matches.reduce((n,t)=>n+(title.includes(t)?4:1),0);return {d,matches:matches.length,named:terms.some(t=>name.includes(t)),score:score+(score>0&&d.id===lessonId?2:0)};})
+ // Pergunta com três assuntos ou mais e só um deles no material, fora do título da lição: o trecho é de
+ // outro tema ("JOIN entre duas tabelas" não é a aula de condicionais, que cita tabelas-verdade).
+ .filter(x=>x.score>=2&&(terms.length<3||x.matches>=2||x.named)).sort((a,b)=>b.score-a.score||a.d.id.localeCompare(b.d.id)).slice(0,2).map(x=>x.d);
 }
 export function retrievalQuery(message:string,history:Turn[]=[]){return tokens(message).length<2?[...history.filter(h=>h.role==='user').slice(-1).map(h=>h.text),message].join(' '):message;}
 export function redactSecrets(text:string){return text.replace(/\b(?:sk-ant-|sk-)[a-zA-Z0-9_-]{16,}\b/g,'[CHAVE REMOVIDA]').replace(/\bBearer\s+[a-zA-Z0-9._~-]{12,}/gi,'Bearer [REMOVIDO]').replace(/\b(password|senha|api[_-]?key|secret|token)\s*[:=]\s*(["']?)[^\s,;"']+\2/gi,'$1=[REMOVIDO]');}
+/**
+ * Começo do texto até `max` caracteres, terminando numa frase ou parágrafo inteiro, e nunca
+ * dentro de um bloco de código (um ``` sem fechamento faria o resto da resposta virar código).
+ */
+export function trecho(text:string,max:number):string{
+ if(text.length<=max)return text;
+ let t=text.slice(0,max);
+ if((t.match(/```/g)??[]).length%2)t=t.slice(0,t.lastIndexOf('```'));
+ const fim=Math.max(t.lastIndexOf('\n\n'),t.lastIndexOf('. '),t.lastIndexOf('.\n'));
+ return (fim>=max*0.4?t.slice(0,fim+1):t.slice(0,t.lastIndexOf(' '))+' …').trimEnd();
+}
 export function coachReply(input:CoachInput):string {
  const mode=input.mode??'learn',history=input.history??[],msg=input.message;
  const request=normal(msg);
@@ -39,11 +58,13 @@ export function coachReply(input:CoachInput):string {
  return `**Hipótese para investigar**\n\n${explanation}\n\nNão executei seu código. Qual é o menor trecho que reproduz o erro e qual resultado você esperava?`;
  }
  if(mode==='debug')return 'Vamos separar sintoma de causa.\n\n1. Use a menor entrada que ainda falha.\n2. Registre saída esperada e saída obtida.\n3. Inspecione os valores antes do primeiro ponto de divergência.\n\n'+(input.code?'Recebi seu trecho, mas não o executei. ':'')+'Cole a mensagem exata do erro ou descreva essa primeira divergência.';
- if(input.exercise&&/dica|hint|resposta|solucao|resolve|resolva/.test(request))return offlineTutor(input);
+ if(input.exercise&&(/dica|hint|resposta|solucao|resolve|resolva/.test(request)||WANTS_ANSWER.test(msg)))return offlineTutor(input);
+ // Pedir para confirmar o código: o apoio local não executa nada, então não confirma; orienta o teste.
+ if(input.exercise&&input.code&&/\b(esta|ta|ficou) (certo|certa|correto|correta)\b|\bconfirm|\bfunciona\?/.test(request))return 'Não executei seu código, então não consigo confirmar se está certo. Quem confirma são os testes do exercício e os seus próprios exemplos.\n\nAntes de rodar, escreva à mão a saída esperada para três entradas: o exemplo do enunciado, um caso limite (o menor valor possível, todos os valores iguais) e um caso que foge do padrão (todos negativos, ou todos positivos).\n\nQual dessas entradas você acha que mais pode quebrar sua solução?';
  const docs=retrieveKnowledge(retrievalQuery(msg,history),input.knowledge??[],input.lessonId);
  const doc=docs[0];
  if(mode==='practice')return doc?`**Recuperação ativa: ${doc.title}**\n\nSem consultar a lição, explique a ideia com suas palavras, crie um exemplo e diga um caso em que ela não se aplica. Depois confira o [material de referência](/licao/${doc.id}).\n\nComo você explicaria essa ideia a alguém que está começando?\n\nNo modo local, sua resposta não recebe nota automática.`:'Escolha um conceito específico, como variáveis, funções, SQL ou redes. Vou indicar uma tarefa de recuperação ativa e o material para você conferir. Qual conceito quer praticar?';
- if(doc)return `**No material do Alicerce: ${doc.title}**\n\n${doc.text.slice(0,1100)}\n\n[Fonte: ${doc.title}](/licao/${doc.id})\n\nEste é um trecho recuperado por palavras-chave, não uma explicação gerada por IA. Como essa ideia se aplica ao que você está tentando fazer?`;
+ if(doc)return `**No material do Alicerce: ${doc.title}**\n\n${trecho(doc.text,1100)}\n\n[Fonte: ${doc.title}](/licao/${doc.id})\n\nEste é um trecho recuperado por palavras-chave, não uma explicação gerada por IA. Como essa ideia se aplica ao que você está tentando fazer?`;
  if(input.exercise)return offlineTutor(input);
  return 'Ainda não encontrei um trecho suficientemente relacionado na base local. Me conte o conceito ou descreva o problema com um exemplo. Posso buscar material da trilha, orientar a investigação de um erro ou propor uma prática. Para uma explicação livre e personalizada, a IA do servidor precisa estar conectada.';
 }

@@ -111,6 +111,27 @@ const runScript = (name: string, args: string[], env: NodeJS.ProcessEnv, as: { u
   spawnSync(NODE[0]!, [...NODE.slice(1), join(API, 'scripts', name), ...args], { env, encoding: 'utf8', timeout: 30_000, ...as });
 const modeOf = (file: string) => statSync(file).mode & 0o777;
 const isRoot = process.getuid?.() === 0;
+/**
+ * Os testes como root dão arquivos ao usuário 1000 (o "node" da imagem Docker). Num namespace
+ * de usuário que só mapeia o próprio root (alguns sandboxes), o processo é root mas o chown para
+ * 1000 dá EINVAL: é o ambiente, não o backup. O teste continua falhando, com o motivo dito
+ * (docs/TESTES.md, "Requisito dos testes como root").
+ */
+function requireUser1000(dir: string) {
+  const probe = join(dir, 'sonda-chown');
+  writeFileSync(probe, '');
+  try {
+    chownSync(probe, 1000, 1000);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'EINVAL') throw e;
+    throw new Error(
+      'Ambiente sem o usuário 1000: este processo é root, mas num namespace de usuário que não mapeia o uid 1000, e o chown dá EINVAL. É limitação do ambiente, não defeito do backup: rode como root de verdade (por exemplo, no build da imagem Docker). Ver docs/TESTES.md.',
+      { cause: e },
+    );
+  } finally {
+    rmSync(probe, { force: true });
+  }
+}
 /** um processo que caiu (SIGKILL) com uma conta gravada só no -wal */
 async function crashWithWal(file: string, email: string): Promise<void> {
   const holder = await holdDb(file, [email]);
@@ -616,6 +637,7 @@ describe('backup e restauração', { timeout: 30_000 }, () => {
   });
 
   it.skipIf(!isRoot)('pasta de backups criada pelo root: o servidor, com outro usuário, não consegue o backup automático e não migra', async () => {
+    requireUser1000(tmp);
     chmodSync(tmp, 0o755);
     const data = join(tmp, 'data');
     mkdirSync(data);
@@ -650,6 +672,7 @@ describe('backup e restauração', { timeout: 30_000 }, () => {
 
   it.skipIf(!isRoot)('restaurar como root mantém o dono do banco: o servidor, com outro usuário, continua gravando', async () => {
     // usuário sem privilégios (1000, como o "node" da imagem Docker) é o dono da pasta e do banco
+    requireUser1000(tmp);
     chmodSync(tmp, 0o755);
     const data = join(tmp, 'data');
     mkdirSync(data);

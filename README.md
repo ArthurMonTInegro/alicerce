@@ -56,7 +56,8 @@ Para voltar a uma versão anterior: Actions → **Pages (rollback)** → Run wor
 
 ```bash
 node apps/api/scripts/metricas.ts            # retenção, funil e pontos difíceis (agregados, sem dados pessoais)
-node apps/api/scripts/plano.ts <email> premium 30   # muda o plano de uma conta (cortesia, teste)
+node apps/api/scripts/plano.ts <email> premium 30   # concessão manual de Premium (cortesia, teste); free revoga
+node apps/api/scripts/acesso.ts [email]             # confere o acesso: direitos de uma conta, ou divergências em todas
 ```
 
 Backup e restauração do banco (rotina, restauração passo a passo e resposta a incidente em [Operação](docs/OPERACAO.md)):

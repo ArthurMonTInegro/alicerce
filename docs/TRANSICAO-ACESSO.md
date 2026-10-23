@@ -1,6 +1,6 @@
 # Transição de acesso: da trilha inteira gratuita para níveis 0 e 1 gratuitos
 
-Situação em 21/10/2026: **o fechamento foi adiado até a venda abrir.** Em 20/10/2026 o Arthur escolheu a carência de 30 dias, e a demonstração passou a avisar que os níveis 2 a 14 fechariam em 20/11/2026 (PR #2). No mesmo dia ele adiou o fechamento ("Adiar até a venda abrir"), porque o Premium ainda não está à venda e ninguém conseguiria assinar. Agora os níveis 2 a 14 fecham **30 dias depois que a venda abrir**, com a data avisada com essa antecedência. O aviso de adiamento está no PR #3 e espera a aprovação do texto. Esta versão (PR #1) pode entrar antes, com os níveis abertos: `TRANSICAO_ACESSO` está com `anunciadaEm: '2026-10-20'`, `corte: null`, `avisoLigado: false` e `niveisPagosAbertos: true`. Nenhuma cobrança foi ativada.
+Situação em 23/10/2026: **o fechamento foi adiado até a venda abrir.** Em 20/10/2026 o Arthur escolheu a carência de 30 dias, e a demonstração passou a avisar que os níveis 2 a 14 fechariam em 20/11/2026 (PR #2). No mesmo dia ele adiou o fechamento ("Adiar até a venda abrir"), porque o Premium ainda não está à venda e ninguém conseguiria assinar. Agora os níveis 2 a 14 fecham **30 dias depois que a venda abrir**, com a data avisada com essa antecedência. O aviso de adiamento (PR #3) e esta versão (PR #1) foram publicados na demonstração em 22/10/2026, com o texto aprovado pelo Arthur. `TRANSICAO_ACESSO` está com `anunciadaEm: '2026-10-20'`, `corte: null`, `avisoLigado: false`, `niveisPagosAbertos: true` e `vendaAbertaEm: null`. Nenhuma cobrança foi ativada.
 
 ### Níveis 2 a 14 abertos até a venda
 
@@ -12,7 +12,7 @@ Situação em 21/10/2026: **o fechamento foi adiado até a venda abrir.** Em 20/
 
 ### Como fechar, quando a venda abrir
 
-1. Defina a data de corte: 30 dias depois do primeiro dia de venda. Atualize o aviso de adiamento para mostrar essa data com 30 dias de antecedência e peça ao Arthur para aprovar o texto.
+1. Defina a data de corte: 30 dias depois do primeiro dia de venda. Na mesma mudança que liga `PREMIUM_FOR_SALE`, preencha `vendaAbertaEm` e ponha em `corte` o que `corteDepoisDaVenda(vendaAbertaEm)` devolve; `transicao.test.ts` (motor) reprova a venda aberta sem `vendaAbertaEm` ou com outro corte. Atualize o aviso de adiamento para mostrar essa data com 30 dias de antecedência e peça ao Arthur para aprovar o texto.
 2. No corte, em `packages/engine/src/transicao.ts`: `corte: 'AAAA-MM-DD'`, `avisoLigado: true` e `niveisPagosAbertos: false`. Apague `packages/content/src/aberto/` e `aberto.ts`, e tire o import de `curriculum.ts`.
 3. Os testes da configuração vão falhar de propósito; atualize-os na mesma mudança. Revise o texto de "O que mudou" (datas do anúncio, do adiamento e da venda) e peça a aprovação do Arthur antes de publicar.
 

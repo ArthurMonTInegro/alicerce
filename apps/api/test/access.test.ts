@@ -162,6 +162,33 @@ describe('aulas pagas: sessão válida + Premium ativo no banco, a cada pedido',
     }
   });
 
+  it('assinatura paga que vence sem renovar: 403 no pedido seguinte, mesmo com a cópia em users ainda Premium; renovada, volta', async () => {
+    const f = await fixture(withPremium, { PAGAMENTO_PROVEDOR: 'teste' });
+    try {
+      const r = await f.app.inject({ method: 'POST', url: '/api/assinatura', headers: f.headers, payload: { periodo: 'mensal' } });
+      const sub = decodeURIComponent(new URL(r.json().url, 'http://x').hash.slice('#a='.length));
+      await f.app.inject({ method: 'POST', url: '/api/pagamento/teste/simular', headers: f.headers, payload: { assinatura: sub, resultado: 'aprovar' } });
+      await f.app.inject({ method: 'PUT', url: '/api/progress', headers: f.headers, payload: { expectedUserId: f.id, progress: { lessons: { [freeLesson.id]: { visited: ['conceito'], completedAt: Date.now() } } } } });
+      expect((await f.app.inject({ url: lessonUrl, headers: f.headers })).statusCode).toBe(200);
+
+      // o período pago acaba e nenhum evento chega (renovação ainda não cobrada)
+      f.db.prepare('UPDATE subscriptions SET paid_until = ? WHERE id = ?').run(Date.now() - 1, sub);
+      expect(f.db.prepare('SELECT plan FROM users WHERE id = ?').get(f.id)).toEqual({ plan: 'premium' });
+      const after = await f.app.inject({ url: lessonUrl, headers: f.headers });
+      expect(after.statusCode).toBe(403);
+      expect(after.body).not.toContain(MARK.body);
+      expect((await f.app.inject({ url: '/api/auth/me', headers: f.headers })).json().entitlements).toMatchObject({ plan: 'free', tutorDailyLimit: 0 });
+      // o gratuito e o progresso continuam
+      expect((await f.app.inject({ url: `/api/content/lessons/${freeLesson.id}`, headers: f.headers })).statusCode).toBe(200);
+      expect(JSON.parse((f.db.prepare('SELECT data FROM progress WHERE user_id = ?').get(f.id) as { data: string }).data).lessons).toHaveProperty(freeLesson.id);
+
+      await f.app.inject({ method: 'POST', url: '/api/pagamento/teste/simular', headers: f.headers, payload: { assinatura: sub, resultado: 'renovar' } });
+      expect((await f.app.inject({ url: lessonUrl, headers: f.headers })).statusCode).toBe(200);
+    } finally {
+      await f.close();
+    }
+  });
+
   it('sem o diretório privado: o servidor sobe, aulas gratuitas seguem e o Premium recebe 503 claro', async () => {
     const f = await fixture(publicContent);
     try {

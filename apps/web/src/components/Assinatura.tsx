@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from "react";
 import { formatBRL, yearlyDeal, PLANS } from "@alicerce/engine";
-import { Link, navigate } from "../lib/router.tsx";
+import { Link, navigate, useSearchParam } from "../lib/router.tsx";
 import { useHead } from "../lib/head.tsx";
 import { STATIC_SITE } from "../lib/base.ts";
 import {
@@ -57,6 +57,8 @@ export function Assinatura() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [erro, setErro] = useState("");
+  // a página do provedor devolve a pessoa para /conta?assinatura=retorno
+  const retorno = useSearchParam("assinatura") === "retorno";
 
   useEffect(() => {
     if (STATIC_SITE) return;
@@ -111,11 +113,34 @@ export function Assinatura() {
   return (
     <section aria-labelledby="h-assinatura" style={{ margin: "1.5rem 0" }}>
       <h2 id="h-assinatura">Assinatura do Premium</h2>
-      {s.venda.teste && (
-        <p className="callout warn">
-          <strong>Ambiente de teste.</strong> Nada é cobrado e nenhum dado de
-          pagamento é pedido: a página de pagamento é uma simulação.
-        </p>
+      {s.venda.teste &&
+        (s.venda.provedor === "teste" ? (
+          <p className="callout warn">
+            <strong>Ambiente de teste.</strong> Nada é cobrado e nenhum dado de
+            pagamento é pedido: a página de pagamento é uma simulação.
+          </p>
+        ) : (
+          <p className="callout warn">
+            <strong>Ambiente de testes do provedor de pagamento.</strong> Nada é
+            cobrado. Na página dele, use só os dados de teste que ele indica,
+            nunca um cartão de verdade.
+          </p>
+        ))}
+      {retorno && !vigente && (
+        <div className="callout" role="status">
+          <p>
+            Se você concluiu o pagamento, a confirmação do provedor pode levar
+            alguns instantes. Confira de novo antes de pagar outra vez.
+          </p>
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={() => void agir(async () => {}, "")}
+          >
+            Conferir de novo
+          </button>
+        </div>
       )}
       {vigente ? (
         <>

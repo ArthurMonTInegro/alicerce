@@ -86,6 +86,60 @@ export const MIGRATIONS: string[] = [
      subscription_id TEXT,
      received_at INTEGER NOT NULL
    );`,
+  // Direitos de acesso concedidos fora do pagamento (script de administração, testes, Premium
+  // dado antes desta migração). O acesso efetivo junta estes com as assinaturas pagas
+  // (plans.ts, computeAccess); users.plan passa a ser só uma cópia do resultado.
+  // O Premium em vigor que nenhuma assinatura paga explica vira uma concessão
+  // 'legado:<origem>' com o mesmo fim, para ninguém perder acesso na migração.
+  `CREATE TABLE access_grants (
+     id INTEGER PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     plan TEXT NOT NULL,
+     source TEXT NOT NULL,
+     starts_at INTEGER NOT NULL,
+     expires_at INTEGER,
+     revoked_at INTEGER,
+     created_at INTEGER NOT NULL
+   );
+   CREATE INDEX access_grants_user ON access_grants(user_id);
+   INSERT INTO access_grants (user_id, plan, source, starts_at, expires_at, created_at)
+   SELECT u.id, 'premium',
+     substr('legado:' || COALESCE((SELECT c.source FROM plan_changes c WHERE c.user_id = u.id AND c.plan = 'premium' ORDER BY c.id DESC LIMIT 1), 'sem-historico'), 1, 40),
+     COALESCE((SELECT c.at FROM plan_changes c WHERE c.user_id = u.id AND c.plan = 'premium' ORDER BY c.id DESC LIMIT 1), u.created_at),
+     u.plan_expires_at,
+     CAST(strftime('%s', 'now') AS INTEGER) * 1000
+   FROM users u
+   WHERE u.plan = 'premium'
+     AND (u.plan_expires_at IS NULL OR u.plan_expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000)
+     AND NOT (u.plan_expires_at IS NOT NULL AND EXISTS (
+       SELECT 1 FROM subscriptions s
+       WHERE s.user_id = u.id AND s.status IN ('ativa', 'cancelada') AND s.paid_until >= u.plan_expires_at
+     ));`,
+  // Fila dos e-mails da assinatura (avisos.ts), gravada na mesma transação do evento de pagamento.
+  // Guarda os fatos (data, JSON), não o texto. Excluir a conta apaga os avisos dela.
+  // withdrawal_requested_at: quando a pessoa pediu para desistir; o direito vale mesmo que o
+  // provedor só responda depois dos 7 dias.
+  `CREATE TABLE email_outbox (
+     id INTEGER PRIMARY KEY,
+     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     kind TEXT NOT NULL,
+     dedupe_key TEXT NOT NULL UNIQUE,
+     to_address TEXT NOT NULL,
+     data TEXT NOT NULL,
+     created_at INTEGER NOT NULL,
+     attempts INTEGER NOT NULL DEFAULT 0,
+     next_attempt_at INTEGER NOT NULL,
+     sent_at INTEGER,
+     last_error TEXT
+   );
+   CREATE INDEX email_outbox_pending ON email_outbox(sent_at, next_attempt_at);
+   ALTER TABLE subscriptions ADD COLUMN withdrawal_requested_at INTEGER;`,
+  // Ids da assinatura no provedor de pagamento (asaas.ts): provider_ref é a cobrança criada no
+  // checkout (o Checkout, no Asaas); provider_subscription, a assinatura que o provedor criou
+  // depois do pagamento. Só acrescenta colunas.
+  `ALTER TABLE subscriptions ADD COLUMN provider_ref TEXT;
+   ALTER TABLE subscriptions ADD COLUMN provider_subscription TEXT;
+   CREATE INDEX subscriptions_provider_ref ON subscriptions(provider, provider_ref);`,
 ];
 
 /** Maior versão de esquema que este código conhece (a restauração recusa backup mais novo). */

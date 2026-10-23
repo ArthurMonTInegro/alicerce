@@ -423,6 +423,134 @@ describe("webhook do provedor", () => {
       ).statusCode,
     ).toBe(400);
   });
+
+  it("falha ao gravar: 500, nada muda, e o mesmo evento entregue de novo vale", async () => {
+    const c = await register();
+    const r = await post(c, "/api/assinatura", { periodo: "mensal" });
+    const id = decodeURIComponent(
+      new URL(r.json().url, "http://x").hash.slice("#a=".length),
+    );
+    const ev = {
+      id: "evt_externo_falha",
+      type: "pagamento_aprovado",
+      subscriptionId: id,
+      paidUntil: Date.now() + 30 * DIA,
+      at: Date.now(),
+    };
+    db.exec(
+      "CREATE TRIGGER falha BEFORE UPDATE OF plan ON users BEGIN SELECT RAISE(ABORT, 'falha simulada'); END;",
+    );
+    expect((await webhook(ev)).statusCode).toBe(500);
+    expect((await status(c)).plano.plan).toBe("free");
+    db.exec("DROP TRIGGER falha");
+    const again = await webhook(ev);
+    expect(again.statusCode).toBe(200);
+    expect(again.json().result).toBe("aplicado");
+    expect((await status(c)).plano.plan).toBe("premium");
+  });
+});
+
+describe("reembolso atrasado de uma assinatura antiga", () => {
+  it("não tira o Premium que uma assinatura nova, paga, ainda garante", async () => {
+    const c = await register();
+    const now = Date.now();
+    // 1. uma assinatura antiga foi paga, parou de renovar e venceu
+    const r = await post(c, "/api/assinatura", { periodo: "mensal" });
+    const antiga = decodeURIComponent(
+      new URL(r.json().url, "http://x").hash.slice("#a=".length),
+    );
+    for (const ev of [
+      {
+        id: "evt_antiga_paga",
+        type: "pagamento_aprovado",
+        subscriptionId: antiga,
+        paidUntil: now - 2 * DIA,
+        at: now - 33 * DIA,
+      },
+      {
+        id: "evt_antiga_cancelada",
+        type: "assinatura_cancelada",
+        subscriptionId: antiga,
+        at: now - 10 * DIA,
+      },
+    ])
+      expect((await webhook(ev)).json().result).toBe("aplicado");
+    expect((await status(c)).plano.plan).toBe("free");
+    // 2. uma assinatura nova foi paga e ativou o Premium
+    const nova = await assinar(c, "mensal");
+    expect(nova.plano.plan).toBe("premium");
+    // 3. chega, atrasado, o reembolso da assinatura antiga
+    expect(
+      (
+        await webhook({
+          id: "evt_antiga_reembolso",
+          type: "reembolso",
+          subscriptionId: antiga,
+          at: now,
+        })
+      ).json().result,
+    ).toBe("aplicado");
+    // 4. a conta continua Premium até o fim do que a nova pagou
+    const depois = await status(c);
+    expect(depois.plano).toMatchObject({
+      plan: "premium",
+      expiresAt: nova.assinatura.pagoAte,
+    });
+    expect(depois.assinatura).toMatchObject({
+      id: nova.id,
+      situacao: "ativa",
+    });
+  });
+
+  it("assinar de novo com a antiga vencida e ainda renovando: a renovação dela para antes, e a conta mostra a que vale", async () => {
+    const c = await register();
+    const now = Date.now();
+    const r = await post(c, "/api/assinatura", { periodo: "mensal" });
+    const antiga = decodeURIComponent(
+      new URL(r.json().url, "http://x").hash.slice("#a=".length),
+    );
+    // paga, venceu, e a renovação está falhando: o provedor ainda tentaria cobrar
+    await webhook({
+      id: "evt_antiga_paga_2",
+      type: "pagamento_aprovado",
+      subscriptionId: antiga,
+      paidUntil: now - DIA,
+      at: now - 31 * DIA,
+    });
+    expect((await status(c)).assinatura).toMatchObject({
+      id: antiga,
+      situacao: "ativa",
+    });
+    const nova = await assinar(c, "anual");
+    expect(
+      db.prepare("SELECT status FROM subscriptions WHERE id = ?").get(antiga),
+    ).toEqual({ status: "cancelada" });
+    await webhook({
+      id: "evt_antiga_reembolso_2",
+      type: "reembolso",
+      subscriptionId: antiga,
+      at: now,
+    });
+    expect(await status(c)).toMatchObject({
+      plano: { plan: "premium", expiresAt: nova.assinatura.pagoAte },
+      assinatura: { id: nova.id, situacao: "ativa" },
+    });
+    // excluir a conta para a renovação de todas as que ainda renovam
+    const del = await app.inject({
+      method: "DELETE",
+      url: "/api/auth/me",
+      headers: { ...H, cookie: c.cookie },
+      payload: { password: SENHA },
+    });
+    expect(del.statusCode).toBe(204);
+    expect(
+      db
+        .prepare(
+          "SELECT COUNT(*) AS n FROM payment_events WHERE subscription_id = ? AND type = 'assinatura_cancelada'",
+        )
+        .get(nova.id),
+    ).toEqual({ n: 1 });
+  });
 });
 
 describe("recuperação de senha", () => {

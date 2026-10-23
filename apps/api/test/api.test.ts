@@ -6,7 +6,7 @@ import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db.ts';
 import { setPlan } from '../src/plans.ts';
 import { publicContent } from '../src/conteudo.ts';
-import { ClaudeTutor, parseTutorRequest, tutorSources, type TutorProvider } from '../src/tutor.ts';
+import { ClaudeTutor, parseTutorRequest, TUTOR_MAX_TOKENS, tutorSources, type TutorProvider } from '../src/tutor.ts';
 
 const H = { 'content-type': 'application/json', 'x-alicerce': '1' };
 
@@ -263,7 +263,9 @@ describe('ClaudeTutor', () => {
     expect(msgs.at(-1)!.content).toContain('<codigo_do_aluno>');
     expect(captured.model).toBe('claude-sonnet-5-5');
     expect(captured.fallbacks).toBeUndefined();
-    expect(captured.max_tokens).toBe(1200);
+    // teto com folga para o pensamento do modelo, que conta nele, e esforço baixo (docs/TUTOR-AVALIACAO.md)
+    expect(captured.max_tokens).toBe(TUTOR_MAX_TOKENS);
+    expect(captured.output_config).toEqual({ effort: 'low' });
   });
 
   it('recusa do modelo vira erro (cai no offline)', async () => {

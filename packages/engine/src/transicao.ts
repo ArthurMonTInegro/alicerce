@@ -47,6 +47,13 @@ export interface ConfigTransicao {
    * repositório privado. Desligar junto com a data de corte e o aviso.
    */
   readonly niveisPagosAbertos: boolean;
+  /**
+   * Primeiro dia de venda do Premium (AAAA-MM-DD), no mesmo dia em que
+   * PREMIUM_FOR_SALE (plans.ts) for ligado. null = ainda não está à venda. O corte
+   * fica DIAS_ATE_O_CORTE depois dele (corteDepoisDaVenda); transicao.test.ts
+   * reprova a venda aberta sem essa data de corte.
+   */
+  readonly vendaAbertaEm: string | null;
 }
 
 export const TRANSICAO_ACESSO: ConfigTransicao = {
@@ -62,7 +69,18 @@ export const TRANSICAO_ACESSO: ConfigTransicao = {
   corte: null,
   avisoLigado: false,
   niveisPagosAbertos: true,
+  vendaAbertaEm: null,
 };
+
+/** Os níveis 2 a 14 fecham 30 dias depois que a venda abrir (decisão de 21/10/2026, "Adiar até a venda abrir"). */
+export const DIAS_ATE_O_CORTE = 30;
+
+/** A data de corte que a decisão pede para uma data de abertura da venda; data inválida → null. */
+export function corteDepoisDaVenda(vendaAbertaEm: string | null): string | null {
+  const t = instanteDoCorte(vendaAbertaEm);
+  if (t === null) return null;
+  return new Date(t - BRASILIA_UTC_OFFSET_H * 3_600_000 + DIAS_ATE_O_CORTE * 86_400_000).toISOString().slice(0, 10);
+}
 
 /** Níveis que a promessa antiga dizia gratuitos e que a estratégia nova põe na assinatura. */
 export const NIVEIS_DA_TRANSICAO = { primeiro: 2, ultimo: 14 } as const;

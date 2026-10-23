@@ -9,8 +9,11 @@
  *   PAGES_DIST=/tmp/alicerce-pages npx playwright test e2e/pages.spec.ts
  * Sem PAGES_DIST, os testes daqui são pulados.
  */
+import { spawnSync } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { servirComoPages } from './servidor-pages.ts';
 
@@ -20,7 +23,8 @@ let srv: Srv;
 
 test.skip(!DIR, 'defina PAGES_DIST com a pasta do build estático (veja o comentário no topo)');
 test.beforeEach(({}, info) => {
-  test.skip(info.project.name !== 'desktop', 'modo estático: basta um projeto');
+  // o piloto tem gente estudando no celular: esse teste roda também com a tela de celular
+  test.skip(info.project.name !== 'desktop' && !info.title.startsWith('piloto'), 'modo estático: basta um projeto');
 });
 test.beforeAll(async () => {
   if (DIR) srv = await servirComoPages(DIR);
@@ -224,4 +228,35 @@ test('página de execução aberta diretamente ou emoldurada por outra origem n�
     srv.url('runner.html'),
   );
   expect(resposta).toBe('sem resposta');
+});
+
+test('piloto na demonstração: o "Exportar JSON" do build estático é lido pela análise (docs/PILOTO.md)', async ({ page }) => {
+  // O piloto roda aqui, sem conta nem servidor: o progresso fica no navegador.
+  const erros = vigiarConsole(page);
+  page.on('dialog', (d) => d.accept());
+  await exercicios(page, 'l0-o-que-e-computador');
+  const ex = page.locator('section.exercise').first();
+  const dica = ex.getByRole('button', { name: /Dica/ });
+  while (await dica.count()) await dica.click();
+  await ex.getByRole('button', { name: 'Ver solução' }).click();
+  await expect(ex.getByText('Solução', { exact: true })).toBeVisible();
+  await page.goto(srv.url('progresso/'));
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exportar JSON' }).click();
+  const pasta = test.info().outputPath('piloto');
+  mkdirSync(pasta, { recursive: true });
+  await (await download).saveAs(join(pasta, 'P01.json'));
+  const r = spawnSync(
+    process.execPath,
+    ['scripts/piloto/analisar.ts', pasta, '--registro', 'docs/piloto/registro-dificuldades.csv', '--conversas', 'docs/piloto/conversas.csv'],
+    { encoding: 'utf8' },
+  );
+  expect(r.status, r.stderr).toBe(0);
+  expect(r.stdout).toContain('Participantes: 1');
+  expect(r.stdout).toContain('| Abriu a primeira lição | 1 | 100% |');
+  expect(r.stdout).toContain('Fora da tabela: 1 exercício(s) tentados por menos de 3 pessoas');
+  // os modelos de docs/piloto só têm a linha de exemplo; os avisos de dados dentro do repositório saem no stderr
+  expect(r.stdout).toContain('Sem anotações das conversas');
+  expect(r.stderr).toContain('docs/piloto/registro-dificuldades.csv está dentro do repositório');
+  expect(erros).toEqual([]);
 });

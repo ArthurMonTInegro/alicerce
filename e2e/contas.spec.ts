@@ -335,7 +335,7 @@ test('esqueci a senha: o link do e-mail troca a senha uma vez e encerra as sessÃ
   await expect(visita.getByRole('status')).toContainText('Se houver uma conta com esse e-mail, enviamos um link');
 
   const linhas = readFileSync('test-results/emails.log', 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { to: string; text: string });
-  const link = /https?:\/\/\S+\/conta\/redefinir#t=[A-Za-z0-9_-]+/.exec(linhas.filter((m) => m.to === bruno.email).at(-1)!.text)![0];
+  const link = /https?:\/\/\S+\/conta\/redefinir#t=[A-Za-z0-9_-]+/.exec(linhas.filter((m) => m.to === bruno.email && m.text.includes('/conta/redefinir#t=')).at(-1)!.text)![0];
   const caminho = new URL(link).pathname + new URL(link).hash;
   await visita.goto(caminho);
   await expect(visita.getByRole('heading', { name: 'Trocar a senha' })).toBeVisible();
