@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { emptyProgress, type AttemptRecord, type ProgressState } from '@alicerce/engine';
-import { analisar, dentroDoRepositorio, licoesDaJornada, lerConversas, lerParticipantes, lerRegistro, primeiroEncontro, relatorio, ultimaAntes, type LicaoDaJornada } from './analisar.ts';
+import { analisar, dentroDoRepositorio, licoesDaJornada, lerConversas, lerParticipantes, lerRegistro, lerTarefas, primeiroEncontro, relatorio, ultimaAntes, type LicaoDaJornada } from './analisar.ts';
 
 const T0 = Date.UTC(2026, 10, 2, 15); // 02/11/2026, 12h em Fortaleza
 const DIA = 86_400_000;
@@ -179,16 +179,24 @@ describe('análise', () => {
         'P01,,l1-loop,2,conceito,,,media\n' +
         'P02,,l0-a,7,conceito,,,media\n' +
         'P09,,l0-a,1,confusao,,,grave\n' +
-        'P01,,,3,conceito,,,baixa\n',
+        'P01,,,3,conceito,,,baixa\n' +
+        'P02,,/planos,,defeito,,,media\n',
     );
     expect(analisar(participantes, r, JORNADA).avisos).toEqual([
       'registro, linha 2: a lição "l1-loop" não é da jornada do piloto (confira o id no endereço da página).',
       'registro, linha 3: a lição l0-a tem 2 exercícios; não há o 7º.',
-      'registro, linha 4: tipo "confusao" fora da lista (conceito, enunciado, interface, ambiente, outro).',
+      'registro, linha 4: tipo "confusao" fora da lista (conceito, enunciado, interface, defeito, ambiente, outro).',
       'registro, linha 4: gravidade "grave" fora da lista (baixa, media, alta).',
       'registro, linha 4: P09 não tem arquivo de progresso.',
       'registro, linha 5: exercício sem lição; sem a lição, a posição não diz qual exercício é.',
     ]);
+  });
+
+  it('fora de uma lição, a coluna da lição leva o endereço da página, e a linha fica agrupada nele', () => {
+    const r = lerRegistro('participante,data,licao,exercicio,tipo,descricao,o_que_destravou,gravidade\nP01,,/planos,,defeito,Botão sem resposta,,alta\nP02,,/planos,,interface,,,baixa\n');
+    const x = analisar(participantes, r, JORNADA);
+    expect(x.avisos).toEqual([]);
+    expect(x.registro.find((g) => g.chave === '/planos')).toMatchObject({ pessoas: 2, tipos: { defeito: 1, interface: 1 }, altas: 1 });
   });
 
   it('escreve o relatório com o aviso de amostra pequena', () => {
@@ -352,6 +360,66 @@ describe('conversas: tarefas de transferência e intenção declarada', () => {
 
   it('o modelo em docs/piloto tem as colunas, e a linha de exemplo não conta', () => {
     expect(lerConversas(readFileSync(new URL('../../docs/piloto/conversas.csv', import.meta.url), 'utf8'))).toEqual([]);
+  });
+});
+
+describe('indicadores mínimos e tarefas observadas', () => {
+  const participantes = [
+    // exercício num dia, pergunta ao tutor em outro: voltou outro dia e usou o tutor
+    { codigo: 'P01', progresso: progresso({ lessons: { 'l0-a': { visited: ['x'] } }, attempts: [tentativa('l0-a-1', T0)], tutorUse: { '2026-11-05': 3 } }) },
+    // exportou com a contagem e não perguntou nada
+    { codigo: 'P02', progresso: progresso({ lessons: { 'l0-a': { visited: ['x'] } }, attempts: [tentativa('l0-a-1', T0)], tutorUse: {} }) },
+    // abriu a lição sem conferir exercício, de uma versão sem a contagem do tutor
+    { codigo: 'P03', progresso: progresso({ lessons: { 'l0-a': { visited: ['x'] } } }) },
+  ];
+  const conversas = lerConversas(
+    'participante,aparelho,ja_programou,horas_semana_declaradas,transferencia_1,transferencia_1_min,transferencia_2,transferencia_2_min,pagaria_declarado,continuaria_declarado\n' +
+      'P01,celular,nunca,3,,,,,talvez,sim\nP02,celular,nunca,3,,,,,nao,Não\n',
+  );
+  const tarefas = lerTarefas(
+    'participante,sessao,tarefa,resultado,minutos,observacao\n' +
+      'exemplo,1,2,sozinha,3,linha de exemplo\n' +
+      'P01,1,2,nao conseguiu,6,\n' +
+      'P01,1,2,Com uma pergunta,4,"refez depois de achar a Trilha"\n' +
+      'P02,1,T2,sozinha,2,\n' +
+      'P02,2,8,não conseguiu,5,"achou que tudo é pago"\n',
+  );
+  const a = analisar(participantes, [], JORNADA, conversas, tarefas);
+
+  it('ativação pede um exercício conferido; retorno conta dias de exercício, revisão ou tutor', () => {
+    expect(a.indicadores).toMatchObject({ ativacao: 2, voltouOutroDia: 1, tutorRegistrado: 2, usaramTutor: 1, perguntasAoTutorMediana: 3 });
+  });
+
+  it('o relatório separa quem exportou sem a contagem do tutor e mostra o interesse como declarado', () => {
+    const md = relatorio(a);
+    expect(md).toContain('| Ativação | abriu a primeira lição e conferiu pelo menos um exercício | 2 de 3 (67%) |');
+    expect(md).toContain('| 1 de 2 com a contagem; mediana de 3 pergunta(s) entre quem usou |');
+    expect(md).toContain('1 pessoa(s) exportaram de uma versão sem a contagem');
+    expect(md).toContain('| Interesse em continuar (declarado) | resposta a "Você continuaria estudando aqui sozinho?" | sim: 1, talvez: 0, nao: 1, nao perguntado: 0 |');
+    expect(md).toContain('| Compras | pagamentos feitos | nenhuma: nesta rodada nada é vendido |');
+    const semContagem = relatorio(analisar([participantes[2]!], [], JORNADA));
+    expect(semContagem).toContain('não registrado: as exportações são de uma versão do site sem a contagem');
+  });
+
+  it('tarefas: vale a última anotação de cada pessoa, "T2" e acentos não fazem diferença', () => {
+    const t2 = a.tarefas.find((t) => t.n === 2)!;
+    expect(t2.resultados).toEqual({ sozinha: 1, 'com uma pergunta': 1, 'nao conseguiu': 0, 'nao feita': 0 });
+    expect(t2.medianaMin).toBe(3);
+    expect(a.tarefas.find((t) => t.n === 8)!.resultados['nao conseguiu']).toBe(1);
+    expect(relatorio(a)).toContain('| 2. Começar a estudar | 1 | 1 | 1 | 0 | 0 | 3 |');
+  });
+
+  it('avisa de tarefa ou resultado fora da lista e de quem não tem arquivo', () => {
+    const t = lerTarefas('participante,sessao,tarefa,resultado,minutos,observacao\nP09,1,9,quase,,\n');
+    expect(analisar(participantes, [], JORNADA, [], t).avisos).toEqual([
+      'tarefas, linha 2: tarefa fora da lista (1 a 8).',
+      'tarefas, linha 2: resultado "quase" fora da lista (sozinha, com uma pergunta, nao conseguiu, nao feita).',
+      'tarefas, linha 2: P09 não tem arquivo de progresso.',
+    ]);
+  });
+
+  it('o modelo em docs/piloto tem as colunas, e a linha de exemplo não conta', () => {
+    expect(lerTarefas(readFileSync(new URL('../../docs/piloto/tarefas-observadas.csv', import.meta.url), 'utf8'))).toEqual([]);
   });
 });
 

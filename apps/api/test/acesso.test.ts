@@ -266,3 +266,32 @@ describe('migração 6 (concessões) num banco com dados', () => {
     db2.close();
   });
 });
+
+describe('acesso temporário do piloto (scripts/plano.ts --piloto)', () => {
+  let dir = '';
+  afterEach(() => dir && rmSync(dir, { recursive: true, force: true }));
+
+  it('concede premium com prazo e origem "piloto", e recusa sem prazo, com prazo longo ou para o plano gratuito', () => {
+    dir = mkdtempSync(join(tmpdir(), 'plano-piloto-'));
+    const file = join(dir, 'alicerce.db');
+    const criado = openDb(file);
+    criado.prepare("INSERT INTO users (id, email, password_hash, created_at) VALUES ('p1', 'p01@exemplo.com', 'x', 0)").run();
+    criado.close();
+    const script = fileURLToPath(new URL('../scripts/plano.ts', import.meta.url));
+    const rodar = (...args: string[]) =>
+      spawnSync(process.execPath, ['--disable-warning=ExperimentalWarning', script, ...args], { encoding: 'utf8', env: { ...process.env, DATABASE_PATH: file, BACKUP_DIR: join(dir, 'backups') } });
+    for (const args of [['premium', '--piloto'], ['premium', '61', '--piloto'], ['free', '10', '--piloto']]) expect(rodar('p01@exemplo.com', ...args).status, args.join(' ')).toBe(2);
+    const antes = Date.now();
+    const r = rodar('p01@exemplo.com', 'premium', '21', '--piloto');
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toContain('Acesso de piloto: temporário');
+    const db2 = openDb(file);
+    const [g] = accessRights(db2, 'p1').filter((x) => x.kind === 'concessao');
+    expect(g).toMatchObject({ source: 'piloto', valid: true });
+    expect(g!.until! - antes).toBeGreaterThanOrEqual(21 * DIA - 1000);
+    expect(g!.until! - antes).toBeLessThan(21 * DIA + 60_000);
+    // passado o prazo, a conta volta ao gratuito sem que ninguém precise lembrar
+    expect(computeAccess(db2, 'p1', antes + 22 * DIA).plan).toBe('free');
+    db2.close();
+  });
+});

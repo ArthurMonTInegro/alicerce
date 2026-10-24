@@ -66,10 +66,18 @@ export interface ProgressState {
   diagnostic?: DiagnosticRecord;
   projects: Record<string, ProjectProgress>;
   interviews: Record<string, { hits: number[]; at: number }>;
+  /**
+   * Perguntas feitas ao tutor, por dia (AAAA-MM-DD no horário do aparelho): só a contagem, nunca
+   * o texto. Serve ao uso do tutor no piloto (docs/PILOTO.md). Ausente em progresso antigo.
+   */
+  tutorUse?: Record<string, number>;
 }
 
 export const MAX_ATTEMPTS = 5000;
 export const MAX_REVIEWS = 5000;
+/** dias guardados em tutorUse (os mais recentes) */
+export const MAX_TUTOR_DAYS = 400;
+const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
 export function emptyProgress(): ProgressState {
   return { version: 1, attempts: [], lessons: {}, modulesDone: {}, forced: {}, testedOut: {}, cards: {}, reviews: [], projects: {}, interviews: {} };
@@ -89,6 +97,13 @@ function minRecord(a: Record<string, number>, b: Record<string, number>): Record
   const out: Record<string, number> = { ...a };
   for (const [k, v] of Object.entries(b)) out[k] = k in out ? Math.min(out[k]!, v) : v;
   return out;
+}
+
+/** Por dia, o maior dos dois: a mesma contagem vinda de dois lugares não soma duas vezes. */
+function maxRecord(a: Record<string, number>, b: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = { ...a };
+  for (const [k, v] of Object.entries(b)) out[k] = Math.max(out[k] ?? 0, v);
+  return Object.fromEntries(Object.entries(out).sort(([x], [y]) => x.localeCompare(y)).slice(-MAX_TUTOR_DAYS));
 }
 
 function pickLatest<T>(a: Record<string, T>, b: Record<string, T>, at: (x: T) => number, tie: (x: T, y: T) => T): Record<string, T> {
@@ -130,6 +145,7 @@ export function mergeProgress(a: ProgressState, b: ProgressState): ProgressState
     interviews: pickLatest(a.interviews, b.interviews, (p) => p.at, tieByJson),
   };
   if (diag) merged.diagnostic = diag;
+  if (a.tutorUse || b.tutorUse) merged.tutorUse = maxRecord(a.tutorUse ?? {}, b.tutorUse ?? {});
   return merged;
 }
 
@@ -215,6 +231,14 @@ export function sanitizeProgress(raw: unknown): ProgressState {
   };
   const d = r.diagnostic as Record<string, unknown> | undefined;
   if (d && Array.isArray(d.answers) && Array.isArray(d.results) && timestamp(d.at) && JSON.stringify(d).length < 20_000) out.diagnostic = d as unknown as DiagnosticRecord;
+  if (r.tutorUse && typeof r.tutorUse === 'object' && !Array.isArray(r.tutorUse)) {
+    const dias = Object.entries(r.tutorUse as Record<string, unknown>)
+      .filter((e): e is [string, number] => DAY_KEY.test(e[0]) && num(e[1]) && Number.isInteger(e[1]) && e[1] > 0)
+      .map(([k, v]) => [k, Math.min(v, 1000)] as const)
+      .sort(([x], [y]) => x.localeCompare(y))
+      .slice(-MAX_TUTOR_DAYS);
+    out.tutorUse = Object.fromEntries(dias);
+  }
   return out;
 }
 

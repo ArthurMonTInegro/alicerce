@@ -2,7 +2,7 @@
  * Análise do piloto: lê o progresso exportado pelos participantes, o registro de
  * dificuldades observadas e as anotações das conversas, e escreve um relatório em Markdown.
  *
- *   node scripts/piloto/analisar.ts <pasta com os JSON> [--registro <arquivo.csv>] [--conversas <arquivo.csv>] [--csv <pasta>]
+ *   node scripts/piloto/analisar.ts <pasta com os JSON> [--registro <arquivo.csv>] [--conversas <arquivo.csv>] [--tarefas <arquivo.csv>] [--csv <pasta>]
  *
  * Cada arquivo é o "Exportar JSON" da página Progresso, renomeado com o código do
  * participante: P01.json, ou P01-semana2.json (o código vai até o primeiro "-").
@@ -11,7 +11,8 @@
  *
  * O que a exportação tem: tentativas de exercício (acertou, dicas, erros, viu a
  * resposta, tempo desde que a etapa abriu), lições visitadas e concluídas,
- * revisões de cartões. Não tem nome, e-mail nem o código escrito.
+ * revisões de cartões e, a partir de 24/10/2026, quantas perguntas a pessoa fez ao tutor por
+ * dia (só a contagem). Não tem nome, e-mail, o texto das perguntas nem o código escrito.
  *
  * --csv grava exercicios.csv e licoes.csv nessa pasta, para abrir numa planilha.
  */
@@ -161,18 +162,18 @@ export function lerCsv(texto: string): string[][] {
 }
 
 /** Lê um CSV com as colunas pedidas (em qualquer ordem), sem a linha do participante "exemplo". */
-function lerTabela(texto: string, colunas: readonly string[], nome: string): Array<{ linha: number; v: (c: string) => string }> {
+function lerTabela(texto: string, colunas: readonly string[], nome: string, opcionais: readonly string[] = []): Array<{ linha: number; v: (c: string) => string }> {
   const [cab, ...resto] = lerCsv(texto.replace(/^﻿/, ''));
-  const pos = new Map(colunas.map((c) => [c, cab?.map((x) => x.trim().toLowerCase()).indexOf(c) ?? -1]));
+  const pos = new Map([...colunas, ...opcionais].map((c) => [c, cab?.map((x) => x.trim().toLowerCase()).indexOf(c) ?? -1]));
   const faltam = colunas.filter((c) => pos.get(c)! < 0);
   if (faltam.length) throw new Error(`${nome} sem as colunas: ${faltam.join(', ')}`);
   return resto
-    .map((l, i) => ({ linha: i + 2, v: (c: string) => (l[pos.get(c)!] ?? '').trim() }))
+    .map((l, i) => ({ linha: i + 2, v: (c: string) => (pos.get(c)! < 0 ? '' : (l[pos.get(c)!] ?? '').trim()) }))
     .filter((l) => l.v('participante') && l.v('participante').toLowerCase() !== 'exemplo');
 }
 
 const COLUNAS = ['participante', 'data', 'licao', 'exercicio', 'tipo', 'descricao', 'o_que_destravou', 'gravidade'] as const;
-export const TIPOS = ['conceito', 'enunciado', 'interface', 'ambiente', 'outro'];
+export const TIPOS = ['conceito', 'enunciado', 'interface', 'defeito', 'ambiente', 'outro'];
 export const GRAVIDADES = ['baixa', 'media', 'alta'];
 
 export function lerRegistro(texto: string): LinhaRegistro[] {
@@ -200,6 +201,8 @@ export interface Conversa {
   horasDeclaradas: number | null;
   transferencias: Array<{ resultado: string; min: number | null }>;
   pagariaDeclarado: string;
+  /** "Você continuaria estudando aqui sozinho?" (coluna opcional; planilhas antigas não têm) */
+  continuariaDeclarado: string;
 }
 const COLUNAS_CONVERSA = [
   'participante',
@@ -214,6 +217,8 @@ const COLUNAS_CONVERSA = [
 ] as const;
 export const RESULTADOS_TRANSFERENCIA = ['sozinha', 'com perguntas', 'nao resolveu', 'nao fez'];
 export const PAGARIA = ['sim', 'talvez', 'nao', 'nao perguntado'];
+/** As mesmas respostas valem para "continuaria" */
+export const CONTINUARIA = PAGARIA;
 
 function semAcento(s: string) {
   return s
@@ -228,14 +233,47 @@ const numero = (s: string) => {
 };
 
 export function lerConversas(texto: string): Conversa[] {
-  return lerTabela(texto, COLUNAS_CONVERSA, 'conversas').map(({ v }) => ({
+  return lerTabela(texto, COLUNAS_CONVERSA, 'conversas', ['continuaria_declarado']).map(({ v }) => ({
     participante: v('participante').toUpperCase(),
     aparelho: semAcento(v('aparelho')),
     jaProgramou: semAcento(v('ja_programou')),
     horasDeclaradas: numero(v('horas_semana_declaradas')),
     transferencias: [1, 2].map((k) => ({ resultado: semAcento(v(`transferencia_${k}`)), min: numero(v(`transferencia_${k}_min`)) })),
     pagariaDeclarado: semAcento(v('pagaria_declarado')),
+    continuariaDeclarado: semAcento(v('continuaria_declarado')),
   }));
+}
+
+/**
+ * As oito tarefas das duas sessões observadas (docs/PILOTO.md, "Tarefas observadas"), cada uma
+ * com um objetivo que quem conduz confere na hora. A sessão 1 tem as tarefas 1 a 5; a 2, de 6 a 8.
+ */
+export const TAREFAS = [
+  { n: 1, sessao: 1, nome: 'Entender a proposta' },
+  { n: 2, sessao: 1, nome: 'Começar a estudar' },
+  { n: 3, sessao: 1, nome: 'Clareza da explicação' },
+  { n: 4, sessao: 1, nome: 'Exercícios' },
+  { n: 5, sessao: 1, nome: 'Tutor' },
+  { n: 6, sessao: 2, nome: 'Voltar outro dia' },
+  { n: 7, sessao: 2, nome: 'Problema novo' },
+  { n: 8, sessao: 2, nome: 'Limite gratuito e assinatura' },
+] as const;
+export const RESULTADOS_TAREFA = ['sozinha', 'com uma pergunta', 'nao conseguiu', 'nao feita'];
+export interface TarefaObservada {
+  linha?: number;
+  participante: string;
+  tarefa: number | null;
+  resultado: string;
+  min: number | null;
+}
+const COLUNAS_TAREFA = ['participante', 'sessao', 'tarefa', 'resultado', 'minutos', 'observacao'] as const;
+
+/** Anotações das sessões observadas (docs/piloto/tarefas-observadas.csv): uma linha por pessoa e tarefa. */
+export function lerTarefas(texto: string): TarefaObservada[] {
+  return lerTabela(texto, COLUNAS_TAREFA, 'tarefas').map(({ linha, v }) => {
+    const n = Number(v('tarefa').replace(/^t/i, ''));
+    return { linha, participante: v('participante').toUpperCase(), tarefa: Number.isInteger(n) && n > 0 ? n : null, resultado: semAcento(v('resultado')), min: numero(v('minutos')) };
+  });
 }
 
 export interface Analise {
@@ -277,9 +315,26 @@ export interface Analise {
     n: number;
     transferencias: Array<{ tarefa: number; resultados: Record<string, number>; medianaMin: number | null }>;
     pagaria: Record<string, number>;
+    continuaria: Record<string, number>;
     horasDeclaradas: number | null;
     nivel1PorAparelho: Array<{ aparelho: string; pessoas: number; concluiram: number }>;
   } | null;
+  /** os indicadores mínimos do piloto (docs/PILOTO.md, "Indicadores mínimos") */
+  indicadores: {
+    ativacao: number;
+    concluiuNivel0: number;
+    concluiuGratuito: number;
+    abriuContinuacao: number;
+    concluiuContinuacao: number;
+    voltouOutroDia: number;
+    comDificuldade: number;
+    pararamAlgumaVez: number;
+    /** exportações com a contagem do tutor (versões de antes de 24/10/2026 não a têm) */
+    tutorRegistrado: number;
+    usaramTutor: number;
+    perguntasAoTutorMediana: number | null;
+  };
+  tarefas: Array<{ n: number; nome: string; sessao: number; resultados: Record<string, number>; medianaMin: number | null }>;
   /** o que nos arquivos de anotação não bate com a jornada ou com os participantes */
   avisos: string[];
 }
@@ -297,7 +352,7 @@ const contagem = (valores: string[], ordem: string[]) => {
   return out;
 };
 
-export function analisar(participantes: Participante[], registro: LinhaRegistro[] = [], jornada = licoesDaJornada(), conversas: Conversa[] = []): Analise {
+export function analisar(participantes: Participante[], registro: LinhaRegistro[] = [], jornada = licoesDaJornada(), conversas: Conversa[] = [], tarefas: TarefaObservada[] = []): Analise {
   const n = participantes.length;
   const avisos: string[] = [];
   const instantes = participantes.flatMap((p) => [...p.progresso.attempts.map((a) => a.at), ...p.progresso.reviews.map((r) => r.at)]);
@@ -378,7 +433,8 @@ export function analisar(participantes: Participante[], registro: LinhaRegistro[
   const onde = (r: LinhaRegistro) => `registro, linha ${r.linha ?? '?'}`;
   const normalizado = registro.map((r) => {
     const exs = porLicao.get(r.licao);
-    if (r.licao && !exs) avisos.push(`${onde(r)}: a lição "${r.licao}" não é da jornada do piloto (confira o id no endereço da página).`);
+    // fora de uma lição (Planos, Progresso), a coluna leva o endereço da página: "/planos"
+    if (r.licao && !exs && !r.licao.startsWith('/')) avisos.push(`${onde(r)}: a lição "${r.licao}" não é da jornada do piloto (confira o id no endereço da página).`);
     if (!r.licao && r.exercicio) avisos.push(`${onde(r)}: exercício sem lição; sem a lição, a posição não diz qual exercício é.`);
     if (r.tipo && !TIPOS.includes(r.tipo)) avisos.push(`${onde(r)}: tipo "${r.tipo}" fora da lista (${TIPOS.join(', ')}).`);
     if (r.gravidade && !GRAVIDADES.includes(r.gravidade)) avisos.push(`${onde(r)}: gravidade "${r.gravidade}" fora da lista (${GRAVIDADES.join(', ')}).`);
@@ -437,6 +493,8 @@ export function analisar(participantes: Participante[], registro: LinhaRegistro[
   for (const c of conversas) {
     if (n && !codigos.has(c.participante)) avisos.push(`conversas: ${c.participante} não tem arquivo de progresso.`);
     if (c.pagariaDeclarado && !PAGARIA.includes(c.pagariaDeclarado)) avisos.push(`conversas: ${c.participante} com pagaria_declarado "${c.pagariaDeclarado}" fora da lista (${PAGARIA.join(', ')}).`);
+    if (c.continuariaDeclarado && !CONTINUARIA.includes(c.continuariaDeclarado))
+      avisos.push(`conversas: ${c.participante} com continuaria_declarado "${c.continuariaDeclarado}" fora da lista (${CONTINUARIA.join(', ')}).`);
     c.transferencias.forEach((t, i) => {
       if (t.resultado && !RESULTADOS_TRANSFERENCIA.includes(t.resultado))
         avisos.push(`conversas: ${c.participante} com transferencia_${i + 1} "${t.resultado}" fora da lista (${RESULTADOS_TRANSFERENCIA.join(', ')}).`);
@@ -459,6 +517,10 @@ export function analisar(participantes: Participante[], registro: LinhaRegistro[
           conversas.map((c) => c.pagariaDeclarado),
           PAGARIA,
         ),
+        continuaria: contagem(
+          conversas.map((c) => c.continuariaDeclarado),
+          CONTINUARIA,
+        ),
         horasDeclaradas: mediana(conversas.flatMap((c) => (c.horasDeclaradas === null ? [] : [c.horasDeclaradas]))),
         nivel1PorAparelho: aparelhos.map((ap) => {
           const deste = conversas.filter((c) => (c.aparelho || 'sem resposta') === ap);
@@ -474,6 +536,47 @@ export function analisar(participantes: Participante[], registro: LinhaRegistro[
       }
     : null;
 
+  for (const t of tarefas) {
+    const onde = `tarefas, linha ${t.linha ?? '?'}`;
+    if (!TAREFAS.some((x) => x.n === t.tarefa)) avisos.push(`${onde}: tarefa fora da lista (1 a ${TAREFAS.length}).`);
+    if (t.resultado && !RESULTADOS_TAREFA.includes(t.resultado)) avisos.push(`${onde}: resultado "${t.resultado}" fora da lista (${RESULTADOS_TAREFA.join(', ')}).`);
+    if (n && !codigos.has(t.participante)) avisos.push(`${onde}: ${t.participante} não tem arquivo de progresso.`);
+  }
+  // a última anotação de cada pessoa em cada tarefa vale (uma tarefa refeita não conta duas vezes)
+  const ultimaPorPessoa = (k: number) => [...new Map(tarefas.filter((t) => t.tarefa === k).map((t) => [t.participante, t])).values()];
+  const resumoTarefas = TAREFAS.map((t) => {
+    const deste = ultimaPorPessoa(t.n);
+    return {
+      n: t.n,
+      nome: t.nome,
+      sessao: t.sessao,
+      resultados: contagem(
+        deste.map((x) => x.resultado),
+        RESULTADOS_TAREFA,
+      ),
+      medianaMin: mediana(deste.flatMap((x) => (x.min === null ? [] : [x.min]))),
+    };
+  });
+
+  // Dias com estudo: exercícios, revisões e perguntas ao tutor (o tutor conta o dia no horário do aparelho).
+  const diasDeEstudo = (p: Participante) => new Set([...activityByDay(p.progresso, FUSO_MIN).keys(), ...Object.keys(p.progresso.tutorUse ?? {})]).size;
+  const perguntas = (p: Participante) => Object.values(p.progresso.tutorUse ?? {}).reduce((x, y) => x + y, 0);
+  const comRegistro = (f: (r: LinhaRegistro) => boolean) => new Set(normalizado.filter(f).map((r) => r.participante)).size;
+  const usaram = participantes.filter((p) => perguntas(p) > 0);
+  const indicadores = {
+    ativacao: conta((p) => !!gratuitas[0] && abriu(p, gratuitas[0].id) && p.progresso.attempts.length > 0),
+    concluiuNivel0: funil[1]!.pessoas,
+    concluiuGratuito: funil[2]!.pessoas,
+    abriuContinuacao: funil[3]!.pessoas,
+    concluiuContinuacao: funil[4]!.pessoas,
+    voltouOutroDia: conta((p) => diasDeEstudo(p) >= 2),
+    comDificuldade: comRegistro(() => true),
+    pararamAlgumaVez: comRegistro((r) => r.gravidade === 'alta'),
+    tutorRegistrado: conta((p) => p.progresso.tutorUse !== undefined),
+    usaramTutor: usaram.length,
+    perguntasAoTutorMediana: mediana(usaram.map(perguntas)),
+  };
+
   return {
     n,
     periodo: instantes.length ? { de: dia(Math.min(...instantes)), ate: dia(Math.max(...instantes)) } : null,
@@ -486,6 +589,8 @@ export function analisar(participantes: Participante[], registro: LinhaRegistro[
     registro: reg,
     candidatos,
     conversas: resumoConversas,
+    indicadores,
+    tarefas: resumoTarefas,
     avisos,
   };
 }
@@ -499,6 +604,44 @@ export function relatorio(a: Analise, avisos: string[] = []): string {
   l.push(`Participantes: ${a.n}${a.periodo ? ` · atividade de ${a.periodo.de} a ${a.periodo.ate} (horário de Fortaleza)` : ''}.`);
   if (a.n < 10) l.push('', `**Amostra pequena (${a.n}).** Os números mostram onde olhar primeiro; não medem a Alicerce nem valem para outros públicos.`);
   for (const w of [...avisos, ...a.avisos]) l.push('', `Aviso: ${w}`);
+
+  const ind = a.indicadores;
+  const pc = (x: number) => `${x} de ${a.n} (${pct(x, a.n)})`;
+  const declarados = (r: Record<string, number> | undefined) =>
+    r
+      ? Object.entries(r)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(', ')
+      : 'sem anotações das conversas';
+  l.push('', '## Indicadores mínimos', '', 'Contagens de pessoas, sem meta: numa amostra deste tamanho elas mostram onde olhar, não medem resultado.', '');
+  l.push('| Indicador | Como é contado | Pessoas |', '|---|---|---|');
+  l.push(`| Ativação | abriu a primeira lição e conferiu pelo menos um exercício | ${pc(ind.ativacao)} |`);
+  l.push(`| Conclusão do nível 0 | todas as lições do nível 0 concluídas | ${pc(ind.concluiuNivel0)} |`);
+  l.push(`| Conclusão do gratuito | todas as lições dos níveis 0 e 1 concluídas | ${pc(ind.concluiuGratuito)} |`);
+  l.push(`| Começou a continuação | abriu a primeira lição de Python (o que a pessoa fez, não o que disse) | ${pc(ind.abriuContinuacao)} |`);
+  l.push(`| Conclusão da continuação | as lições de m2-1 e m2-2 concluídas | ${pc(ind.concluiuContinuacao)} |`);
+  l.push(`| Retorno | estudou em 2 dias ou mais (exercício, revisão ou pergunta ao tutor) | ${pc(ind.voltouOutroDia)} |`);
+  l.push(`| Dificuldade registrada | pelo menos uma linha no registro de dificuldades | ${a.registro.length ? pc(ind.comDificuldade) : 'sem registro'} |`);
+  l.push(`| Parou numa dificuldade | pelo menos uma dificuldade de gravidade alta | ${a.registro.length ? pc(ind.pararamAlgumaVez) : 'sem registro'} |`);
+  l.push(
+    `| Uso do tutor | fez pelo menos uma pergunta ao tutor (contagem do próprio site) | ${
+      ind.tutorRegistrado ? `${ind.usaramTutor} de ${ind.tutorRegistrado} com a contagem${ind.perguntasAoTutorMediana !== null ? `; mediana de ${ind.perguntasAoTutorMediana} pergunta(s) entre quem usou` : ''}` : 'não registrado: as exportações são de uma versão do site sem a contagem'
+    } |`,
+  );
+  l.push(`| Interesse em continuar (declarado) | resposta a "Você continuaria estudando aqui sozinho?" | ${declarados(a.conversas?.continuaria)} |`);
+  l.push(`| Interesse em pagar (declarado) | resposta a "Hoje, você pagaria?"; não é compra | ${declarados(a.conversas?.pagaria)} |`);
+  l.push('| Compras | pagamentos feitos | nenhuma: nesta rodada nada é vendido |');
+  if (ind.tutorRegistrado && ind.tutorRegistrado < a.n) l.push('', `Uso do tutor: ${a.n - ind.tutorRegistrado} pessoa(s) exportaram de uma versão sem a contagem e ficam fora dessa linha.`);
+
+  l.push('', '## Tarefas das sessões observadas', '');
+  if (!a.tarefas.some((t) => Object.values(t.resultados).some((v) => v))) l.push('Sem anotações das sessões (use --tarefas com o CSV de docs/piloto/tarefas-observadas.csv).');
+  else {
+    l.push('Uma linha por tarefa; vale a última anotação de cada pessoa. O objetivo de cada tarefa está em docs/PILOTO.md.', '');
+    l.push(`| Tarefa | Sessão | ${RESULTADOS_TAREFA.join(' | ')} | Minutos (mediana) |`, `|---|---|${'---|'.repeat(RESULTADOS_TAREFA.length)}---|`);
+    for (const t of a.tarefas) l.push(`| ${t.n}. ${t.nome} | ${t.sessao} | ${RESULTADOS_TAREFA.map((k) => t.resultados[k] ?? 0).join(' | ')} | ${t.medianaMin ?? '–'} |`);
+    const fora = a.tarefas.flatMap((t) => Object.entries(t.resultados).filter(([k, v]) => !RESULTADOS_TAREFA.includes(k) && v).map(([k, v]) => `tarefa ${t.n}, ${k}: ${v}`));
+    if (fora.length) l.push('', `Sem resultado anotado ou fora da lista: ${fora.join('; ')}.`);
+  }
 
   l.push('', '## Jornada', '', '| Etapa | Pessoas | Do total |', '|---|---|---|');
   for (const f of a.funil) l.push(`| ${f.etapa} | ${f.pessoas} | ${pct(f.pessoas, a.n)} |`);
@@ -567,6 +710,7 @@ export function relatorio(a: Analise, avisos: string[] = []): string {
     l.push('', 'Concluiu a trilha gratuita, pelo aparelho que a pessoa disse usar mais:', '');
     for (const x of c.nivel1PorAparelho) l.push(`- ${x.aparelho}: ${x.concluiram} de ${x.pessoas}`);
     l.push('', `Horas por semana que as pessoas disseram ter para estudar: mediana ${c.horasDeclaradas ?? '–'} (declarado, não medido).`);
+    l.push('', `**Continuaria estudando sozinha (declarado):** ${declarados(c.continuaria)}.`);
     l.push(
       '',
       '**Intenção declarada de pagar (o que a pessoa respondeu à pergunta "Hoje, você pagaria?"; não é compra):** ' +
@@ -654,15 +798,15 @@ export function dentroDoRepositorio(caminho: string, raiz = RAIZ): boolean {
 }
 
 function main(argv: string[]) {
-  const comValor = ['--registro', '--conversas', '--csv'];
+  const comValor = ['--registro', '--conversas', '--tarefas', '--csv'];
   const pasta = argv.find((a, i) => !a.startsWith('--') && !comValor.includes(argv[i - 1] ?? ''));
   const opcao = (nome: string) => (argv.includes(nome) ? argv[argv.indexOf(nome) + 1] : undefined);
   if (!pasta || !existsSync(pasta)) {
-    console.error('uso: node scripts/piloto/analisar.ts <pasta com os JSON> [--registro <arquivo.csv>] [--conversas <arquivo.csv>] [--csv <pasta>]');
+    console.error('uso: node scripts/piloto/analisar.ts <pasta com os JSON> [--registro <arquivo.csv>] [--conversas <arquivo.csv>] [--tarefas <arquivo.csv>] [--csv <pasta>]');
     process.exit(2);
   }
   const { participantes, avisos } = lerParticipantes(pasta);
-  const fora = [pasta, opcao('--registro'), opcao('--conversas'), opcao('--csv')].filter((x): x is string => !!x && dentroDoRepositorio(x));
+  const fora = [pasta, opcao('--registro'), opcao('--conversas'), opcao('--tarefas'), opcao('--csv')].filter((x): x is string => !!x && dentroDoRepositorio(x));
   for (const x of fora) {
     const m = `${x} está dentro do repositório e fora de piloto-dados/: o git pode levar esses dados para o GitHub. Mova para fora do repositório.`;
     console.error(`Atenção: ${m}`);
@@ -672,7 +816,9 @@ function main(argv: string[]) {
   const registro = regArq ? lerRegistro(readFileSync(regArq, 'utf8')) : [];
   const convArq = opcao('--conversas');
   const conversas = convArq ? lerConversas(readFileSync(convArq, 'utf8')) : [];
-  const a = analisar(participantes, registro, licoesDaJornada(), conversas);
+  const tarArq = opcao('--tarefas');
+  const tarefas = tarArq ? lerTarefas(readFileSync(tarArq, 'utf8')) : [];
+  const a = analisar(participantes, registro, licoesDaJornada(), conversas, tarefas);
   process.stdout.write(relatorio(a, avisos));
   const saida = opcao('--csv');
   if (saida) {
@@ -694,6 +840,10 @@ function main(argv: string[]) {
     writeFileSync(
       join(saida, 'licoes.csv'),
       csv([['licao', 'titulo', 'trecho', 'abriram', 'concluiram'], ...a.licoes.map((x) => [x.id, x.titulo, x.trecho, x.abriram, x.concluiram])]),
+    );
+    writeFileSync(
+      join(saida, 'tarefas.csv'),
+      csv([['tarefa', 'nome', 'sessao', ...RESULTADOS_TAREFA, 'minutos_mediana'], ...a.tarefas.map((t) => [t.n, t.nome, t.sessao, ...RESULTADOS_TAREFA.map((k) => t.resultados[k] ?? 0), t.medianaMin])]),
     );
   }
 }

@@ -60,7 +60,7 @@ demanda a partir de elogios nem tratar 12 entrevistas como representatividade.
 
 ## Piloto — UP21
 
-A primeira rodada (8 a 12 pessoas, jornada gratuita e começo do Python) está pronta para ser conduzida: perfil, convite, termo de consentimento, mensagem de início, roteiro de observação (o desta rodada, mais detalhado que o acima), perguntas, tarefas de transferência, registro de dificuldades, anotações das conversas, a análise do progresso exportado e a ordem do que corrigir estão em [PILOTO.md](PILOTO.md) (21/10/2026, revisto em 23/10/2026).
+A primeira rodada (8 a 12 pessoas, jornada gratuita e começo do Python, começando por 2 pessoas observadas) está pronta para ser conduzida: perfil, convite, termo de consentimento, mensagem de início, questionários, as duas sessões observadas com oito tarefas de objetivo verificável, problemas novos, registro de dificuldades e defeitos, anotações das sessões e das conversas, agenda diária, indicadores mínimos, a análise do progresso exportado, o modelo do relatório e os critérios para prosseguir, corrigir ou interromper estão em [PILOTO.md](PILOTO.md) (21/10/2026, revisto em 23/10 e 24/10/2026).
 
 Meta inicial proposta: 30–50 participantes; não é um resultado ou benchmark.
 Observar ativação (primeira prática), retorno, conclusão, revisão e problemas

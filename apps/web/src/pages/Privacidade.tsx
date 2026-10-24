@@ -11,7 +11,7 @@ export function Privacidade() {
 
       <h2>Sem conta</h2>
       <p>
-        Seu progresso (exercícios tentados, lições concluídas, cartões de revisão, rascunhos de código e respostas do diagnóstico) fica apenas no armazenamento local do seu navegador (<span lang="en">localStorage</span>) e não é enviado ao servidor. O código que você executa roda no próprio navegador.
+        Seu progresso (exercícios tentados, lições concluídas, cartões de revisão, rascunhos de código, respostas do diagnóstico e quantas perguntas você fez ao tutor em cada dia, só a contagem, sem o texto) fica apenas no armazenamento local do seu navegador (<span lang="en">localStorage</span>) e não é enviado ao servidor. O código que você executa roda no próprio navegador.
       </p>
 
       <h2>Com conta</h2>

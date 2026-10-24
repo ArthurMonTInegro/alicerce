@@ -1,2 +1,2 @@
-participante,aparelho,ja_programou,horas_semana_declaradas,transferencia_1,transferencia_1_min,transferencia_2,transferencia_2_min,pagaria_declarado,observacao
-exemplo,celular,nunca,3,com perguntas,22,,,talvez,"Comparou com uma assinatura de streaming; disse que talvez pagasse depois de terminar o gratuito"
+participante,aparelho,ja_programou,horas_semana_declaradas,transferencia_1,transferencia_1_min,transferencia_2,transferencia_2_min,pagaria_declarado,continuaria_declarado,observacao
+exemplo,celular,nunca,3,com perguntas,22,,,talvez,sim,"Comparou com uma assinatura de streaming; disse que talvez pagasse depois de terminar o gratuito"

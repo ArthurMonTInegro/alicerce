@@ -56,7 +56,7 @@ Cada evento do provedor muda só a assinatura a que se refere, e o plano é reca
 
 O servidor decide pelos direitos, a cada pedido. `users.plan` e `users.plan_expires_at` viraram uma cópia do resultado, reescrita na mesma transação de cada mudança e registrada em `plan_changes` (origem `pagamento:<provedor>`, `reembolso:<provedor>`, `admin` ou `conferencia`). A cópia existe para os scripts (`metricas.ts`, `afetados-transicao.ts`) e para o código anterior a esta regra.
 
-O script de administração (`node apps/api/scripts/plano.ts <email> <free|premium> [dias]`) mexe só na concessão manual: a nova substitui a anterior, e `free` só a revoga. Ele não altera assinatura paga; se houver uma em vigor, avisa que ela continua valendo. Tirar o acesso de quem pagou é reembolso, no provedor.
+O script de administração (`node apps/api/scripts/plano.ts <email> <free|premium> [dias]`) mexe só na concessão manual: a nova substitui a anterior, e `free` só a revoga. Ele não altera assinatura paga; se houver uma em vigor, avisa que ela continua valendo. Tirar o acesso de quem pagou é reembolso, no provedor. Com `--piloto`, a concessão é o acesso temporário de participante de piloto: só Premium, de 1 a 60 dias, com a origem `piloto` no histórico, separada das cortesias (`admin`); ver "Acesso durante o piloto" em [PILOTO.md](PILOTO.md).
 
 ## Cobranças e acesso
 

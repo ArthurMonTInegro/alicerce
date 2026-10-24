@@ -5,6 +5,7 @@ import {coachReply,redactSecrets,type CoachMode,type Knowledge,type Turn} from '
 import {Markdown} from '../../lib/markdown.tsx';
 import {STATIC_SITE} from '../../lib/base.ts';
 import {api} from '../../state/api.ts';
+import {countTutorQuestion} from '../../state/store.ts';
 import {closeTutor,takePendingQuestion,useTutor} from './context.ts';
 interface Msg extends Turn {feedback?:'useful'|'unclear';source?:string}
 const MODES:{id:CoachMode;label:string;starter:string}[]=[{id:'learn',label:'Entender',starter:'Explique variáveis com um exemplo'},{id:'debug',label:'Investigar erro',starter:'Quero investigar um erro no meu código'},{id:'practice',label:'Praticar',starter:'Quero praticar funções'},{id:'plan',label:'Planejar',starter:'Tenho 30 minutos hoje. Monte minha sessão de estudo'},{id:'english',label:'Inglês',starter:'Vamos ensaiar uma conversa em inglês'}];
@@ -28,7 +29,7 @@ export function TutorPanel(){
   if(!raw.trim()||running.current)return;
   if(lessonId&&!lessonAccess(accessPlan,lessonId)){setStatus('O tutor desta lição requer Premium ativo.');return;}
   const message=redactSecrets(raw.trim().slice(0,2000));const history=(scopeChanged?[]:msgs).slice(-10).map(({role,text})=>({role,text}));
-  const requestId=++generation.current;running.current=true;setBusy(true);setText('');setMsgs(m=>[...m,{role:'user' as const,text:message}].slice(-40));
+  const requestId=++generation.current;running.current=true;setBusy(true);setText('');setMsgs(m=>[...m,{role:'user' as const,text:message}].slice(-40));countTutorQuestion();
   const abort=new AbortController();controller.current=abort;
   const timer=setTimeout(()=>abort.abort(),30000);
   const context={lessonId,exerciseId:ctx.exerciseId,hintsSeen:ctx.hintsSeen, ...(!scopeChanged&&share?{code:ctx.code?redactSecrets(ctx.code.slice(0,6000)):undefined,error:ctx.error?redactSecrets(ctx.error.slice(0,1500)):undefined}:{})};

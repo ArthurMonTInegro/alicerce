@@ -250,6 +250,13 @@ export function reviewCard(cardId: string, grade: Grade) {
   }));
 }
 
+/** Conta uma pergunta ao tutor no dia de hoje (horário do aparelho). Só a contagem, nunca o texto. */
+export function countTutorQuestion() {
+  const d = new Date();
+  const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  update((s) => ({ ...s, tutorUse: { ...s.tutorUse, [day]: (s.tutorUse?.[day] ?? 0) + 1 } }));
+}
+
 /** Adiciona os cartões de uma lição à revisão sem concluí-la (ex.: módulos dispensados). */
 export function enrollCards(cardIds: string[]) {
   const now = Date.now();

@@ -240,6 +240,12 @@ test('piloto na demonstração: o "Exportar JSON" do build estático é lido pel
   while (await dica.count()) await dica.click();
   await ex.getByRole('button', { name: 'Ver solução' }).click();
   await expect(ex.getByText('Solução', { exact: true })).toBeVisible();
+  // uma pergunta ao tutor entra na exportação só como contagem do dia
+  await page.locator('.tutor-fab').click();
+  const painel = page.getByRole('dialog', { name: 'Tutor Alicerce' });
+  await painel.getByRole('textbox', { name: 'Sua pergunta' }).fill('O que é entrada e saída?');
+  await painel.getByRole('textbox', { name: 'Sua pergunta' }).press('Enter');
+  await expect(painel.locator('.msg.tutor')).toHaveCount(2);
   await page.goto(srv.url('progresso/'));
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Exportar JSON' }).click();
@@ -248,15 +254,18 @@ test('piloto na demonstração: o "Exportar JSON" do build estático é lido pel
   await (await download).saveAs(join(pasta, 'P01.json'));
   const r = spawnSync(
     process.execPath,
-    ['scripts/piloto/analisar.ts', pasta, '--registro', 'docs/piloto/registro-dificuldades.csv', '--conversas', 'docs/piloto/conversas.csv'],
+    ['scripts/piloto/analisar.ts', pasta, '--registro', 'docs/piloto/registro-dificuldades.csv', '--conversas', 'docs/piloto/conversas.csv', '--tarefas', 'docs/piloto/tarefas-observadas.csv'],
     { encoding: 'utf8' },
   );
   expect(r.status, r.stderr).toBe(0);
   expect(r.stdout).toContain('Participantes: 1');
   expect(r.stdout).toContain('| Abriu a primeira lição | 1 | 100% |');
   expect(r.stdout).toContain('Fora da tabela: 1 exercício(s) tentados por menos de 3 pessoas');
+  expect(r.stdout).toContain('| Ativação | abriu a primeira lição e conferiu pelo menos um exercício | 1 de 1 (100%) |');
+  expect(r.stdout).toContain('| 1 de 1 com a contagem; mediana de 1 pergunta(s) entre quem usou |');
   // os modelos de docs/piloto só têm a linha de exemplo; os avisos de dados dentro do repositório saem no stderr
   expect(r.stdout).toContain('Sem anotações das conversas');
+  expect(r.stdout).toContain('Sem anotações das sessões');
   expect(r.stderr).toContain('docs/piloto/registro-dificuldades.csv está dentro do repositório');
   expect(erros).toEqual([]);
 });

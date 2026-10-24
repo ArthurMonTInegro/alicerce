@@ -76,3 +76,26 @@ describe('sanitizeProgress (entrada hostil)', () => {
     expect(p.cards.c).toEqual({ reps: 0, lapses: 0, stability: 1, difficulty: 5, due: 2, lastReview: 1 });
   });
 });
+
+describe('uso do tutor por dia (só a contagem)', () => {
+  it('mescla pelo maior de cada dia: comutativa, idempotente, sem somar a mesma contagem duas vezes', () => {
+    const a = { ...emptyProgress(), tutorUse: { '2026-10-20': 3, '2026-10-21': 1 } };
+    const b = { ...emptyProgress(), tutorUse: { '2026-10-21': 4, '2026-10-22': 2 } };
+    expect(mergeProgress(a, b).tutorUse).toEqual({ '2026-10-20': 3, '2026-10-21': 4, '2026-10-22': 2 });
+    expect(mergeProgress(a, b)).toEqual(mergeProgress(b, a));
+    expect(mergeProgress(a, a)).toEqual(a);
+    // progresso antigo, sem o campo, continua igual depois da mescla
+    expect('tutorUse' in mergeProgress(emptyProgress(), emptyProgress())).toBe(false);
+    expect(mergeProgress(emptyProgress(), b).tutorUse).toEqual(b.tutorUse);
+  });
+
+  it('guarda só dias válidos com contagens inteiras positivas, até 400 dias', () => {
+    const p = sanitizeProgress({ tutorUse: { '2026-10-20': 2, ontem: 3, '2026-10-21': -1, '2026-10-22': 1.5, '2026-10-23': 99999, __proto__: 1 } });
+    expect(p.tutorUse).toEqual({ '2026-10-20': 2, '2026-10-23': 1000 });
+    const muitos = Object.fromEntries(Array.from({ length: 450 }, (_, i) => [new Date(Date.UTC(2025, 0, 1) + i * DAY).toISOString().slice(0, 10), 1]));
+    const q = sanitizeProgress({ tutorUse: muitos });
+    expect(Object.keys(q.tutorUse!)).toHaveLength(400);
+    expect(Object.keys(q.tutorUse!)[0]).toBe(new Date(Date.UTC(2025, 0, 1) + 50 * DAY).toISOString().slice(0, 10));
+    expect('tutorUse' in sanitizeProgress({ tutorUse: [1, 2] })).toBe(false);
+  });
+});

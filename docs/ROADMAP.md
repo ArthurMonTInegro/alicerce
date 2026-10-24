@@ -44,7 +44,7 @@ Na ordem em que um destrava o outro. Os três primeiros dependem do Arthur.
 6. **Custo da IA**: medir com o provedor (a rodada está pronta em [TUTOR-AVALIACAO.md](TUTOR-AVALIACAO.md)) e validar se 20 por dia dentro de 200 por mês e o teto global de 300 por dia cabem no orçamento, antes de oferecer o Premium (UP04).
 7. **Provedor de pagamento**: o Asaas foi escolhido e o adaptador está escrito; falta a conta do sandbox e rodar nele a lista de [PAGAMENTO.md](PAGAMENTO.md), "Asaas" (UP27).
 8. **Isolamento no Firefox e no Safari** (UP03).
-9. **Pessoas reais**: observações de uso (UP18), entrevistas (UP20) e piloto (UP21). Sem isso, nenhum portão de fase é cumprido. A primeira rodada, com 8 a 12 pessoas na demonstração pública e sem custo, está pronta em [PILOTO.md](PILOTO.md) desde 21/10/2026, revista em 23/10/2026 com perfil, convite, mensagem de início, roteiro de observação próprio e a ordem do que corrigir; falta recrutar e conduzir.
+9. **Pessoas reais**: observações de uso (UP18), entrevistas (UP20) e piloto (UP21). Sem isso, nenhum portão de fase é cumprido. A primeira rodada, com 8 a 12 pessoas na demonstração pública e sem custo, está pronta em [PILOTO.md](PILOTO.md) desde 21/10/2026, revista em 23/10/2026 com perfil, convite, mensagem de início, roteiro de observação próprio e a ordem do que corrigir, e em 24/10/2026 com duas ondas (2 pessoas observadas antes das demais), oito tarefas de objetivo verificável, agenda diária, indicadores mínimos, modelo de relatório e critérios para prosseguir, corrigir ou interromper; falta recrutar e conduzir.
 
 Só depois desses passos a liberação paga (UP29) pode ser avaliada.
 
