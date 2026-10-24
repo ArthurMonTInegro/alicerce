@@ -37,6 +37,7 @@ import {
   chargeStatusOf,
   deriveSubscription,
   eventTypeFor,
+  getCharge,
   latestCoverage,
   recordCharge,
   WAS_PAID,
@@ -809,6 +810,12 @@ function syncSubscription(db: DatabaseSync, id: string, ev: PaymentEvent, now: n
   );
 }
 
+/** O período da cobrança reembolsada e se a assinatura dela continua renovando (avisos.ts). */
+function chargeRefundInfo(db: DatabaseSync, s: SubscriptionRow, chargeId: string) {
+  const c = getCharge(db, s.provider, chargeId);
+  return { de: c?.covers_from ?? null, ate: c?.covers_until ?? null, renova: s.status === "ativa" };
+}
+
 /** O e-mail que o evento pede, se pede algum (avisos.ts), na mesma transação. */
 function queueSubscriptionEmail(
   db: DatabaseSync,
@@ -866,6 +873,7 @@ function queueSubscriptionEmail(
         ...data,
         premiumAte: access.plan === "premium" ? access.expiresAt : null,
         premiumSemFim: access.plan === "premium" && access.expiresAt === null,
+        ...(ev.chargeId ? { cobranca: chargeRefundInfo(db, after, ev.chargeId) } : {}),
       },
       now,
     );

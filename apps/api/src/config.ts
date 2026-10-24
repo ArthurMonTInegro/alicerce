@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { DEFAULT_TUTOR_DAILY_LIMIT } from '@alicerce/engine';
 import { resolvePremiumDir } from '@alicerce/content/completo';
 import type { AsaasBillingType, AsaasEnvironment } from './asaas.ts';
+import type { ResendConfig } from './email.ts';
 
 export interface Config {
   port: number;
@@ -33,11 +34,15 @@ export interface Config {
   /** Endereço público do servidor, para os links dos e-mails (APP_URL). */
   appUrl: string;
   /**
-   * Enquanto não há fornecedor de e-mail, os e-mails (recuperação de senha) são gravados
-   * neste arquivo, um JSON por linha (EMAIL_LOG_PATH). null = recuperação de senha desligada.
-   * Padrão: apps/api/data/emails.log. Em produção, sempre null, até haver um provedor de envio.
+   * Sem fornecedor de e-mail, os e-mails são gravados neste arquivo, um JSON por linha
+   * (EMAIL_LOG_PATH), para testes. Padrão: apps/api/data/emails.log. Em produção, sempre null.
    */
   emailLogPath: string | null;
+  /**
+   * EMAIL_PROVEDOR=resend, com RESEND_API_KEY e EMAIL_REMETENTE (e, se quiser, EMAIL_RESPONDER_PARA):
+   * o envio de verdade (email.ts), no lugar do arquivo. null = sem fornecedor.
+   */
+  resend: ResendConfig | null;
   /**
    * 'teste' liga o provedor de pagamento simulado (recusado em produção); 'asaas', o adaptador
    * do Asaas (asaas.ts), no sandbox a não ser que ASAAS_AMBIENTE=producao; null = Premium sem venda.
@@ -71,6 +76,14 @@ const int = (v: string | undefined, dflt: number) => {
   return Number.isFinite(n) && n >= 0 ? n : dflt;
 };
 
+function emailProvider(env: NodeJS.ProcessEnv): ResendConfig | null {
+  const p = env.EMAIL_PROVEDOR?.trim().toLowerCase();
+  if (!p) return null;
+  // Um nome errado desligaria os e-mails sem ninguém notar: melhor o servidor não subir.
+  if (p !== 'resend') throw new Error(`EMAIL_PROVEDOR desconhecido: "${p.slice(0, 40)}" (o único é "resend").`);
+  return { apiKey: env.RESEND_API_KEY ?? '', from: env.EMAIL_REMETENTE ?? '', replyTo: env.EMAIL_RESPONDER_PARA?.trim() || null };
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const production = env.NODE_ENV === 'production';
   const port = int(env.PORT, 3001);
@@ -91,6 +104,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     appUrl: (env.APP_URL || `http://127.0.0.1:${port}`).replace(/\/+$/, ''),
     // Em produção, nunca: o arquivo não entrega nada, e a tela diria "enviamos um link".
     emailLogPath: production ? null : env.EMAIL_LOG_PATH || fileURLToPath(new URL('../data/emails.log', import.meta.url)),
+    resend: emailProvider(env),
     paymentProvider: env.PAGAMENTO_PROVEDOR === 'teste' || env.PAGAMENTO_PROVEDOR === 'asaas' ? env.PAGAMENTO_PROVEDOR : null,
     asaas:
       env.PAGAMENTO_PROVEDOR === 'asaas'

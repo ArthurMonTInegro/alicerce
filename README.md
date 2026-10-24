@@ -36,8 +36,9 @@ Todas são opcionais. Para não repeti-las a cada comando, copie `.env.example` 
 | `TUTOR_DAILY_LIMIT` | `20` | Teto diário de IA Premium (não aumenta o máximo de 20); 200/mês calendário UTC. Gratuito: sem IA externa. |
 | `TUTOR_GLOBAL_DAILY_LIMIT` | `300` | Teto de chamadas à IA por dia (UTC), somando todas as contas; atingido, todos usam o tutor local até o dia seguinte. `0` desliga a IA. Valor provisório, até medir o custo real por chamada (`apps/api/scripts/metricas.ts`) |
 | `APP_URL` | `http://127.0.0.1:<PORT>` | Endereço público do servidor, usado nos links dos e-mails |
-| `EMAIL_LOG_PATH` | `apps/api/data/emails.log` (desligado em produção) | Enquanto não há provedor de envio, os e-mails (recuperação de senha) vão para este arquivo. Em produção a recuperação responde 503. Ver [docs/PAGAMENTO.md](docs/PAGAMENTO.md) |
-| `PAGAMENTO_PROVEDOR` | vazio | `teste` liga o pagamento simulado (nada é cobrado; recusado com `NODE_ENV=production`). Vazio: Premium sem venda |
+| `EMAIL_PROVEDOR` | vazio | `resend` liga o envio de verdade pelo Resend, com `RESEND_API_KEY`, `EMAIL_REMETENTE` e, opcional, `EMAIL_RESPONDER_PARA`; outro valor não deixa o servidor subir. Testado só contra um fetch simulado. Ver [docs/OPERACAO.md](docs/OPERACAO.md), "E-mail" |
+| `EMAIL_LOG_PATH` | `apps/api/data/emails.log` (desligado em produção) | Sem `EMAIL_PROVEDOR`, os e-mails vão para este arquivo, para testes. Em produção sem fornecedor, a recuperação de senha responde 503 e os avisos esperam na fila |
+| `PAGAMENTO_PROVEDOR` | vazio | `teste` liga o pagamento simulado (nada é cobrado; recusado com `NODE_ENV=production`); `asaas`, o adaptador do Asaas no sandbox, com `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` (testado só contra uma simulação; ver [docs/PAGAMENTO.md](docs/PAGAMENTO.md), "Asaas"). Vazio: Premium sem venda |
 | `PAGAMENTO_WEBHOOK_SEGREDO` | aleatório a cada início | Segredo HMAC dos webhooks do provedor |
 | `AUTH_RATE_LIMIT` | `10` | Tentativas de cadastro e de entrada por IP em 15 minutos; só muda fora de produção (o e2e usa 50) |
 | `TRUST_PROXY` | `false` | Ative só atrás de um proxy reverso conhecido |
@@ -122,6 +123,7 @@ docs               documentação do projeto
 - [Testes](docs/TESTES.md)
 - [Segurança](docs/SEGURANCA.md)
 - [Pagamento e recuperação de senha (ambiente de teste)](docs/PAGAMENTO.md)
+- [Validação das integrações](docs/VALIDACAO-INTEGRACOES.md): pagamento e e-mail, fluxo por fluxo, o que foi testado localmente e o que falta no sandbox
 - [Conteúdo pago no repositório privado](docs/PREMIUM.md)
 - [Operação](docs/OPERACAO.md): backup, restauração, volta de versão e resposta a incidente
 - [Roadmap](docs/ROADMAP.md)

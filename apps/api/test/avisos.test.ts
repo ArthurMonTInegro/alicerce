@@ -101,13 +101,13 @@ describe('e-mails da assinatura', () => {
   it('fornecedor de e-mail fora do ar: o aviso espera e sai numa nova tentativa, sem duplicar', async () => {
     quebrado = true;
     await assinar();
-    expect(await enviar()).toEqual({ enviados: 0, falhas: 1 });
+    expect(await enviar()).toEqual({ enviados: 0, falhas: 1, esgotados: 0, erros: { ['erro inesperado no envio (Error)']: 1 } });
     expect(fila()).toEqual([{ kind: 'compra', attempts: 1, enviado: 0 }]);
     quebrado = false;
-    expect(await enviar()).toEqual({ enviados: 0, falhas: 0 }); // ainda dentro da espera
+    expect(await enviar()).toMatchObject({ enviados: 0, falhas: 0 }); // ainda dentro da espera
     const ctx = { appUrl: 'https://alicerce.exemplo', seller: null };
-    expect(await drainOutbox(db, mailer, ctx, Date.now() + 2 * 60_000)).toEqual({ enviados: 1, falhas: 0 });
-    expect(await drainOutbox(db, mailer, ctx, Date.now() + 3 * 60_000)).toEqual({ enviados: 0, falhas: 0 });
+    expect(await drainOutbox(db, mailer, ctx, Date.now() + 2 * 60_000)).toMatchObject({ enviados: 1, falhas: 0 });
+    expect(await drainOutbox(db, mailer, ctx, Date.now() + 3 * 60_000)).toMatchObject({ enviados: 0, falhas: 0 });
     expect(mails).toHaveLength(1);
     expect(mails[0]!.text).toContain('identificação ainda não configurada');
   });
@@ -117,7 +117,7 @@ describe('e-mails da assinatura', () => {
     await assinar();
     const ctx = { appUrl: 'https://x', seller: null };
     for (let i = 0, t = Date.now(); i < MAX_ATTEMPTS + 2; i++, t += 3 * DIA) await drainOutbox(db, mailer, ctx, t);
-    expect(db.prepare('SELECT attempts, sent_at, last_error FROM email_outbox').get()).toEqual({ attempts: MAX_ATTEMPTS, sent_at: null, last_error: 'fornecedor de e-mail fora do ar' });
+    expect(db.prepare('SELECT attempts, sent_at, last_error FROM email_outbox').get()).toEqual({ attempts: MAX_ATTEMPTS, sent_at: null, last_error: 'erro inesperado no envio (Error)' }); // só o tipo: a mensagem de um erro qualquer poderia trazer o destinatário ou o texto
   });
 
   it('sem fornecedor de e-mail, os avisos esperam na fila', async () => {
@@ -128,7 +128,7 @@ describe('e-mails da assinatura', () => {
     const s = await semEmail.inject({ method: 'POST', url: '/api/assinatura', headers: { ...H, cookie: c }, payload: { periodo: 'mensal' } });
     const id = decodeURIComponent(new URL(s.json().url, 'http://x').hash.slice('#a='.length));
     await semEmail.inject({ method: 'POST', url: '/api/pagamento/teste/simular', headers: { ...H, cookie: c }, payload: { assinatura: id, resultado: 'aprovar' } });
-    expect(await semEmail.rotinas.enviarEmails()).toEqual({ enviados: 0, falhas: 0 });
+    expect(await semEmail.rotinas.enviarEmails()).toEqual({ enviados: 0, falhas: 0, esgotados: 0, erros: {} });
     expect(outro.prepare('SELECT COUNT(*) AS n FROM email_outbox WHERE sent_at IS NULL').get()).toEqual({ n: 1 });
   });
 

@@ -21,6 +21,7 @@ process.on('SIGTERM', shutdown);
 
 await app.listen({ port: config.port, host: config.host });
 app.log.info(`tutor: ${config.anthropicApiKey ? `IA (${config.tutorModel})` : 'offline'}`);
+app.log.info(`e-mail: ${config.resend ? 'Resend' : config.emailLogPath ? 'arquivo, só para testes' : 'nenhum fornecedor (recuperação de senha desligada, avisos esperam na fila)'}`);
 
 // Conciliação com o provedor de pagamento: recupera webhooks perdidos (conciliacao.ts). O que
 // precisa de alguém sai como aviso uma vez por caso a cada 24 h; o esperado, só no resumo.
@@ -41,7 +42,10 @@ if (app.pagamentos && config.reconcileMinutes > 0) {
 // E-mails da assinatura que ficaram na fila (fornecedor fora do ar, servidor reiniciado): avisos.ts.
 const enviar = () =>
   app.rotinas.enviarEmails().then(
-    (r) => r.falhas && app.log.warn({ emails: r }, 'e-mails da assinatura com falha no envio'),
+    (r) => {
+      if (r.falhas) app.log.warn({ emails: r }, 'e-mails da assinatura com falha no envio');
+      if (r.esgotados) app.log.error({ emails: { esgotados: r.esgotados, erros: r.erros } }, 'e-mails da assinatura que não serão mais tentados: ver email_outbox (last_error) e reenviar à mão');
+    },
     (e) => app.log.error({ err: e }, 'falha ao enviar os e-mails da fila'),
   );
 void enviar();

@@ -16,7 +16,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import { AsaasPaymentProvider, asaasRefs, coverageEnd } from '../src/asaas.ts';
 import { addPeriod, applyPaymentEvent, createSubscription, getSubscription, ProviderUnavailable, recordProviderRef, type PaymentEvent, type Period } from '../src/assinatura.ts';
+import { drainOutbox } from '../src/avisos.ts';
 import { chargesOf } from '../src/cobrancas.ts';
+import type { Mail } from '../src/email.ts';
 import { reconcile, ReconcileAlerts, type ReconcileReport } from '../src/conciliacao.ts';
 import { MIGRATIONS, openDb } from '../src/db.ts';
 import { computeAccess, setPlan } from '../src/plans.ts';
@@ -81,6 +83,39 @@ describe('reembolso de uma cobrança antiga na mesma assinatura (regressão)', (
     const r = await reconcile(c.db, c.provider, c.sim.now);
     expect(r).toMatchObject({ corrigidas: [], divergencias: [] });
     expect(c.plano()).toEqual({ plan: 'premium', expiresAt: fim2 });
+  });
+});
+
+describe('o e-mail do reembolso de uma cobrança', () => {
+  const ler = async (db: DatabaseSync, now: number) => {
+    const mails: Mail[] = [];
+    await drainOutbox(db, { name: 'memoria', send: async (m) => void mails.push(m) }, { appUrl: 'https://alicerce.exemplo', seller: null }, now);
+    return mails.filter((m) => m.subject.startsWith('Reembolso'));
+  };
+
+  it('de uma cobrança antiga: diz o período dela, que o acesso continua e que a assinatura renova', async () => {
+    const c = cenario();
+    const { primeira, fim2 } = await renovada(c);
+    c.sim.estornarNoPainel(primeira);
+    await c.drain();
+    const [m, ...resto] = await ler(c.db, c.sim.now);
+    expect(resto).toEqual([]);
+    expect(m!.subject).toBe('Reembolso de uma cobrança da sua assinatura do Premium');
+    expect(m!.text).toMatch(/Registramos o reembolso da cobrança de \d+ de \S+ de \d{4} a \d+ de \S+ de \d{4} da sua assinatura Premium mensal/);
+    const fim = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long', timeZone: 'America/Sao_Paulo' }).format(fim2);
+    expect(m!.text).toContain(`A sua conta continua Premium até ${fim}.`);
+    expect(m!.text).toContain('A assinatura continua ativa e renova sozinha');
+    expect(m!.text).not.toContain('plano gratuito');
+    expect(m!.text).not.toContain('integral');
+  });
+
+  it('da cobrança que sustentava o acesso: a conta voltou ao gratuito', async () => {
+    const c = cenario();
+    const { segunda } = await renovada(c);
+    c.sim.estornarNoPainel(segunda);
+    await c.drain();
+    const [m] = await ler(c.db, c.sim.now);
+    expect(m!.text).toContain('Esta cobrança não dá mais acesso ao Premium, e a conta voltou ao plano gratuito');
   });
 });
 

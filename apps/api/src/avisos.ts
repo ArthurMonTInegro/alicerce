@@ -11,8 +11,9 @@
  *
  * Só ficam guardados os fatos (tipo e dados); o texto é montado na hora do envio.
  */
+import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import type { Mail, Mailer } from "./email.ts";
+import { MailError, type Mail, type Mailer } from "./email.ts";
 
 export type EmailKind =
   | "compra"
@@ -29,6 +30,11 @@ export interface EmailData {
   /** depois do reembolso: até quando a conta continua Premium por outro direito (null = não continua) */
   premiumAte?: number | null;
   premiumSemFim?: boolean;
+  /**
+   * Reembolso de uma cobrança só (cobrancas.ts), não da assinatura toda: o período que ela
+   * cobria e se a assinatura continua renovando.
+   */
+  cobranca?: { de: number | null; ate: number | null; renova: boolean };
 }
 
 /** Espera antes de cada nova tentativa de envio; depois da última, o aviso fica como falho. */
@@ -104,6 +110,24 @@ export function renderEmail(kind: EmailKind, to: string, d: EmailData, ctx: Rend
         ? ["", `Se quiser o valor de volta, ainda dá para desistir com reembolso integral até ${dia(d.desistirAte)}, em ${conta}.`]
         : []),
     ]);
+  if (d.cobranca) {
+    const c = d.cobranca;
+    return lines("Reembolso de uma cobrança da sua assinatura do Premium", [
+      c.de !== null
+        ? `Registramos o reembolso da cobrança de ${dia(c.de)} a ${dia(c.ate)} da sua assinatura ${plano}.`
+        : `Registramos o reembolso de uma cobrança da sua assinatura ${plano}, do período que ia até ${dia(c.ate)}.`,
+      "O prazo para o valor aparecer depende do meio de pagamento e do provedor.",
+      "",
+      d.premiumSemFim
+        ? "A sua conta continua Premium, sem data para acabar."
+        : d.premiumAte
+          ? `A sua conta continua Premium até ${dia(d.premiumAte)}.`
+          : "Esta cobrança não dá mais acesso ao Premium, e a conta voltou ao plano gratuito, sem perder o progresso.",
+      ...(c.renova
+        ? ["", `A assinatura continua ativa e renova sozinha ao fim de cada período. Para parar a renovação: ${conta}, na seção "Assinatura do Premium".`]
+        : []),
+    ]);
+  }
   return lines("Reembolso da sua assinatura do Premium", [
     `Registramos o reembolso integral da sua assinatura ${plano}.`,
     "O prazo para o valor aparecer depende do meio de pagamento e do provedor.",
@@ -119,7 +143,19 @@ export function renderEmail(kind: EmailKind, to: string, d: EmailData, ctx: Rend
 export interface DrainReport {
   enviados: number;
   falhas: number;
+  /** avisos que falharam pela última vez nesta rodada e não serão mais tentados */
+  esgotados: number;
+  /** quantas falhas de cada tipo (só o código do fornecedor, sem destinatário nem texto) */
+  erros: Record<string, number>;
 }
+
+/**
+ * A chave de idempotência do envio: o aviso e o texto. A mesma tentativa repetida (o processo
+ * caiu depois de enviar e antes de registrar) não sai duas vezes no fornecedor; um texto que
+ * mudou com o tempo (o prazo de desistência passou) sai com outra chave.
+ */
+const mailKey = (id: number, m: Mail) =>
+  `alicerce/aviso/${id}/${createHash("sha256").update(m.subject).update("\n").update(m.text).digest("hex").slice(0, 32)}`;
 
 /** Envia os avisos pendentes. Sem fornecedor de e-mail, eles esperam na fila. */
 export async function drainOutbox(
@@ -129,7 +165,7 @@ export async function drainOutbox(
   now = Date.now(),
   limit = 50,
 ): Promise<DrainReport> {
-  const report = { enviados: 0, falhas: 0 };
+  const report: DrainReport = { enviados: 0, falhas: 0, esgotados: 0, erros: {} };
   if (!mailer) return report;
   const rows = db
     .prepare(
@@ -142,18 +178,23 @@ export async function drainOutbox(
       .run(now + LEASE_MS, r.id, now);
     if (claimed.changes !== 1) continue;
     try {
-      await mailer.send(renderEmail(r.kind, r.to_address, JSON.parse(r.data) as EmailData, ctx, now));
+      const mail = renderEmail(r.kind, r.to_address, JSON.parse(r.data) as EmailData, ctx, now);
+      await mailer.send({ ...mail, key: mailKey(r.id, mail) });
       db.prepare("UPDATE email_outbox SET sent_at = ?, attempts = attempts + 1, last_error = NULL WHERE id = ?").run(Date.now(), r.id);
       report.enviados++;
     } catch (e) {
+      // Só o código: a mensagem de um erro qualquer poderia trazer o destinatário ou o texto.
+      const code = e instanceof MailError ? e.code : `erro inesperado no envio (${(e as Error)?.name ?? "?"})`;
       const attempts = r.attempts + 1;
       db.prepare("UPDATE email_outbox SET attempts = ?, next_attempt_at = ?, last_error = ? WHERE id = ?").run(
         attempts,
         now + (BACKOFF_MS[attempts - 1] ?? 0),
-        String((e as Error).message).slice(0, 300),
+        code.slice(0, 300),
         r.id,
       );
       report.falhas++;
+      report.erros[code] = (report.erros[code] ?? 0) + 1;
+      if (attempts >= MAX_ATTEMPTS) report.esgotados++;
     }
   }
   return report;

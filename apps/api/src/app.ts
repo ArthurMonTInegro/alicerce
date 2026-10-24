@@ -50,7 +50,7 @@ import {
   RESET_MINUTES,
   type UserRow,
 } from './auth.ts';
-import { FileMailer, type Mailer } from './email.ts';
+import { mailerFor, MailError, type Mailer } from './email.ts';
 import type { Config } from './config.ts';
 import { drainOutbox, type DrainReport } from './avisos.ts';
 import { AsaasPaymentProvider, asaasRefs } from './asaas.ts';
@@ -67,8 +67,9 @@ export interface AppDeps {
   tutor?: TutorProvider;
   /** corpo das aulas (gratuitas + pagas, se o diretório privado foi carregado); padrão: só gratuitas */
   content?: ContentStore;
-  logger?: boolean;
-  /** injetável nos testes; padrão: FileMailer em config.emailLogPath, ou nenhum */
+  /** true: log em JSON na saída padrão; com `stream`, nele (os testes leem o que sai no log) */
+  logger?: boolean | { stream: { write(line: string): void } };
+  /** injetável nos testes; padrão: o que a configuração pede (email.ts, mailerFor) */
   mailer?: Mailer | null;
   /** fetch usado pelo adaptador do Asaas; os testes passam a simulação local da API */
   paymentFetch?: typeof fetch;
@@ -112,7 +113,7 @@ export const PROGRESS_BODY_LIMIT = 4 * 1024 * 1024;
  */
 export const PROGRESS_SYNCS_PER_MINUTE = 60;
 
-export async function buildApp({ config, db, tutor, content = publicContent, logger = false, mailer = config.emailLogPath ? new FileMailer(config.emailLogPath) : null, paymentFetch, anthropicClient }: AppDeps) {
+export async function buildApp({ config, db, tutor, content = publicContent, logger = false, mailer = mailerFor(config), paymentFetch, anthropicClient }: AppDeps) {
   if (config.production && config.paymentProvider === 'teste') throw new Error('O provedor de pagamento de teste (PAGAMENTO_PROVEDOR=teste) não pode rodar com NODE_ENV=production.');
   if (config.paymentProvider === 'asaas') {
     if (!config.asaas?.apiKey || !config.asaas.webhookToken) throw new Error('PAGAMENTO_PROVEDOR=asaas precisa de ASAAS_API_KEY e ASAAS_WEBHOOK_TOKEN no ambiente.');
@@ -120,7 +121,7 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     if (config.asaas.environment === 'producao' && !PREMIUM_FOR_SALE) throw new Error('Cobrança real bloqueada: ASAAS_AMBIENTE=producao só sobe com PREMIUM_FOR_SALE ligado em packages/engine/src/plans.ts.');
   }
   const app = Fastify({
-    logger: logger ? { level: 'info', redact: ['req.headers.cookie', 'req.headers.authorization'] } : false,
+    logger: logger ? { level: 'info', redact: ['req.headers.cookie', 'req.headers.authorization'], ...(logger === true ? {} : { stream: logger.stream }) } : false,
     bodyLimit: BODY_LIMIT,
     trustProxy: config.trustProxy,
   });
@@ -329,7 +330,7 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
           subject: 'Alicerce: trocar a senha',
           text: `Alguém pediu para trocar a senha da conta do Alicerce com este e-mail.\n\nPara escolher uma senha nova, abra este link em até ${RESET_MINUTES} minutos:\n${config.appUrl}/conta/redefinir#t=${token}\n\nSe não foi você, ignore esta mensagem: a senha continua a mesma.`,
         })
-        .catch(() => req.log.error('falha ao enviar o e-mail de recuperação'));
+        .catch((e) => req.log.error({ email: { erro: e instanceof MailError ? e.code : 'erro inesperado' } }, 'falha ao enviar o e-mail de recuperação'));
     }
     return reply.code(202).send({ ok: true });
   });

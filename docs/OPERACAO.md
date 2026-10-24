@@ -145,6 +145,28 @@ Desfazer faz o mesmo caminho (integridade, versão, verificação de uso, dono e
 6. **Verificar**: `/api/health`, entrar com uma conta de teste, sincronizar progresso, `node apps/api/scripts/metricas.ts` com números plausíveis. Faça um backup novo logo depois.
 7. **Registrar**: linha do tempo, causa, o que se perdeu, o que mudou para não repetir.
 
+## E-mail
+
+O servidor manda e-mail para a recuperação de senha e para os avisos da assinatura ([PAGAMENTO.md](PAGAMENTO.md), "E-mails da assinatura"). Na partida, o log diz qual fornecedor está ligado: `e-mail: Resend`, `arquivo, só para testes` ou `nenhum fornecedor` (então a recuperação de senha responde 503 e os avisos esperam na fila).
+
+**Fornecedor recomendado: Resend**, pela documentação oficial lida em 24/10/2026 ([enviar](https://resend.com/docs/api-reference/emails/send-email), [idempotência](https://resend.com/docs/dashboard/emails/idempotency-keys), [erros](https://resend.com/docs/api-reference/errors), [limites](https://resend.com/docs/knowledge-base/account-quotas-and-limits), [preços](https://resend.com/pricing)). O envio é um `POST` com `fetch`, sem dependência nova; a chave de idempotência evita e-mail repetido quando uma tentativa é refeita; o plano gratuito não tem mensalidade: 3.000 e-mails por mês, 100 por dia (a cota volta à meia-noite UTC) e 3 domínios. Acima de 100 por dia, os avisos esperam na fila e a recuperação de senha falha até a cota voltar. Nada foi contratado nem enviado: o `ResendMailer` (`apps/api/src/email.ts`) foi testado só contra um fetch que responde como a documentação (`apps/api/test/email.test.ts`).
+
+O que falta, e é do Arthur:
+
+1. Criar a conta no Resend e uma chave só de envio (a documentação descreve chaves restritas ao envio).
+2. **Um domínio próprio**, verificado no Resend com os registros DNS que o painel mostra. Sem domínio, o Resend só entrega para o e-mail da própria conta (erro 403 para qualquer outro): serve para testar, não para contas de verdade. Hoje o Alicerce não tem domínio (a demonstração está no github.io). Um `.com.br` custa R$ 40,00 por ano no [Registro.br](https://registro.br/dominio/) (24/10/2026): é custo e depende da autorização dele. O piloto na demonstração estática não precisa de e-mail, porque lá não há contas.
+3. No ambiente do servidor (nunca no repositório nem na conversa): `EMAIL_PROVEDOR=resend`, `RESEND_API_KEY`, `EMAIL_REMETENTE` (`Alicerce <nao-responda@dominio>`) e, se quiser, `EMAIL_RESPONDER_PARA`.
+
+Travas: o servidor não sobe com `EMAIL_PROVEDOR` desconhecido, sem a chave, com um remetente que não é endereço, ou em produção com o remetente de teste do `resend.dev`.
+
+Primeiro envio de verdade (preparado, não feito):
+
+1. Num servidor de teste com as variáveis e o remetente `onboarding@resend.dev`, pedir "Esqueci a senha" para o e-mail da própria conta do Resend.
+2. Conferir que o e-mail chegou, que o link abre `/conta/redefinir` e troca a senha, e que o envio aparece nos logs do painel do Resend. No log do servidor não deve aparecer o link nem o endereço.
+3. Com o domínio verificado, repetir para outro endereço e, no sandbox do Asaas, assinar para ver a confirmação da compra chegar.
+
+No log, sem destinatário nem texto: `falha ao enviar o e-mail de recuperação` (com `email.erro`, o código do Resend), `e-mails da assinatura com falha no envio` (contagem por código) e, como erro, `e-mails da assinatura que não serão mais tentados` depois da 7ª tentativa (o aviso fica em `email_outbox`, com `last_error`, para reenviar à mão).
+
 ## Limitações conhecidas
 
 - Os backups ficam no mesmo disco do banco até alguém copiá-los para fora. Agendamento, cópia externa e cifragem não estão automatizados no repositório.

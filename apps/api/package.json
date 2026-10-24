@@ -7,7 +7,8 @@
     "dev": "node --env-file-if-exists=../../.env --watch --disable-warning=ExperimentalWarning src/main.ts",
     "start": "node --env-file-if-exists=../../.env --disable-warning=ExperimentalWarning src/main.ts",
     "backup": "node --env-file-if-exists=../../.env --disable-warning=ExperimentalWarning scripts/backup.ts",
-    "restore": "node --env-file-if-exists=../../.env --disable-warning=ExperimentalWarning scripts/restore.ts"
+    "restore": "node --env-file-if-exists=../../.env --disable-warning=ExperimentalWarning scripts/restore.ts",
+    "homologar:asaas": "node --env-file-if-exists=../../.env --disable-warning=ExperimentalWarning scripts/asaas-homologacao.ts"
   },
   "dependencies": {
     "@alicerce/content": "*",

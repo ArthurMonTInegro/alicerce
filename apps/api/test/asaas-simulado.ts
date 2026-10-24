@@ -108,6 +108,12 @@ export class AsaasSimulado {
   removidaSome = false;
   /** toda chamada responde 503 */
   foraDoAr = false;
+  /**
+   * Os webhooks cadastrados no painel (GET /webhooks, "Listar webhooks"). Suposição: a
+   * listagem traz os campos do cadastro ("Criar novo Webhook pela API") sem o authToken,
+   * que a documentação diz voltar só na criação. A página da listagem não mostra os campos.
+   */
+  webhooks: Array<{ id: string; name: string; url: string; email: string; enabled: boolean; interrupted: boolean; apiVersion: number; sendType: string; events: string[] }> = [];
   /** os próximos `n` webhooks mudam a situação, mas não chegam */
   perderProximos = 0;
 
@@ -171,6 +177,7 @@ export class AsaasSimulado {
         return json(200, { deleted: true, id: s.id });
       }
     }
+    if (method === 'GET' && path === '/webhooks') return pagina(this.webhooks, q);
     if (method === 'GET' && path === '/subscriptions') {
       const ref = q.get('externalReference');
       return pagina(
