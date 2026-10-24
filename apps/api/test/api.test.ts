@@ -8,6 +8,7 @@ import { setPlan } from '../src/plans.ts';
 import { publicContent } from '../src/conteudo.ts';
 import { ClaudeTutor, parseTutorRequest, TUTOR_MAX_TOKENS, tutorSources, type TutorProvider } from '../src/tutor.ts';
 
+import { criarConta } from './cadastro.ts';
 const H = { 'content-type': 'application/json', 'x-alicerce': '1' };
 
 let fixtureDb:ReturnType<typeof openDb>;
@@ -91,7 +92,7 @@ describe('API', () => {
   it('CSRF: caminho codificado (/%61pi/...) não escapa do cabeçalho x-alicerce', async () => {
     // O roteador decodifica o caminho: /%61pi/auth/me é a rota /api/auth/me. Antes, a conferência
     // olhava o texto cru (startsWith('/api/')) e um DELETE sem o cabeçalho apagava a conta.
-    const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'csrf@exemplo.com', password: 'uma frase longa', name: 'C' } });
+    const reg = await criarConta(app, fixtureDb, { email: 'csrf@exemplo.com', password: 'uma frase longa', name: 'C' });
     const cookie = cookieOf(reg);
     for (const [method, url, ct] of [
       ['DELETE', '/%61pi/auth/me', 'application/json'],
@@ -110,17 +111,17 @@ describe('API', () => {
     expect(me.json().user.email).toBe('csrf@exemplo.com');
   });
 
-  it('cadastro, sessão, login, logout', async () => {
-    const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'Ana@Exemplo.com', password: 'uma frase longa', name: 'Ana' } });
+  // O pedido de cadastro e o e-mail com o link: cadastro.test.ts.
+  it('confirmação do cadastro, sessão, login, logout', async () => {
+    const reg = await criarConta(app, fixtureDb, { email: 'Ana@Exemplo.com', password: 'uma frase longa', name: 'Ana' });
     expect(reg.statusCode).toBe(201);
     const setCookie = String(reg.headers['set-cookie']);
     expect(setCookie).toMatch(/HttpOnly/);
     expect(setCookie).toMatch(/SameSite=Lax/);
     const me = await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie: cookieOf(reg) } });
     expect(me.json().user.email).toBe('ana@exemplo.com');
+    expect(me.json().user.name).toBe('Ana');
 
-    const dup = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'ana@exemplo.com', password: 'outra frase longa' } });
-    expect(dup.statusCode).toBe(409);
     const bad = await app.inject({ method: 'POST', url: '/api/auth/login', headers: H, payload: { email: 'ana@exemplo.com', password: 'errada errada' } });
     expect(bad.statusCode).toBe(401);
     const ok = await app.inject({ method: 'POST', url: '/api/auth/login', headers: H, payload: { email: 'ANA@exemplo.com', password: 'uma frase longa' } });
@@ -144,7 +145,7 @@ describe('API', () => {
   }, 30_000); // 10 conferências de senha (scrypt); com a máquina ocupada, passa dos 5 s padrão
 
   it('sincroniza progresso somando os dois lados', async () => {
-    const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'b@b.co', password: 'uma frase longa' } });
+    const reg = await criarConta(app, fixtureDb, { email: 'b@b.co', password: 'uma frase longa' });
     const cookie = cookieOf(reg);
     const a = emptyProgress();
     a.attempts.push({ exerciseId: 'e1', skills: ['s'], difficulty: 'facil', correct: true, score: 1, hintsUsed: 0, wrongTries: 0, revealed: false, at: 1000 });
@@ -161,7 +162,7 @@ describe('API', () => {
   });
 
   it('excluir conta apaga sessão', async () => {
-    const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'c@c.co', password: 'uma frase longa' } });
+    const reg = await criarConta(app, fixtureDb, { email: 'c@c.co', password: 'uma frase longa' });
     const cookie = cookieOf(reg);
     expect((await app.inject({ method: 'DELETE', url: '/api/auth/me', headers: { ...H, cookie }, payload: { password: 'uma frase longa' } })).statusCode).toBe(204);
     expect((await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie } })).json().user).toBeNull();
@@ -181,7 +182,7 @@ describe('API', () => {
     app = await setup(fake);
     const anon = await app.inject({ method: 'POST', url: '/api/tutor', headers: H, payload: { message: 'oi' } });
     expect(anon.json().mode).toBe('offline');
-    const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'd@d.co', password: 'uma frase longa' } });
+    const reg = await criarConta(app, fixtureDb, { email: 'd@d.co', password: 'uma frase longa' });
     const cookie = cookieOf(reg);
     setPlan(fixtureDb,reg.json().user.id,'premium',null,'test');
     const ask = () => app.inject({ method: 'POST', url: '/api/tutor', headers: { ...H, cookie }, payload: { message: 'como começo?' } });
@@ -193,7 +194,7 @@ describe('API', () => {
 
   it('informa indisponibilidade do provedor e mantém apoio local após falha', async () => {
     app=await setup({name:'ia',answer:async()=>{throw new Error('private-provider-detail');}});
-    const reg=await app.inject({method:'POST',url:'/api/auth/register',headers:H,payload:{email:'fallback@test.co',password:'uma frase longa'}});
+    const reg=await criarConta(app,fixtureDb,{email:'fallback@test.co',password:'uma frase longa'});
     setPlan(fixtureDb,reg.json().user.id,'premium',null,'test');
     const res=await app.inject({method:'POST',url:'/api/tutor',headers:{...H,cookie:cookieOf(reg)},payload:{message:'Explique variáveis'}});
     expect(res.json().mode).toBe('offline');expect(res.json().reason).toBe('provider_unavailable');expect(res.json().reply).not.toContain('private-provider-detail');
@@ -203,7 +204,7 @@ describe('API', () => {
     const db = openDb(':memory:');
     const config = { ...loadConfig({}), webDist: '/nao-existe', tutorDailyLimit: 2 };
     app = await buildApp({ config, db, tutor: { name: 'ia', answer: async () => 'pista' } });
-    const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'p@p.co', password: 'uma frase longa' } });
+    const reg = await criarConta(app, db, { email: 'p@p.co', password: 'uma frase longa' });
     expect(reg.json().entitlements.plan).toBe('free');
     const cookie = cookieOf(reg);
     const me = async () => (await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie } })).json();

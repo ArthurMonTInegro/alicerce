@@ -146,7 +146,7 @@ const PROGRESSO = [
  * Páginas do site (a mesma lista de apps/web/src/routes.tsx; tutor-avaliacao.test.ts confere). Um
  * link interno fora dela é uma página inventada.
  */
-export const ROTAS = new Set(['/', '/tutor', '/ingles', '/evolucao', '/autonomia', '/trilha', '/revisao', '/diagnostico', '/laboratorio', '/projetos', '/carreira', '/glossario', '/visualizacoes', '/progresso', '/conta', '/conta/redefinir', '/conta/pagamento-teste', '/metodologia', '/referencias', '/sobre', '/privacidade', '/planos']);
+export const ROTAS = new Set(['/', '/tutor', '/ingles', '/evolucao', '/autonomia', '/trilha', '/revisao', '/diagnostico', '/laboratorio', '/projetos', '/carreira', '/glossario', '/visualizacoes', '/progresso', '/conta', '/conta/redefinir', '/conta/confirmar', '/conta/pagamento-teste', '/metodologia', '/referencias', '/sobre', '/privacidade', '/planos']);
 export const ROTAS_COM_ID = ['/nivel/', '/modulo/', '/licao/', '/projetos/'];
 /** Links internos ([texto](/caminho)) que não levam a nenhuma página do site. */
 export function rotasInventadas(texto: string): string[] {

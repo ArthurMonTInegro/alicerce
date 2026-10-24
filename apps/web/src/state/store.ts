@@ -429,8 +429,17 @@ export async function initAuth() {
   if (user && currentGeneration===generation) await syncNow();
 }
 
-export async function signIn(kind: 'login' | 'register', email: string, password: string, name?: string) {
-  const next = kind === 'login' ? await api.login(email, password) : await api.register(email, password, name ?? '');
+export async function signIn(email: string, password: string) {
+  await enter(await api.login(email, password));
+}
+
+/** O link do e-mail do cadastro: o servidor cria a conta e abre a sessão. */
+export async function confirmSignup(token: string) {
+  await enter(await api.confirmSignup(token));
+}
+
+/** Passa a usar a sessão que o servidor acabou de abrir (login ou confirmação do cadastro). */
+async function enter(next: User) {
   logoutPending=false;markLogoutPending(false);
   switchUser(next);broadcastAuth();
   await syncNow();

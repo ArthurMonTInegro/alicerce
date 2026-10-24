@@ -18,6 +18,7 @@ import { openDb } from '../src/db.ts';
 import { setPlan } from '../src/plans.ts';
 import { ClaudeTutor } from '../src/tutor.ts';
 
+import { criarConta } from './cadastro.ts';
 const DIA = '2026-10-24';
 const PROCESSO = fileURLToPath(new URL('./cota-ia-processo.ts', import.meta.url));
 const run = promisify(execFile);
@@ -125,7 +126,7 @@ describe('novas tentativas depois de falha do provedor', () => {
     const app = await buildApp({ db, config, mailer: null, anthropicClient: client as unknown as Anthropic });
     try {
       const H = { 'x-alicerce': '1', 'content-type': 'application/json' };
-      const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'falha@example.com', password: 'long-password-123' } });
+      const reg = await criarConta(app, db, { email: 'falha@example.com', password: 'long-password-123' });
       setPlan(db, reg.json().user.id as string, 'premium', null, 'test');
       const headers = { ...H, cookie: String(reg.headers['set-cookie']).split(';')[0]! };
       const motivos: string[] = [];

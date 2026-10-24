@@ -108,7 +108,8 @@ Toda mutação exige o cabeçalho `x-alicerce: 1` (defesa contra CSRF somada ao 
 |---|---|---|
 | `GET /api/health` | Situação do servidor e se o tutor com IA está ligado | global 600/min por IP |
 | `GET /api/auth/me` | `{ user, entitlements }` ou `{ user: null, entitlements: null }` | |
-| `POST /api/auth/register` | Cria conta (senha de 10 a 200 caracteres) e já entra | 10 por 15 min por IP |
+| `POST /api/auth/register` | Pede o cadastro (senha de 10 a 200 caracteres): responde sempre 202 `{ ok: true }`, sem sessão, com ou sem conta para o e-mail; sem conta, o e-mail traz o link que cria a conta; com conta, explica como entrar. 503 sem fornecedor de e-mail | 10 por 15 min por IP e, separadamente, por e-mail |
+| `POST /api/auth/confirmar` | Corpo `{ token }` do link do e-mail: cria a conta e já entra (201); 400 com o link vencido (60 min) ou usado; 409 se o e-mail ganhou conta enquanto o link esperava | 10 por 15 min por IP |
 | `POST /api/auth/login` | Entra; tempo constante para e-mail inexistente | 10 por 15 min por IP e, separadamente, por e-mail |
 | `POST /api/auth/logout` | Sai (204) | |
 | `POST /api/auth/sessions/encerrar` | Encerra todas as sessões da conta, inclusive a atual, e limpa o cookie; devolve `{ ended }` | exige sessão |

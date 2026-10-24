@@ -11,6 +11,7 @@ import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db.ts';
 import { FileMailer, MailError, mailerFor, ResendMailer, senderAddress } from '../src/email.ts';
 
+import { criarConta } from './cadastro.ts';
 const CFG = { apiKey: 're_teste_123', from: 'Alicerce <nao-responda@alicerce.exemplo>' };
 const MAIL = { to: 'pessoa@exemplo.com', subject: 'Alicerce: trocar a senha', text: 'link secreto https://x/conta/redefinir#t=abc' };
 
@@ -185,7 +186,7 @@ describe('recuperação de senha com o Resend fora do ar', () => {
       logger: { stream: { write: (l: string) => void linhas.push(l) } },
     });
     const H = { 'content-type': 'application/json', 'x-alicerce': '1' };
-    await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'pessoa@exemplo.com', password: 'uma frase longa' } });
+    await criarConta(app, db, { email: 'pessoa@exemplo.com', password: 'uma frase longa' });
     const com = await app.inject({ method: 'POST', url: '/api/auth/senha/recuperar', headers: H, payload: { email: 'pessoa@exemplo.com' } });
     const sem = await app.inject({ method: 'POST', url: '/api/auth/senha/recuperar', headers: H, payload: { email: 'ninguem@exemplo.com' } });
     expect([com.statusCode, com.body]).toEqual([sem.statusCode, sem.body]);

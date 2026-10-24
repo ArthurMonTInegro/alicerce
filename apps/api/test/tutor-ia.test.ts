@@ -12,6 +12,7 @@ import { openDb } from '../src/db.ts';
 import { setPlan } from '../src/plans.ts';
 import { TUTOR_MAX_TOKENS } from '../src/tutor.ts';
 
+import { criarConta } from './cadastro.ts';
 const H = { 'x-alicerce': '1', 'content-type': 'application/json' };
 type Pedido = { model: string; max_tokens: number; output_config?: { effort?: string }; system: string };
 type Resposta = { stop_reason: string; usage: { input_tokens: number; output_tokens: number }; content: Array<{ type: string; text?: string }> };
@@ -23,7 +24,7 @@ async function setup(env: Record<string, string> = {}, responder: (p: Pedido) =>
   const client = { beta: { messages: { create: async (p: Pedido) => (pedidos.push(p), responder(p)) } } };
   const config = { ...loadConfig({ ANTHROPIC_API_KEY: 'chave-de-teste', ...env }), webDist: '/none', emailLogPath: null };
   const app = await buildApp({ db, config, mailer: null, anthropicClient: client as unknown as Anthropic });
-  const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'ia@example.com', password: 'long-password-123' } });
+  const reg = await criarConta(app, db, { email: 'ia@example.com', password: 'long-password-123' });
   const id = reg.json().user.id as string;
   setPlan(db, id, 'premium', null, 'test');
   const headers = { ...H, cookie: String(reg.headers['set-cookie']).split(';')[0]! };

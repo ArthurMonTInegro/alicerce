@@ -26,6 +26,7 @@ import { computeAccess } from '../src/plans.ts';
 import { AsaasSimulado, nextCycle } from './asaas-simulado.ts';
 import { providerContract, type Delivery } from './contrato-provedor.ts';
 
+import { criarConta } from './cadastro.ts';
 const APP_URL = 'https://alicerce.exemplo';
 const DIA = 86_400_000;
 
@@ -298,7 +299,7 @@ describe('Asaas pelas rotas do servidor', () => {
       mailer: null,
       paymentFetch: sim.fetch,
     });
-    const res = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'b@exemplo.com', password: 'uma frase longa' } });
+    const res = await criarConta(app, db, { email: 'b@exemplo.com', password: 'uma frase longa' });
     const cookie = String(res.headers['set-cookie']).split(';')[0]!;
     const post = (url: string, payload: object = {}) => app.inject({ method: 'POST', url, headers: { ...H, cookie }, payload });
     const estado = async () => (await app.inject({ method: 'GET', url: '/api/assinatura', headers: { cookie } })).json();

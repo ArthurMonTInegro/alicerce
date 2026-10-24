@@ -91,7 +91,10 @@ export const api = {
     }
   },
   login: async (email: string, password: string) => withEnt(await call<AuthReply>('POST', '/auth/login', { email, password }))!,
-  register: async (email: string, password: string, name: string) => withEnt(await call<AuthReply>('POST', '/auth/register', { email, password, name }))!,
+  /** Sempre responde igual, com ou sem conta para o e-mail; a conta só existe depois do link do e-mail. */
+  register: (email: string, password: string, name: string) => call<{ ok: true }>('POST', '/auth/register', { email, password, name }),
+  /** O link do e-mail do cadastro: cria a conta e já entra nela. */
+  confirmSignup: async (token: string) => withEnt(await call<AuthReply>('POST', '/auth/confirmar', { token }))!,
   logout: () => call<void>('POST', '/auth/logout'),
   putProgress: async (p: ProgressState, expectedUserId:string) => (await call<{ progress: ProgressState }>('PUT', '/progress', { progress: p, expectedUserId })).progress,
   /** Encerra todas as sessões da conta, inclusive a deste aparelho; devolve quantas eram. */

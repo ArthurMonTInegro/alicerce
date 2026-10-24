@@ -170,6 +170,18 @@ export const MIGRATIONS: string[] = [
      updated_at, updated_at
    FROM subscriptions
    WHERE paid_until IS NOT NULL AND status IN ('ativa', 'cancelada', 'reembolsada');`,
+  // Cadastro confirmado por e-mail (auth.ts, createPendingSignup): o pedido espera aqui até o
+  // link do e-mail ser aberto, e só então vira uma linha de users. Assim a resposta do cadastro é
+  // a mesma com ou sem conta para o e-mail, e um pedido não confirmado não ocupa o e-mail de
+  // ninguém (um pedido novo para o mesmo e-mail troca o anterior). Só acrescenta.
+  `CREATE TABLE pending_signups (
+     email TEXT PRIMARY KEY COLLATE NOCASE,
+     name TEXT NOT NULL DEFAULT '',
+     password_hash TEXT NOT NULL,
+     token_hash TEXT NOT NULL UNIQUE,
+     created_at INTEGER NOT NULL,
+     expires_at INTEGER NOT NULL
+   );`,
 ];
 
 /** Maior versão de esquema que este código conhece (a restauração recusa backup mais novo). */

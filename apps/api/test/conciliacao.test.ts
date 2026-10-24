@@ -9,6 +9,7 @@ import { getSubscription, signWebhook, TestPaymentProvider, WEBHOOK_ROUTE } from
 import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db.ts';
 
+import { criarConta } from './cadastro.ts';
 const H = { 'content-type': 'application/json', 'x-alicerce': '1' };
 let db: ReturnType<typeof openDb>;
 let app: Awaited<ReturnType<typeof buildApp>>;
@@ -23,7 +24,7 @@ async function subir() {
 beforeEach(async () => {
   db = openDb(':memory:');
   await subir();
-  const r = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'c@exemplo.com', password: 'uma frase longa' } });
+  const r = await criarConta(app, db, { email: 'c@exemplo.com', password: 'uma frase longa' });
   cookie = String(r.headers['set-cookie']).split(';')[0]!;
 });
 const post = (url: string, payload: object = {}) => app.inject({ method: 'POST', url, headers: { ...H, cookie }, payload });

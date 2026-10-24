@@ -34,8 +34,10 @@ import {
 } from './assinatura.ts';
 import {
   clearCookie,
+  consumePendingSignup,
   consumeResetToken,
   COOKIE,
+  createPendingSignup,
   createResetToken,
   createSession,
   deleteSession,
@@ -44,10 +46,12 @@ import {
   hashPassword,
   parseCookies,
   purgeExpiredSessions,
+  purgeExpiredSignups,
   sessionCookie,
   userForToken,
   verifyPassword,
   RESET_MINUTES,
+  SIGNUP_MINUTES,
   type UserRow,
 } from './auth.ts';
 import { mailerFor, MailError, type Mailer } from './email.ts';
@@ -87,7 +91,7 @@ declare module 'fastify' {
     /** o provedor de pagamento em uso (null = Premium sem venda); os testes o manipulam */
     pagamentos: PaymentProvider | null;
     /** rotinas que o servidor roda de tempos em tempos (main.ts) */
-    rotinas: { conciliar(): Promise<ReconcileReport | null>; enviarEmails(): Promise<DrainReport> };
+    rotinas: { conciliar(): Promise<ReconcileReport | null>; enviarEmails(): Promise<DrainReport>; limparCadastros(): number };
   }
 }
 
@@ -240,21 +244,63 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     return { user, entitlements: user ? ent(user.id) : null };
   });
 
+  // Cadastro em dois passos, para a resposta não revelar quem tem conta: o pedido devolve
+  // sempre o mesmo 202, e o e-mail é que diz o resto. Sem conta, o e-mail traz o link que cria
+  // a conta (/api/auth/confirmar); com conta, explica como entrar ou trocar a senha. A senha
+  // passa pelo scrypt nos dois casos, e o envio não é esperado, para o tempo da resposta e uma
+  // falha do fornecedor de e-mail também não revelarem nada.
   app.post('/api/auth/register', async (req, reply) => {
-    const retry = limits.auth.take(`reg:${req.ip}`);
-    if (retry) return tooMany(reply, retry);
+    if (!mailer) return reply.code(503).send({ error: 'O cadastro ainda não está disponível neste servidor.' });
     const b = (req.body ?? {}) as Record<string, unknown>;
     const email = typeof b.email === 'string' ? b.email.trim().toLowerCase() : '';
+    const retry = limits.auth.take(`reg:${req.ip}`) || limits.auth.take(`reg-email:${email.slice(0, 254)}`);
+    if (retry) return tooMany(reply, retry);
     const password = typeof b.password === 'string' ? b.password : '';
     const name = typeof b.name === 'string' ? b.name.trim().slice(0, 80) : '';
     if (!EMAIL.test(email) || email.length > 254) return reply.code(400).send({ error: 'E-mail inválido.' });
     // NIST SP 800-63B: comprimento mínimo, sem regras de composição, aceita espaços e Unicode.
     if (password.length < 10 || password.length > 200) return reply.code(400).send({ error: 'A senha precisa ter entre 10 e 200 caracteres.' });
-    if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(email)) return reply.code(409).send({ error: 'Já existe uma conta com esse e-mail. Tente entrar.' });
+    const passwordHash = await hashPassword(password);
+    const exists = db.prepare('SELECT 1 FROM users WHERE email = ?').get(email);
+    const token = exists ? null : createPendingSignup(db, { email, name, passwordHash });
+    const mail = token
+      ? {
+          to: email,
+          subject: 'Alicerce: confirme o seu cadastro',
+          text: `Alguém pediu para criar uma conta do Alicerce com este e-mail.\n\nPara criar a conta, abra este link em até ${SIGNUP_MINUTES} minutos:\n${config.appUrl}/conta/confirmar#t=${token}\n\nSe não foi você, ignore esta mensagem: sem o link, a conta não é criada.`,
+        }
+      : {
+          to: email,
+          subject: 'Alicerce: você já tem uma conta',
+          text: `Alguém pediu para criar uma conta do Alicerce com este e-mail, mas ele já tem uma conta. Nenhuma conta nova foi criada.\n\nPara entrar, use a senha que você já tem:\n${config.appUrl}/conta\n\nSe esqueceu a senha, na mesma página escolha "Esqueci a senha".\n\nSe não foi você, ignore esta mensagem: nada mudou na sua conta.`,
+        };
+    mailer.send(mail).catch((e) => req.log.error({ email: { erro: e instanceof MailError ? e.code : 'erro inesperado' } }, 'falha ao enviar o e-mail do cadastro'));
+    return reply.code(202).send({ ok: true });
+  });
+
+  // O link do e-mail cria a conta e já entra nela. Quem abre o link tem acesso ao e-mail,
+  // então aqui pode dizer que a conta já existia (outro link criou antes).
+  app.post('/api/auth/confirmar', async (req, reply) => {
+    const retry = limits.auth.take(`confirmar-ip:${req.ip}`);
+    if (retry) return tooMany(reply, retry);
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const token = typeof b.token === 'string' ? b.token : '';
     const id = randomUUID();
-    db.prepare('INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)').run(id, email, name, await hashPassword(password), Date.now());
+    let pending: ReturnType<typeof consumePendingSignup> = null;
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      pending = consumePendingSignup(db, token);
+      const taken = pending && db.prepare('SELECT 1 FROM users WHERE email = ?').get(pending.email);
+      if (pending && !taken) db.prepare('INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)').run(id, pending.email, pending.name, pending.passwordHash, Date.now());
+      db.exec('COMMIT');
+      if (taken) return reply.code(409).send({ error: 'Este e-mail já tem uma conta. Entre com a senha dela.' });
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+    if (!pending) return reply.code(400).send({ error: `Este link não vale mais: ele vence em ${SIGNUP_MINUTES} minutos e só pode ser usado uma vez. Faça o cadastro de novo para receber outro.` });
     startSession(reply, id);
-    return reply.code(201).send({ user: { id, email, name }, entitlements: ent(id) });
+    return reply.code(201).send({ user: { id, email: pending.email, name: pending.name }, entitlements: ent(id) });
   });
 
   app.post('/api/auth/login', async (req, reply) => {
@@ -663,6 +709,7 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
   app.decorate('rotinas', {
     conciliar: async () => (payments ? reconcile(db, payments) : null),
     enviarEmails: sendEmails,
+    limparCadastros: () => purgeExpiredSignups(db),
   });
   return app;
 }

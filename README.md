@@ -40,7 +40,7 @@ Todas são opcionais. Para não repeti-las a cada comando, copie `.env.example` 
 | `EMAIL_LOG_PATH` | `apps/api/data/emails.log` (desligado em produção) | Sem `EMAIL_PROVEDOR`, os e-mails vão para este arquivo, para testes. Em produção sem fornecedor, a recuperação de senha responde 503 e os avisos esperam na fila |
 | `PAGAMENTO_PROVEDOR` | vazio | `teste` liga o pagamento simulado (nada é cobrado; recusado com `NODE_ENV=production`); `asaas`, o adaptador do Asaas no sandbox, com `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` (testado só contra uma simulação; ver [docs/PAGAMENTO.md](docs/PAGAMENTO.md), "Asaas"). Vazio: Premium sem venda |
 | `PAGAMENTO_WEBHOOK_SEGREDO` | aleatório a cada início | Segredo HMAC dos webhooks do provedor |
-| `AUTH_RATE_LIMIT` | `10` | Tentativas de cadastro e de entrada por IP em 15 minutos; só muda fora de produção (o e2e usa 50) |
+| `AUTH_RATE_LIMIT` | `10` | Tentativas de cadastro (por IP e por e-mail), de confirmação do cadastro e de entrada em 15 minutos; só muda fora de produção (o e2e usa 50) |
 | `TRUST_PROXY` | `false` | Ative só atrás de um proxy reverso conhecido |
 | `COOKIE_SECURE` | ligado só com `NODE_ENV=production` | Cookie de sessão com atributo `Secure` (exige HTTPS). Com valor, prevalece em qualquer modo: `true`, `1`, `yes` ou `sim` liga; outro valor desliga; vazia vale como não definida |
 | `SITE_URL` | vazio | Usado no build para canonical, sitemap e robots.txt |

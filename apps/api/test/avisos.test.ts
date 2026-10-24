@@ -14,6 +14,7 @@ import { openDb } from '../src/db.ts';
 import type { Mail, Mailer } from '../src/email.ts';
 import { setPlan } from '../src/plans.ts';
 
+import { criarConta } from './cadastro.ts';
 const H = { 'content-type': 'application/json', 'x-alicerce': '1' };
 const DIA = 86_400_000;
 let db: ReturnType<typeof openDb>;
@@ -39,7 +40,7 @@ beforeEach(async () => {
     db,
     mailer,
   });
-  const r = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'e@exemplo.com', password: 'uma frase longa' } });
+  const r = await criarConta(app, db, { email: 'e@exemplo.com', password: 'uma frase longa' });
   cookie = String(r.headers['set-cookie']).split(';')[0]!;
   userId = r.json().user.id;
 });
@@ -123,7 +124,7 @@ describe('e-mails da assinatura', () => {
   it('sem fornecedor de e-mail, os avisos esperam na fila', async () => {
     const outro = openDb(':memory:');
     const semEmail = await buildApp({ config: { ...loadConfig({ PAGAMENTO_PROVEDOR: 'teste' }), webDist: '/nao-existe' }, db: outro, mailer: null });
-    const r = await semEmail.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 's@exemplo.com', password: 'uma frase longa' } });
+    const r = await criarConta(semEmail, outro, { email: 's@exemplo.com', password: 'uma frase longa' });
     const c = String(r.headers['set-cookie']).split(';')[0]!;
     const s = await semEmail.inject({ method: 'POST', url: '/api/assinatura', headers: { ...H, cookie: c }, payload: { periodo: 'mensal' } });
     const id = decodeURIComponent(new URL(s.json().url, 'http://x').hash.slice('#a='.length));

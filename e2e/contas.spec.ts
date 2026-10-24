@@ -13,6 +13,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { test as base, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { cadastrar } from './cadastro.ts';
 
 const SENHA = 'uma frase bem longa';
 const VISITANTE = 'alicerce:progresso:v2:guest';
@@ -32,9 +33,7 @@ const test = base.extend<object, { contas: { ana: Conta; bruno: Conta } | null }
       const criar = async (nome: string, modulo: string): Promise<Conta> => {
         const req = await playwright.request.newContext({ baseURL: info.project.use.baseURL, extraHTTPHeaders: { 'x-alicerce': '1' } });
         const email = `contas-${nome.toLowerCase()}-${Date.now()}-${Math.random().toString(36).slice(2)}@exemplo.com`;
-        const r = await req.post('/api/auth/register', { data: { email, password: SENHA, name: nome } });
-        expect(r.status()).toBe(201);
-        const id = (await r.json()).user.id as string;
+        const { id } = await cadastrar(req, { email, password: SENHA, name: nome });
         const p = await req.put('/api/progress', { data: { progress: { version: 1, modulesDone: { [modulo]: QUANDO } }, expectedUserId: id } });
         expect(p.status()).toBe(200);
         return { nome, email, id, req };

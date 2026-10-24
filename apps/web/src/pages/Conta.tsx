@@ -10,6 +10,7 @@ import { Assinatura } from '../components/Assinatura.tsx';
 
 export { PagamentoTeste } from '../components/Assinatura.tsx';
 export { RedefinirSenha } from '../components/RedefinirSenha.tsx';
+export { ConfirmarCadastro } from '../components/ConfirmarCadastro.tsx';
 
 const SYNC_LABEL = { offline: 'Sem conta: progresso só neste navegador', idle: 'Sincronizado', syncing: 'Sincronizando…', error: 'Falha ao sincronizar; tentaremos de novo' } as const;
 
@@ -33,8 +34,14 @@ export function Conta() {
     setBusy(true);
     setError('');
     setNotice('');
+    const form = e.currentTarget;
     try {
-      await signIn(mode === 'register' ? 'register' : 'login', email, password, name);
+      if (mode === 'register') {
+        // A resposta é a mesma com ou sem conta para o e-mail: quem diz o resto é o e-mail.
+        await api.register(email, password, name);
+        form.reset();
+        setNotice(`Enviamos um e-mail para ${email}. Se ainda não houver conta com ele, a mensagem traz o link que cria a conta, válido por 60 minutos. Se já houver, ela explica como entrar. Não chegou em alguns minutos? Confira o spam ou faça o cadastro de novo.`);
+      } else await signIn(email, password);
     } catch (err) {
       setError(
         err instanceof ApiError

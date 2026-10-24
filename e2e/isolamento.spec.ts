@@ -14,10 +14,11 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { test as base, expect, type APIRequestContext, type BrowserContext, type Cookie, type Page, type Request } from '@playwright/test';
 import { TRANSICAO_ACESSO } from '../packages/engine/src/transicao.ts';
+import { cadastrar } from './cadastro.ts';
 
 type Conta = { email: string; id: string; cookies: Cookie[] } | null;
 /**
- * Uma conta por processo de teste, e não por teste: o cadastro tem limite de 10 por 15 minutos por IP
+ * Uma conta por processo de teste, e não por teste: o cadastro e a confirmação têm limite por IP
  * (apps/api/src/app.ts), e todos os testes saem do mesmo IP. Cada teste entra com o cookie da sessão.
  * Se um ataque funcionasse (apagasse a conta ou encerrasse a sessão), os testes seguintes do mesmo
  * processo também falhariam, o que só deixa a falha mais visível.
@@ -28,9 +29,7 @@ const test = base.extend<object, { conta: Conta }>({
       if (info.project.name !== 'desktop') return use(null);
       const req = await playwright.request.newContext({ baseURL: info.project.use.baseURL });
       const email = `iso-${Date.now()}-${Math.random().toString(36).slice(2)}@exemplo.com`;
-      const r = await req.post('/api/auth/register', { data: { email, password: SENHA, name: 'Pessoa' }, headers: { 'x-alicerce': '1' } });
-      expect(r.status()).toBe(201);
-      const id = (await r.json()).user.id as string;
+      const { id } = await cadastrar(req, { email, password: SENHA, name: 'Pessoa' });
       const p = await req.put('/api/progress', { data: { progress: PROGRESSO, expectedUserId: id }, headers: { 'x-alicerce': '1' } });
       expect((await p.json()).progress.modulesDone).toEqual(PROGRESSO.modulesDone);
       await use({ email, id, cookies: (await req.storageState()).cookies });

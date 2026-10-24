@@ -90,6 +90,35 @@ export function consumeResetToken(db: DatabaseSync, token: string, now = Date.no
   return row.user_id;
 }
 
+/** Validade do link que confirma um cadastro. */
+export const SIGNUP_MINUTES = 60;
+
+/**
+ * Guarda um pedido de cadastro até o link do e-mail ser aberto (a conta ainda não existe).
+ * Um pedido novo para o mesmo e-mail troca o anterior, cujo link deixa de valer.
+ */
+export function createPendingSignup(db: DatabaseSync, s: { email: string; name: string; passwordHash: string }, now = Date.now()): string {
+  const token = randomBytes(32).toString('base64url');
+  purgeExpiredSignups(db, now);
+  db.prepare('DELETE FROM pending_signups WHERE email = ?').run(s.email);
+  db.prepare('INSERT INTO pending_signups (email, name, password_hash, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)').run(s.email, s.name, s.passwordHash, sha256(token), now, now + SIGNUP_MINUTES * 60_000);
+  return token;
+}
+
+/** Usa o link (uma vez só) e devolve o pedido; null se não existe ou venceu. */
+export function consumePendingSignup(db: DatabaseSync, token: string, now = Date.now()): { email: string; name: string; passwordHash: string } | null {
+  if (!token || token.length > 100) return null;
+  const row = db.prepare('SELECT email, name, password_hash, expires_at FROM pending_signups WHERE token_hash = ?').get(sha256(token)) as { email: string; name: string; password_hash: string; expires_at: number } | undefined;
+  if (!row) return null;
+  db.prepare('DELETE FROM pending_signups WHERE token_hash = ?').run(sha256(token));
+  return row.expires_at > now ? { email: row.email, name: row.name, passwordHash: row.password_hash } : null;
+}
+
+/** Apaga os pedidos de cadastro cujo link venceu (o servidor roda de tempos em tempos, main.ts). Devolve quantos. */
+export function purgeExpiredSignups(db: DatabaseSync, now = Date.now()): number {
+  return Number(db.prepare('DELETE FROM pending_signups WHERE expires_at <= ?').run(now).changes);
+}
+
 export function purgeExpiredSessions(db: DatabaseSync, now = Date.now()) {
   db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(now);
 }

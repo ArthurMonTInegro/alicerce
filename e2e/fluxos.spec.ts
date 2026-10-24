@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { assuntosPara, cadastrar, linkDoCadastro } from './cadastro.ts';
 
 /** Falha o teste se a página registrar erro no console (inclui violações de CSP e erros de hidratação). */
 function watchConsole(page: Page) {
@@ -92,24 +93,40 @@ test('diagnóstico do começo ao fim', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /trilha recomendada/i }).first()).toBeVisible();
 });
 
-test('conta: cadastro, sincronização e saída', async ({ page }) => {
+test('conta: cadastro pelo link do e-mail, sincronização, saída e cadastro repetido', async ({ page }) => {
   const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2)}@exemplo.com`;
   await page.goto('/conta');
   await page.getByRole('button', { name: 'Criar conta' }).first().click();
   await page.getByLabel('E-mail').fill(email);
   await page.getByLabel('Senha').fill('uma frase bem longa');
   await page.locator('form').getByRole('button', { name: 'Criar conta' }).click();
+  // A resposta é a mesma com ou sem conta para o e-mail; a conta nasce pelo link do e-mail.
+  await expect(page.getByText(`Enviamos um e-mail para ${email}.`)).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Entrar ou criar conta' })).toBeVisible();
+  await page.goto(await linkDoCadastro(email));
+  await expect(page.getByRole('heading', { name: 'Confirmar o cadastro' })).toBeVisible();
+  await expect.poll(() => new URL(page.url()).hash).toBe(''); // o código sai do endereço
+  await page.getByRole('button', { name: 'Criar a conta' }).click();
+  await expect(page.getByText('Conta criada, e você já entrou nela.')).toBeVisible();
+  await page.goto('/conta');
   await expect(page.getByText('Sincronizado')).toBeVisible();
   await page.getByRole('button', { name: 'Sair', exact: true }).click(); // há também "Sair de todos os aparelhos"
   await expect(page.getByRole('heading', { name: 'Entrar' })).toBeVisible();
+
+  // De novo com o mesmo e-mail: a página diz exatamente o mesmo; só o e-mail explica que a conta já existe.
+  await page.getByRole('button', { name: 'Criar conta' }).first().click();
+  await page.getByLabel('E-mail').fill(email);
+  await page.getByLabel('Senha').fill('outra frase bem longa');
+  await page.locator('form').getByRole('button', { name: 'Criar conta' }).click();
+  await expect(page.getByText(`Enviamos um e-mail para ${email}.`)).toBeVisible();
+  await expect.poll(() => assuntosPara(email)).toEqual(['Alicerce: confirme o seu cadastro', 'Alicerce: você já tem uma conta']);
 });
 
 test('com conta, a página só aceita interação depois que a conta é reconhecida', async ({ page }) => {
   // Quando /api/auth/me responde, o conteúdo remonta para a conta (key = id). Antes disso ele fica
   // inerte, para que nada do que o aluno fizer no laboratório se perca na remontagem.
   const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2)}@exemplo.com`;
-  const reg = await page.request.post('/api/auth/register', { data: { email, password: 'uma frase bem longa', name: '' }, headers: { 'x-alicerce': '1' } });
-  expect(reg.ok()).toBe(true);
+  await cadastrar(page.request, { email, password: 'uma frase bem longa', name: '' });
   let liberar!: () => void;
   const segurar = new Promise<void>((ok) => (liberar = ok));
   await page.route('**/api/auth/me', async (route) => {

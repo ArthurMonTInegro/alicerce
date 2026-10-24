@@ -15,6 +15,7 @@ import { loadConfig } from "../src/config.ts";
 import { openDb } from "../src/db.ts";
 import type { Mail, Mailer } from "../src/email.ts";
 import { setPlan } from "../src/plans.ts";
+import { criarConta } from "./cadastro.ts";
 
 const H = { "content-type": "application/json", "x-alicerce": "1" };
 const SENHA = "uma frase longa";
@@ -47,12 +48,7 @@ const cookieOf = (res: { headers: Record<string, unknown> }) =>
 async function register(
   email = `a-${Math.random().toString(36).slice(2)}@exemplo.com`,
 ) {
-  const res = await app.inject({
-    method: "POST",
-    url: "/api/auth/register",
-    headers: H,
-    payload: { email, password: SENHA },
-  });
+  const res = await criarConta(app, db, { email, password: SENHA });
   expect(res.statusCode).toBe(201);
   return { email, cookie: cookieOf(res), id: res.json().user.id as string };
 }

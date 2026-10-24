@@ -147,9 +147,9 @@ Desfazer faz o mesmo caminho (integridade, versão, verificação de uso, dono e
 
 ## E-mail
 
-O servidor manda e-mail para a recuperação de senha e para os avisos da assinatura ([PAGAMENTO.md](PAGAMENTO.md), "E-mails da assinatura"). Na partida, o log diz qual fornecedor está ligado: `e-mail: Resend`, `arquivo, só para testes` ou `nenhum fornecedor` (então a recuperação de senha responde 503 e os avisos esperam na fila).
+O servidor manda e-mail para o cadastro (o link que cria a conta, ou o aviso de que o e-mail já tem conta; [SEGURANCA.md](SEGURANCA.md), "Cadastro em dois passos"), para a recuperação de senha e para os avisos da assinatura ([PAGAMENTO.md](PAGAMENTO.md), "E-mails da assinatura"). Na partida, o log diz qual fornecedor está ligado: `e-mail: Resend`, `arquivo, só para testes` ou `nenhum fornecedor` (então o cadastro e a recuperação de senha respondem 503, e os avisos esperam na fila). Num servidor, sem e-mail não há conta nova.
 
-**Fornecedor recomendado: Resend**, pela documentação oficial lida em 24/10/2026 ([enviar](https://resend.com/docs/api-reference/emails/send-email), [idempotência](https://resend.com/docs/dashboard/emails/idempotency-keys), [erros](https://resend.com/docs/api-reference/errors), [limites](https://resend.com/docs/knowledge-base/account-quotas-and-limits), [preços](https://resend.com/pricing)). O envio é um `POST` com `fetch`, sem dependência nova; a chave de idempotência evita e-mail repetido quando uma tentativa é refeita; o plano gratuito não tem mensalidade: 3.000 e-mails por mês, 100 por dia (a cota volta à meia-noite UTC) e 3 domínios. Acima de 100 por dia, os avisos esperam na fila e a recuperação de senha falha até a cota voltar. Nada foi contratado nem enviado: o `ResendMailer` (`apps/api/src/email.ts`) foi testado só contra um fetch que responde como a documentação (`apps/api/test/email.test.ts`).
+**Fornecedor recomendado: Resend**, pela documentação oficial lida em 24/10/2026 ([enviar](https://resend.com/docs/api-reference/emails/send-email), [idempotência](https://resend.com/docs/dashboard/emails/idempotency-keys), [erros](https://resend.com/docs/api-reference/errors), [limites](https://resend.com/docs/knowledge-base/account-quotas-and-limits), [preços](https://resend.com/pricing)). O envio é um `POST` com `fetch`, sem dependência nova; a chave de idempotência evita e-mail repetido quando uma tentativa é refeita; o plano gratuito não tem mensalidade: 3.000 e-mails por mês, 100 por dia (a cota volta à meia-noite UTC) e 3 domínios. Acima de 100 por dia, os avisos esperam na fila, e os e-mails do cadastro e da recuperação de senha não saem até a cota voltar (a resposta na página é a mesma; a falha fica no log). Nada foi contratado nem enviado: o `ResendMailer` (`apps/api/src/email.ts`) foi testado só contra um fetch que responde como a documentação (`apps/api/test/email.test.ts`).
 
 O que falta, e é do Arthur:
 
@@ -161,11 +161,11 @@ Travas: o servidor não sobe com `EMAIL_PROVEDOR` desconhecido, sem a chave, com
 
 Primeiro envio de verdade (preparado, não feito):
 
-1. Num servidor de teste com as variáveis e o remetente `onboarding@resend.dev`, pedir "Esqueci a senha" para o e-mail da própria conta do Resend.
-2. Conferir que o e-mail chegou, que o link abre `/conta/redefinir` e troca a senha, e que o envio aparece nos logs do painel do Resend. No log do servidor não deve aparecer o link nem o endereço.
+1. Num servidor de teste com as variáveis e o remetente `onboarding@resend.dev`, fazer o cadastro com o e-mail da própria conta do Resend, abrir o link do e-mail e criar a conta. Fazer o cadastro de novo com o mesmo e-mail e conferir que chega o aviso de que a conta já existe. Depois, pedir "Esqueci a senha" para o mesmo e-mail.
+2. Conferir que os e-mails chegaram, que os links abrem `/conta/confirmar` (cria a conta) e `/conta/redefinir` (troca a senha), e que os envios aparecem nos logs do painel do Resend. No log do servidor não deve aparecer link nem endereço.
 3. Com o domínio verificado, repetir para outro endereço e, no sandbox do Asaas, assinar para ver a confirmação da compra chegar.
 
-No log, sem destinatário nem texto: `falha ao enviar o e-mail de recuperação` (com `email.erro`, o código do Resend), `e-mails da assinatura com falha no envio` (contagem por código) e, como erro, `e-mails da assinatura que não serão mais tentados` depois da 7ª tentativa (o aviso fica em `email_outbox`, com `last_error`, para reenviar à mão).
+No log, sem destinatário nem texto: `falha ao enviar o e-mail do cadastro` e `falha ao enviar o e-mail de recuperação` (com `email.erro`, o código do Resend), `e-mails da assinatura com falha no envio` (contagem por código) e, como erro, `e-mails da assinatura que não serão mais tentados` depois da 7ª tentativa (o aviso fica em `email_outbox`, com `last_error`, para reenviar à mão).
 
 ## Limitações conhecidas
 

@@ -36,7 +36,7 @@ O roteiro do sandbox do Asaas está em [PAGAMENTO.md](PAGAMENTO.md), "Roteiro da
 | Nenhum token nem endereço no log de uma falha de envio | Sim (`email.test.ts`, lendo o log do servidor) | Sim, servidor real | Não | — |
 | Avisos da assinatura: fila gravada com o evento, novas tentativas espaçadas, sem duplicar, aviso esgotado no log | Sim (`avisos.test.ts`, `email.test.ts`) | Sim: servidor real com fornecedor na memória | Não | Conta no Resend; revisão dos textos pelo Arthur |
 | Envio pelo Resend: pedido documentado, chave de idempotência, o que se repete e o que não, cotas | Sim, contra um fetch simulado (`email.test.ts`) | — | Não | Conta no Resend e domínio verificado (sem domínio, só entrega para o dono da conta) |
-| Cadastro sem revelar quem tem conta | **Não implementado**: o cadastro responde 409 | — | — | Depende do envio real (confirmação do e-mail); ver [SEGURANCA.md](SEGURANCA.md) |
+| Cadastro sem revelar quem tem conta: mesma resposta com e sem conta, sem esperar o envio, link de 60 min e uso único, pedido alheio não ocupa o e-mail, limite por e-mail | Sim (`cadastro.test.ts`) | Sim: no navegador, lendo o link no arquivo de e-mails, e de novo com o mesmo e-mail (`e2e/fluxos.spec.ts`, Chromium) | Não | Conta no Resend e domínio verificado; revisão dos dois textos novos pelo Arthur |
 
 ## O que precisa do Arthur
 

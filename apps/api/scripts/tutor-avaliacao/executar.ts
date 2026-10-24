@@ -11,6 +11,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { PlanId } from '@alicerce/engine';
 import { buildApp } from '../../src/app.ts';
+import { createPendingSignup, hashPassword } from '../../src/auth.ts';
 import { loadConfig, type TutorEffort } from '../../src/config.ts';
 import type { ContentStore } from '../../src/conteudo.ts';
 import { openDb } from '../../src/db.ts';
@@ -114,7 +115,9 @@ export async function executarCaso(caso: Caso, o: Opcoes, repeticao = 1): Promis
     const headers: Record<string, string> = { ...H };
     let plano: PlanId = 'free';
     if (caso.conta !== 'visitante') {
-      const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers, payload: { email: `${caso.id}@avaliacao.invalid`, password: 'senha-da-avaliacao-123' } });
+      // A conta nasce pelo link do e-mail do cadastro; aqui o pedido vai direto ao banco (sem e-mail).
+      const token = createPendingSignup(db, { email: `${caso.id}@avaliacao.invalid`, name: '', passwordHash: await hashPassword('senha-da-avaliacao-123') });
+      const reg = await app.inject({ method: 'POST', url: '/api/auth/confirmar', headers, payload: { token } });
       if (reg.statusCode >= 300) throw new Error(`cadastro da conta do caso ${caso.id}: HTTP ${reg.statusCode}`);
       const id = (reg.json() as { user: { id: string } }).user.id;
       headers.cookie = String(reg.headers['set-cookie']).split(';')[0]!;

@@ -72,6 +72,8 @@ async function holdDb(file: string, emails: string[]): Promise<ChildProcess & { 
 
 interface Server {
   url: string;
+  /** EMAIL_LOG_PATH do servidor: onde ficam os e-mails (o do cadastro, com o link) */
+  emailLog: string;
   stop: () => Promise<void>;
 }
 async function startServer(env: NodeJS.ProcessEnv, as: { uid?: number; gid?: number } = {}): Promise<Server> {
@@ -93,6 +95,7 @@ async function startServer(env: NodeJS.ProcessEnv, as: { uid?: number; gid?: num
   });
   return {
     url,
+    emailLog: env.EMAIL_LOG_PATH ?? '',
     stop: async () => {
       if (proc.exitCode === null) proc.kill('SIGTERM'); // main.ts fecha o banco no SIGTERM
       await exited;
@@ -100,12 +103,25 @@ async function startServer(env: NodeJS.ProcessEnv, as: { uid?: number; gid?: num
   };
 }
 const H = { 'content-type': 'application/json', 'x-alicerce': '1' };
-/** cria a conta por HTTP; devolve o cookie de sessão e o id (a sincronização exige expectedUserId) */
-async function register(url: string, email: string): Promise<{ cookie: string; id: string }> {
-  const res = await fetch(`${url}/api/auth/register`, { method: 'POST', headers: H, body: JSON.stringify({ email, password: 'uma frase longa' }) });
-  expect(res.status).toBe(201);
-  const { user } = (await res.json()) as { user: { id: string } };
-  return { cookie: res.headers.get('set-cookie')!.split(';')[0]!, id: user.id };
+/**
+ * Cria a conta por HTTP, como uma pessoa: o pedido de cadastro e o link do e-mail, que o servidor
+ * (fora de produção) grava em EMAIL_LOG_PATH. Devolve o cookie de sessão e o id (a sincronização
+ * exige expectedUserId).
+ */
+async function register(server: Server, email: string): Promise<{ cookie: string; id: string }> {
+  const res = await fetch(`${server.url}/api/auth/register`, { method: 'POST', headers: H, body: JSON.stringify({ email, password: 'uma frase longa' }) });
+  expect(res.status).toBe(202);
+  let token: string | undefined;
+  // o servidor não espera o envio para responder: o e-mail chega ao arquivo logo depois
+  for (let i = 0; i < 50 && !token; i++) {
+    const mails = existsSync(server.emailLog) ? readFileSync(server.emailLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as { to: string; text: string }) : [];
+    token = /\/conta\/confirmar#t=([A-Za-z0-9_-]+)/.exec(mails.filter((m) => m.to === email).at(-1)?.text ?? '')?.[1];
+    if (!token) await new Promise((r) => setTimeout(r, 100));
+  }
+  const conf = await fetch(`${server.url}/api/auth/confirmar`, { method: 'POST', headers: H, body: JSON.stringify({ token }) });
+  expect(conf.status).toBe(201);
+  const { user } = (await conf.json()) as { user: { id: string } };
+  return { cookie: conf.headers.get('set-cookie')!.split(';')[0]!, id: user.id };
 }
 const runScript = (name: string, args: string[], env: NodeJS.ProcessEnv, as: { uid?: number; gid?: number; cwd?: string } = {}) =>
   spawnSync(NODE[0]!, [...NODE.slice(1), join(API, 'scripts', name), ...args], { env, encoding: 'utf8', timeout: 30_000, ...as });
@@ -145,15 +161,15 @@ describe('backup e restauração', { timeout: 30_000 }, () => {
   it('ensaio completo: servidor rodando, backup com escritas ainda no WAL, restauração e volta', async () => {
     const dbFile = join(tmp, 'data', 'alicerce.db');
     const backups = join(tmp, 'backups');
-    const env = { ...process.env, DATABASE_PATH: dbFile, BACKUP_DIR: backups, PORT: '0', HOST: '127.0.0.1', WEB_DIST: join(tmp, 'sem-site'), ANTHROPIC_API_KEY: '', NODE_ENV: 'test' };
+    const env = { ...process.env, DATABASE_PATH: dbFile, BACKUP_DIR: backups, PORT: '0', HOST: '127.0.0.1', WEB_DIST: join(tmp, 'sem-site'), ANTHROPIC_API_KEY: '', NODE_ENV: 'test', EMAIL_LOG_PATH: join(tmp, 'emails.log') };
 
     let server = await startServer(env);
     let backupFile: string;
     let ana: { cookie: string; id: string };
     try {
-      ana = await register(server.url, 'ana@exemplo.com');
-      await register(server.url, 'bruno@exemplo.com');
-      await register(server.url, 'carla@exemplo.com');
+      ana = await register(server, 'ana@exemplo.com');
+      await register(server, 'bruno@exemplo.com');
+      await register(server, 'carla@exemplo.com');
       const progress = emptyProgress();
       progress.attempts.push({ exerciseId: 'e1', skills: ['s'], difficulty: 'facil', correct: true, score: 1, hintsUsed: 0, wrongTries: 0, revealed: false, at: 1000 });
       const put = await fetch(`${server.url}/api/progress`, { method: 'PUT', headers: { ...H, cookie: ana.cookie }, body: JSON.stringify({ progress, expectedUserId: ana.id }) });
@@ -177,7 +193,7 @@ describe('backup e restauração', { timeout: 30_000 }, () => {
       expect(readFileSync(`${backupFile}.sha256`, 'utf8')).toBe(`${sha256File(backupFile)}  ${basename(backupFile)}\n`);
       expect(emailsIn(backupFile)).toEqual(['ana@exemplo.com', 'bruno@exemplo.com', 'carla@exemplo.com']);
 
-      await register(server.url, 'diana@exemplo.com'); // depois do backup
+      await register(server, 'diana@exemplo.com'); // depois do backup
 
       const refused = runScript('restore.ts', [backupFile], env);
       expect(refused.status).toBe(1);
@@ -685,7 +701,7 @@ describe('backup e restauração', { timeout: 30_000 }, () => {
     chownSync(dbFile, 1000, 1000);
     chmodSync(dbFile, 0o600);
 
-    const env = { ...process.env, DATABASE_PATH: dbFile, BACKUP_DIR: join(data, 'backups'), PORT: '0', HOST: '127.0.0.1', WEB_DIST: join(tmp, 'sem-site'), ANTHROPIC_API_KEY: '', NODE_ENV: 'test' };
+    const env = { ...process.env, DATABASE_PATH: dbFile, BACKUP_DIR: join(data, 'backups'), PORT: '0', HOST: '127.0.0.1', WEB_DIST: join(tmp, 'sem-site'), ANTHROPIC_API_KEY: '', NODE_ENV: 'test', EMAIL_LOG_PATH: join(data, 'emails.log') };
     const r = runScript('restore.ts', [b.path], env);
     expect(r.stderr).toBe('');
     expect(r.status).toBe(0);
@@ -696,7 +712,7 @@ describe('backup e restauração', { timeout: 30_000 }, () => {
 
     const server = await startServer(env, { uid: 1000, gid: 1000 });
     try {
-      await register(server.url, 'depois@x.co'); // 201: o servidor consegue gravar no banco restaurado
+      await register(server, 'depois@x.co'); // 201: o servidor consegue gravar no banco restaurado
     } finally {
       await server.stop();
     }

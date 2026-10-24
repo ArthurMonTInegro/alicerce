@@ -78,6 +78,7 @@ export const ROUTES: Route[] = [
   route('/progresso', 'progresso', (m) => <m.Progresso />),
   route('/conta', 'conta', (m) => <m.Conta />),
   route('/conta/redefinir', 'conta', (m) => <m.RedefinirSenha />),
+  route('/conta/confirmar', 'conta', (m) => <m.ConfirmarCadastro />),
   route('/conta/pagamento-teste', 'conta', (m) => <m.PagamentoTeste />),
   route('/metodologia', 'metodologia', (m) => <m.Metodologia />),
   route('/referencias', 'referencias', (m) => <m.Referencias />),

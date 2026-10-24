@@ -19,6 +19,7 @@ import { openDb } from '../src/db.ts';
 import { setPlan } from '../src/plans.ts';
 import { OfflineTutor, tutorSources, parseTutorRequest, type TutorSources } from '../src/tutor.ts';
 
+import { criarConta } from './cadastro.ts';
 const H = { 'x-alicerce': '1', 'content-type': 'application/json' };
 
 /* ---------- fixture: corpo falso de uma aula paga do nível 2 ---------- */
@@ -77,7 +78,7 @@ async function fixture(content: ContentStore = withPremium, env: Record<string, 
     },
   };
   const app = await buildApp({ db, content, config: { ...loadConfig(env), webDist: '/none' }, tutor });
-  const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'reader@example.com', password: 'long-password-123' } });
+  const reg = await criarConta(app, db, { email: 'reader@example.com', password: 'long-password-123' });
   const id = reg.json().user.id as string;
   const cookie = String(reg.headers['set-cookie']).split(';')[0]!;
   return {

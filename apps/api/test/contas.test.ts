@@ -14,6 +14,7 @@ import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db.ts';
 import { corpoDeSincronizacao, maiorProgressoValido } from './maior-progresso.ts';
 
+import { criarConta } from './cadastro.ts';
 const H = { 'content-type': 'application/json', 'x-alicerce': '1' };
 const SENHA = 'uma frase longa';
 
@@ -25,7 +26,7 @@ async function setup(env: NodeJS.ProcessEnv = {}) {
 }
 const cookieOf = (res: { headers: Record<string, unknown> }) => String(res.headers['set-cookie']).split(';')[0]!;
 const register = async (email: string) => {
-  const res = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email, password: SENHA } });
+  const res = await criarConta(app, db, { email, password: SENHA });
   expect(res.statusCode).toBe(201);
   return { cookie: cookieOf(res), id: res.json().user.id as string };
 };
@@ -102,13 +103,13 @@ describe('excluir a conta exige a senha atual', SCRYPT, () => {
 
   it('a senha é comparada como no login (normalização NFKC e corte em 200 caracteres)', async () => {
     const longa = 'x'.repeat(200);
-    const reg = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'longa@senha.co', password: longa } });
+    const reg = await criarConta(app, db, { email: 'longa@senha.co', password: longa });
     expect(reg.statusCode).toBe(201);
     // o login corta em 200; a exclusão faz o mesmo, então os dois aceitam a mesma entrada
     expect((await login('longa@senha.co', longa + 'yyy')).statusCode).toBe(200);
     expect((await del(cookieOf(reg), { password: longa + 'yyy' })).statusCode).toBe(204);
     // NFKC: a ligadura "ﬁ" (U+FB01) e as letras "fi" valem a mesma senha, no login e na exclusão
-    const lig = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 'nfkc@senha.co', password: 'ﬁ'.repeat(10) } });
+    const lig = await criarConta(app, db, { email: 'nfkc@senha.co', password: 'ﬁ'.repeat(10) });
     expect(lig.statusCode).toBe(201);
     expect((await login('nfkc@senha.co', 'fi'.repeat(10))).statusCode).toBe(200);
     expect((await del(cookieOf(lig), { password: 'fi'.repeat(10) })).statusCode).toBe(204);
@@ -143,7 +144,7 @@ describe('excluir a conta exige a senha atual', SCRYPT, () => {
 
   it('mandar o IP de outra pessoa como "e-mail" não bloqueia o login dela', async () => {
     const vitima = '198.51.100.7';
-    const reg = await app.inject({ method: 'POST', url: '/api/auth/register', remoteAddress: vitima, headers: H, payload: { email: 'vitima@ip.co', password: SENHA } });
+    const reg = await criarConta(app, db, { email: 'vitima@ip.co', password: SENHA }, { remoteAddress: vitima });
     expect(reg.statusCode).toBe(201);
     for (let i = 0; i < 10; i++) await app.inject({ method: 'POST', url: '/api/auth/login', remoteAddress: '203.0.113.66', headers: H, payload: { email: vitima, password: 'qualquer' } });
     const res = await app.inject({ method: 'POST', url: '/api/auth/login', remoteAddress: vitima, headers: H, payload: { email: 'vitima@ip.co', password: SENHA } });
@@ -294,7 +295,7 @@ describe('sincronização não falha por tamanho', SCRYPT, () => {
 describe('cookie Secure', () => {
   const setCookieWith = async (env: NodeJS.ProcessEnv) => {
     await setup(env);
-    const res = await app.inject({ method: 'POST', url: '/api/auth/register', headers: H, payload: { email: 's@cookie.co', password: SENHA } });
+    const res = await criarConta(app, db, { email: 's@cookie.co', password: SENHA });
     return String(res.headers['set-cookie']);
   };
   it('liga em produção ou com COOKIE_SECURE; COOKIE_SECURE prevalece quando definido', async () => {
