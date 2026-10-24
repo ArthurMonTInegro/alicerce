@@ -140,6 +140,36 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE subscriptions ADD COLUMN provider_ref TEXT;
    ALTER TABLE subscriptions ADD COLUMN provider_subscription TEXT;
    CREATE INDEX subscriptions_provider_ref ON subscriptions(provider, provider_ref);`,
+  // Cobranças de cada assinatura e o período que cada uma cobre (cobrancas.ts). O acesso passa a
+  // vir delas: o reembolso de uma cobrança muda só aquela cobrança. Cada assinatura que já tinha
+  // um período pago ganha uma cobrança 'legado:<id>' com esse período (desde sempre até
+  // paid_until), para ninguém ganhar nem perder acesso na migração; a conciliação a troca pelas
+  // cobranças de verdade quando o provedor as lista. Só acrescenta: subscriptions continua com a
+  // situação e o fim do período, que o código anterior lê (docs/PAGAMENTO.md, "Migração 9").
+  `CREATE TABLE subscription_charges (
+     provider TEXT NOT NULL,
+     charge_id TEXT NOT NULL,
+     subscription_id TEXT NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+     status TEXT NOT NULL,
+     provider_status TEXT,
+     covers_from INTEGER,
+     covers_until INTEGER,
+     paid_at INTEGER,
+     refunded_at INTEGER,
+     observed_at INTEGER NOT NULL,
+     transitions INTEGER NOT NULL DEFAULT 0,
+     updated_at INTEGER NOT NULL,
+     PRIMARY KEY (provider, charge_id)
+   );
+   CREATE INDEX subscription_charges_subscription ON subscription_charges(subscription_id);
+   INSERT INTO subscription_charges (provider, charge_id, subscription_id, status, covers_from, covers_until, paid_at, refunded_at, observed_at, updated_at)
+   SELECT provider, 'legado:' || id, id,
+     CASE WHEN status = 'reembolsada' THEN 'estornada' ELSE 'paga' END,
+     NULL, paid_until, first_paid_at,
+     CASE WHEN status = 'reembolsada' THEN updated_at END,
+     updated_at, updated_at
+   FROM subscriptions
+   WHERE paid_until IS NOT NULL AND status IN ('ativa', 'cancelada', 'reembolsada');`,
 ];
 
 /** Maior versão de esquema que este código conhece (a restauração recusa backup mais novo). */

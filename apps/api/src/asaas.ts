@@ -15,7 +15,19 @@
  * - cancel: remove a assinatura no Asaas (DELETE), o que também apaga as cobranças pendentes.
  * - refund: remove a assinatura, para não haver cobrança nova, e estorna as cobranças pagas
  *   que ainda não foram estornadas. Pedir de novo não estorna de novo.
- * - fetchState: lê a assinatura e as cobranças dela (conciliação).
+ * - fetchState: lê a assinatura e todas as cobranças dela, página por página (conciliação).
+ *
+ * Cada webhook de cobrança vira um evento daquela cobrança (cobrancas.ts): o estorno de uma
+ * cobrança antiga não encerra a assinatura. Situações conferidas na documentação em 24/10/2026
+ * ("Eventos para cobranças", "Estornos", "Chargeback", "Listagem e paginação"):
+ * - paga: CONFIRMED, RECEIVED, RECEIVED_IN_CASH, DUNNING_RECEIVED;
+ * - estorno parcial: paga, com estorno DONE em `refunds` de valor menor que o da cobrança
+ *   (PAYMENT_PARTIALLY_REFUNDED); só estorno DONE conta como devolvido;
+ * - estorno pedido: REFUND_REQUESTED, REFUND_IN_PROGRESS ("a cobrança será estornada após sua execução");
+ * - estornada: REFUNDED (também a contestação perdida termina assim);
+ * - contestada: CHARGEBACK_REQUESTED, CHARGEBACK_DISPUTE, AWAITING_CHARGEBACK_REVERSAL. A
+ *   disputa ganha passa por AWAITING_CHARGEBACK_REVERSAL e volta a CONFIRMED ou RECEIVED;
+ * - vencida: OVERDUE, DUNNING_REQUESTED; pendente: PENDING, AWAITING_RISK_ANALYSIS.
  */
 import { timingSafeEqual } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
@@ -25,8 +37,10 @@ import {
   type PaymentEvent,
   type PaymentProvider,
   type Period,
+  type ProviderCharge,
   type ProviderSubscriptionState,
 } from "./assinatura.ts";
+import { deriveSubscription, eventTypeFor, WAS_PAID, type ChargeStatus } from "./cobrancas.ts";
 
 export type AsaasEnvironment = "sandbox" | "producao";
 export type AsaasBillingType = "CREDIT_CARD" | "PIX";
@@ -78,13 +92,14 @@ export function asaasRefs(db: DatabaseSync): AsaasRefs {
 interface AsaasPayment {
   id: string;
   status: string;
+  value?: number;
   subscription?: string | null;
   checkoutSession?: string | null;
   dueDate: string;
   paymentDate?: string | null;
   clientPaymentDate?: string | null;
   deleted?: boolean;
-  refunds?: Array<{ dateCreated?: string; status?: string }> | null;
+  refunds?: Array<{ dateCreated?: string; status?: string; value?: number }> | null;
 }
 interface AsaasSubscription {
   id: string;
@@ -93,26 +108,33 @@ interface AsaasSubscription {
   checkoutSession?: string | null;
 }
 
-const PAID = new Set(["CONFIRMED", "RECEIVED", "RECEIVED_IN_CASH"]);
-/**
- * A cobrança deixa de valer: estorno integral (feito, pedido ou em processamento) ou
- * contestação no cartão (proposta de PAGAMENTO.md). O acesso acaba já no pedido, como na
- * desistência; se o Asaas desfizer o estorno, a conciliação aponta a divergência.
- */
-const REFUNDED = new Set([
-  "REFUNDED",
-  "REFUND_REQUESTED",
-  "REFUND_IN_PROGRESS",
-  "CHARGEBACK_REQUESTED",
-  "CHARGEBACK_DISPUTE",
-  "AWAITING_CHARGEBACK_REVERSAL",
-]);
+const PAID = new Set(["CONFIRMED", "RECEIVED", "RECEIVED_IN_CASH", "DUNNING_RECEIVED"]);
+const REFUND_PENDING = new Set(["REFUND_REQUESTED", "REFUND_IN_PROGRESS"]);
+const CHARGEBACK = new Set(["CHARGEBACK_REQUESTED", "CHARGEBACK_DISPUTE", "AWAITING_CHARGEBACK_REVERSAL"]);
+const OVERDUE = new Set(["OVERDUE", "DUNNING_REQUESTED"]);
+/** Quanto da cobrança já foi devolvido de fato: só estorno com status DONE conta ("Estornos"). */
+const refundedValue = (p: AsaasPayment) =>
+  (p.refunds ?? []).filter((r) => r.status === "DONE").reduce((t, r) => t + (typeof r.value === "number" ? r.value : 0), 0);
+
+/** A situação da cobrança no Alicerce (cobrancas.ts) pela situação dela no Asaas. */
+export function chargeStatusFromAsaas(p: Pick<AsaasPayment, "status" | "deleted" | "value" | "refunds">, cardRefused = false): ChargeStatus {
+  if (p.deleted) return "removida";
+  if (PAID.has(p.status)) return refundedValue(p as AsaasPayment) > 0 ? "estorno_parcial" : "paga";
+  if (p.status === "REFUNDED") return "estornada";
+  if (REFUND_PENDING.has(p.status)) return "estorno_pedido";
+  if (CHARGEBACK.has(p.status)) return "contestada";
+  if (OVERDUE.has(p.status)) return "vencida";
+  return cardRefused ? "recusada" : "pendente";
+}
 const CARD_REFUSED = new Set(["PAYMENT_CREDIT_CARD_CAPTURE_REFUSED", "PAYMENT_REPROVED_BY_RISK_ANALYSIS"]);
 const SUBSCRIPTION_ENDED = new Set(["SUBSCRIPTION_DELETED", "SUBSCRIPTION_INACTIVATED", "SUBSCRIPTION_UPDATED"]);
 /** Imagem do item no Checkout (obrigatória na API): um quadrado de 64 px no verde da marca. */
 const ITEM_IMAGE =
   "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAUElEQVR42u3PQQkAAAgEsAtjHkvYv4MRfAuDFVh66rUICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICFwWovFQxAGWARYAAAAASUVORK5CYII=";
 
+const PAGE = 100;
+const RETRY_MS = 300;
+const MAX_PAGES = 50;
 const BRASILIA_MS = 3 * 3_600_000;
 const DAY_MS = 86_400_000;
 /** "AAAA-MM-DD" do Asaas → 00:00 desse dia em Brasília. */
@@ -132,19 +154,32 @@ const today = (now: number) => new Date(now - BRASILIA_MS).toISOString().slice(0
  */
 export const coverageEnd = (dueDate: string, period: Period) => addPeriod(dayStart(dueDate), period) + DAY_MS;
 
+/**
+ * Algo que alguém precisa poder investigar, sem dado pessoal: só ids do Asaas e situações.
+ * - cobranca_sem_vinculo: uma cobrança paga (ou mexida) que não é de nenhuma assinatura do
+ *   Alicerce que conhecemos; pode ser um pagamento feito por fora, ou um Checkout que não ficou
+ *   registrado aqui. O dinheiro pode ter entrado sem acesso: é para olhar.
+ * - cobranca_desconhecida: um webhook que aponta uma cobrança que a API não conhece (corpo
+ *   adulterado ou cobrança removida).
+ */
+export type AsaasNotice = "cobranca_sem_vinculo" | "cobranca_desconhecida";
+export type AsaasNotify = (kind: AsaasNotice, context: Record<string, string | boolean | null>) => void;
+
 export class AsaasPaymentProvider implements PaymentProvider {
   readonly name = "asaas";
   private readonly base: string;
   private readonly cfg: AsaasConfig;
   private readonly refs: AsaasRefs;
   private readonly http: typeof fetch;
+  private readonly notify: AsaasNotify;
   /** um estorno por vez para cada assinatura neste processo (dois cliques não pedem dois) */
   private readonly refunding = new Map<string, Promise<void>>();
 
-  constructor(cfg: AsaasConfig, refs: AsaasRefs, http: typeof fetch = globalThis.fetch) {
+  constructor(cfg: AsaasConfig, refs: AsaasRefs, http: typeof fetch = globalThis.fetch, notify: AsaasNotify = () => {}) {
     this.cfg = cfg;
     this.refs = refs;
     this.http = http;
+    this.notify = notify;
     if (!cfg.apiKey.startsWith(ASAAS_KEY_PREFIX[cfg.environment]))
       throw new Error(`A chave do Asaas não é do ambiente ${cfg.environment} (deveria começar com ${ASAAS_KEY_PREFIX[cfg.environment]}).`);
     if (cfg.webhookToken.length < 32 || /\s/.test(cfg.webhookToken))
@@ -200,14 +235,60 @@ export class AsaasPaymentProvider implements PaymentProvider {
   /** O evento que a cobrança pede, pela situação dela na API (o corpo do webhook só aponta qual é). */
   private async fromPayment(id: string, event: string, paymentId: string, now: number): Promise<PaymentEvent | null> {
     const p = await this.getOrNull<AsaasPayment>(`/payments/${encodeURIComponent(paymentId)}`);
-    if (!p) return null; // cobrança que a API não conhece: nada muda
+    if (!p) {
+      this.notify("cobranca_desconhecida", { cobranca: paymentId.slice(0, 80), evento: event.slice(0, 60) });
+      return null; // cobrança que a API não conhece: nada muda
+    }
     const ours = await this.ownerOf(p);
-    if (!ours) return null; // cobrança que não é de uma assinatura do Alicerce
-    const base = { id, subscriptionId: ours.id, at: now };
-    if (PAID.has(p.status)) return { ...base, type: "pagamento_aprovado", paidUntil: coverageEnd(p.dueDate, ours.period) };
-    if (REFUNDED.has(p.status)) return { ...base, type: "reembolso" };
-    if (p.status === "OVERDUE" || CARD_REFUSED.has(event)) return { ...base, type: "pagamento_recusado" };
-    return null; // criada, atualizada, em análise, estorno parcial: o acesso não muda
+    if (!ours) {
+      // Cobrança que não é de uma assinatura do Alicerce: nada muda, mas fica rastreável se houve dinheiro.
+      if (PAID.has(p.status) || REFUND_PENDING.has(p.status) || CHARGEBACK.has(p.status) || p.status === "REFUNDED")
+        this.notify("cobranca_sem_vinculo", {
+          cobranca: p.id,
+          situacao: p.status,
+          evento: event.slice(0, 60),
+          temCheckout: Boolean(p.checkoutSession),
+          temAssinatura: Boolean(p.subscription),
+        });
+      return null;
+    }
+    const c = this.toCharge(p, ours.period, now, CARD_REFUSED.has(event));
+    const type = eventTypeFor(c.status);
+    if (!type) return null; // pendente ou removida: o acesso não muda
+    return {
+      id,
+      type,
+      subscriptionId: ours.id,
+      chargeId: p.id,
+      chargeStatus: c.status,
+      providerStatus: p.status,
+      at: now,
+      ...(WAS_PAID.has(c.status) ? { coversFrom: c.coversFrom!, paidUntil: c.coversUntil!, paidAt: c.paidAt! } : {}),
+    };
+  }
+
+  /** Uma cobrança do Asaas como o Alicerce a registra (cobrancas.ts). */
+  private toCharge(p: AsaasPayment, period: Period, now: number, cardRefused = false): ProviderCharge {
+    const status = chargeStatusFromAsaas(p, cardRefused);
+    // O fim do dia do pagamento (hora de Brasília): o prazo de desistência nunca encolhe por
+    // falta da hora, e a mesma cobrança lida duas vezes dá o mesmo valor (o evento é o mesmo).
+    const paidDay = p.clientPaymentDate ?? p.paymentDate;
+    const paidAt = WAS_PAID.has(status) ? (paidDay ? dayStart(paidDay) + DAY_MS - 1 : now) : null;
+    let refundedAt: number | null = null;
+    if (status === "estornada") {
+      const d = (p.refunds ?? []).find((r) => r.status === "DONE" && r.dateCreated)?.dateCreated ?? p.refunds?.find((r) => r.dateCreated)?.dateCreated;
+      const at = d ? Date.parse(d.replace(" ", "T") + (d.length <= 19 ? "-03:00" : "")) : NaN;
+      refundedAt = Number.isFinite(at) ? Math.min(at, now) : now;
+    }
+    return {
+      id: p.id,
+      status,
+      providerStatus: p.status,
+      coversFrom: dayStart(p.dueDate),
+      coversUntil: coverageEnd(p.dueDate, period),
+      paidAt,
+      refundedAt,
+    };
   }
 
   private async fromSubscription(id: string, event: string, asaasId: string, now: number): Promise<PaymentEvent | null> {
@@ -268,76 +349,100 @@ export class AsaasPaymentProvider implements PaymentProvider {
     await this.remove(asaasId);
     for (const p of await this.payments(asaasId)) {
       if (!PAID.has(p.status)) continue; // já estornada, pedida ou não paga: não pedir de novo
+      // Com um estorno parcial já feito, pede só o que falta (o valor total não pode passar do pago).
+      const done = refundedValue(p);
+      const rest = typeof p.value === "number" ? Math.round((p.value - done) * 100) / 100 : null;
+      if (rest !== null && rest <= 0) continue;
       await this.call("POST", `/payments/${encodeURIComponent(p.id)}/refund`, {
+        ...(done > 0 && rest !== null ? { value: rest } : {}),
         description: "Desistência no prazo de 7 dias (CDC, art. 49)",
       });
     }
   }
 
+  /**
+   * A situação da assinatura e de cada cobrança dela no Asaas. A situação da assinatura sai
+   * das cobranças pela mesma regra do banco (cobrancas.ts, deriveSubscription).
+   */
   async fetchState(subscriptionId: string, now = Date.now()): Promise<ProviderSubscriptionState | null> {
     const ref = this.refs.get(subscriptionId);
     if (!ref) return null;
     const asaasId = await this.asaasSubscription(subscriptionId);
     if (!asaasId) return null; // sem pagamento ainda, ou o Asaas não diz qual assinatura veio do Checkout
     const s = await this.getOrNull<AsaasSubscription>(`/subscriptions/${encodeURIComponent(asaasId)}`);
-    const list = await this.payments(asaasId);
-    let paidUntil: number | null = null;
-    let firstPaidAt: number | null = null;
-    let refundedAt: number | null = null;
-    for (const p of list) {
-      if (PAID.has(p.status)) paidUntil = Math.max(paidUntil ?? 0, coverageEnd(p.dueDate, ref.period));
-      if (PAID.has(p.status) || REFUNDED.has(p.status)) {
-        // o fim do dia do pagamento: o prazo de desistência nunca encolhe por falta da hora
-        const paidDay = p.clientPaymentDate ?? p.paymentDate;
-        const at = paidDay ? Math.min(now, dayStart(paidDay) + DAY_MS - 1) : now;
-        firstPaidAt = Math.min(firstPaidAt ?? at, at);
-      }
-      if (REFUNDED.has(p.status)) {
-        const d = p.refunds?.find((r) => r.dateCreated)?.dateCreated;
-        const at = d ? Date.parse(d.replace(" ", "T") + (d.length <= 19 ? "-03:00" : "")) : NaN;
-        refundedAt = Math.min(refundedAt ?? now, Number.isFinite(at) ? at : now);
-      }
+    let list: AsaasPayment[];
+    try {
+      list = await this.payments(asaasId);
+    } catch (e) {
+      if (!s && e instanceof AsaasError && e.status === 404) return null; // a assinatura que conhecíamos não existe lá
+      throw e;
     }
+    const charges = list.map((p) => this.toCharge(p, ref.period, now));
     const ended = !s || s.deleted === true || s.status !== "ACTIVE";
-    if (refundedAt !== null)
-      return {
-        status: "reembolsada",
-        paidUntil: paidUntil === null ? null : Math.min(paidUntil, refundedAt),
-        firstPaidAt,
-        canceledAt: refundedAt,
-        refundedAt,
-      };
-    if (paidUntil !== null)
-      return { status: ended ? "cancelada" : "ativa", paidUntil, firstPaidAt, canceledAt: ended ? now : null, refundedAt: null };
-    if (ended) return { status: "recusada", paidUntil: null, firstPaidAt: null, canceledAt: now, refundedAt: null };
-    const overdue = list.some((p) => p.status === "OVERDUE");
-    return { status: overdue ? "recusada" : "pendente", paidUntil: null, firstPaidAt: null, canceledAt: null, refundedAt: null };
+    const rows = charges.map((c) => ({ status: c.status, covers_until: c.coversUntil, paid_at: c.paidAt }));
+    const d = deriveSubscription({ status: "pendente", canceledAt: ended ? now : null, paidUntil: null, firstPaidAt: null }, rows, { type: "conciliacao", at: now });
+    const everPaid = charges.some((c) => WAS_PAID.has(c.status));
+    const status = everPaid
+      ? (d.status as ProviderSubscriptionState["status"])
+      : ended || charges.some((c) => c.status === "vencida" || c.status === "recusada")
+        ? "recusada"
+        : "pendente";
+    const refunds = charges.filter((c) => c.status === "estornada").map((c) => c.refundedAt!);
+    return {
+      status,
+      paidUntil: rows.some((c) => c.status === "paga" || c.status === "estorno_parcial")
+        ? Math.max(...charges.filter((c) => c.status === "paga" || c.status === "estorno_parcial").map((c) => c.coversUntil!))
+        : null,
+      firstPaidAt: d.firstPaidAt,
+      canceledAt: ended ? now : null,
+      refundedAt: status === "reembolsada" ? (refunds.length ? Math.max(...refunds) : now) : null,
+      charges,
+    };
   }
 
   /**
-   * O id da assinatura no Asaas: o que um webhook já trouxe ou, se todos se perderam, a
-   * busca pela referência externa. A documentação não diz se a referência do Checkout passa
-   * para a assinatura criada; se não passar, isso devolve null e a conciliação avisa
-   * ("desconhecida") em vez de adivinhar.
+   * O id da assinatura no Asaas: o que um webhook já trouxe ou, se todos se perderam, a busca
+   * pela referência externa. A documentação não diz se a referência do Checkout passa para a
+   * assinatura criada; se não passar, procura as cobranças daquele Checkout (o filtro
+   * `checkoutSession` de "Listar cobranças") e usa a assinatura delas. Sem nenhuma das duas,
+   * devolve null e a conciliação conta a tentativa como sem pagamento, em vez de adivinhar.
    */
   private async asaasSubscription(subscriptionId: string): Promise<string | null> {
     const ref = this.refs.get(subscriptionId);
     if (!ref) return null;
     if (ref.subscription) return ref.subscription;
     if (!ref.checkout) return null;
-    const r = await this.call<{ data?: AsaasSubscription[] }>(
-      "GET",
+    const list = await this.list<AsaasSubscription>(
       `/subscriptions?externalReference=${encodeURIComponent(subscriptionId)}&includeDeleted=true`,
     );
-    const found = (r.data ?? []).find((s) => s.checkoutSession === ref.checkout);
+    let found = list.find((s) => s.checkoutSession === ref.checkout)?.id;
+    if (!found) {
+      const pays = await this.list<AsaasPayment>(`/payments?checkoutSession=${encodeURIComponent(ref.checkout)}`);
+      found = pays.find((p) => p.checkoutSession === ref.checkout && p.subscription)?.subscription ?? undefined;
+    }
     if (!found) return null;
-    this.refs.setSubscription(subscriptionId, found.id);
-    return found.id;
+    this.refs.setSubscription(subscriptionId, found);
+    return found;
   }
 
   private async payments(asaasId: string): Promise<AsaasPayment[]> {
-    const r = await this.call<{ data?: AsaasPayment[] }>("GET", `/subscriptions/${encodeURIComponent(asaasId)}/payments`);
-    return (r.data ?? []).filter((p) => !p.deleted);
+    return (await this.list<AsaasPayment>(`/subscriptions/${encodeURIComponent(asaasId)}/payments`)).filter((p) => !p.deleted);
+  }
+
+  /**
+   * Todos os itens de uma listagem, página por página ("Listagem e paginação": limit até 100,
+   * offset a partir de 0, continuar enquanto hasMore). Sem isso, só vinham os 10 primeiros, e
+   * uma assinatura mensal com mais de 10 cobranças perdia as mais novas na conciliação.
+   */
+  private async list<T>(path: string): Promise<T[]> {
+    const out: T[] = [];
+    const sep = path.includes("?") ? "&" : "?";
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const r = await this.call<{ data?: T[]; hasMore?: boolean }>("GET", `${path}${sep}limit=${PAGE}&offset=${page * PAGE}`);
+      out.push(...(r.data ?? []));
+      if (!r.hasMore) return out;
+    }
+    throw new ProviderUnavailable(`listagem do Asaas com mais de ${MAX_PAGES * PAGE} itens (${path}); nada foi mudado`);
   }
 
   /** Remove a assinatura no Asaas; já removida (404) conta como feito. */
@@ -358,7 +463,22 @@ export class AsaasPaymentProvider implements PaymentProvider {
     }
   }
 
+  /**
+   * Uma chamada à API. Uma leitura (GET) que falha por rede, tempo esgotado, 5xx ou 429 é
+   * tentada mais uma vez, depois de uma pausa curta; o resto não, porque criar um Checkout
+   * ou pedir um estorno duas vezes não é seguro sem conferir antes.
+   */
   private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
+    try {
+      return await this.callOnce<T>(method, path, body);
+    } catch (e) {
+      if (method !== "GET" || !(e instanceof ProviderUnavailable) || /respondeu 40[13]/.test(e.message)) throw e;
+      await new Promise((r) => setTimeout(r, RETRY_MS));
+      return this.callOnce<T>(method, path, body);
+    }
+  }
+
+  private async callOnce<T>(method: string, path: string, body?: unknown): Promise<T> {
     let res: Response;
     try {
       res = await this.http(`${this.base}${path}`, {

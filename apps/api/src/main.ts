@@ -1,4 +1,5 @@
 import { buildApp } from './app.ts';
+import { ReconcileAlerts } from './conciliacao.ts';
 import { loadConfig } from './config.ts';
 import { loadContentStore } from './conteudo.ts';
 import { openDb } from './db.ts';
@@ -21,11 +22,13 @@ process.on('SIGTERM', shutdown);
 await app.listen({ port: config.port, host: config.host });
 app.log.info(`tutor: ${config.anthropicApiKey ? `IA (${config.tutorModel})` : 'offline'}`);
 
-// Conciliação com o provedor de pagamento: recupera webhooks perdidos (conciliacao.ts).
+// Conciliação com o provedor de pagamento: recupera webhooks perdidos (conciliacao.ts). O que
+// precisa de alguém sai como aviso uma vez por caso a cada 24 h; o esperado, só no resumo.
+const alertas = new ReconcileAlerts();
 const conciliar = async () => {
   try {
     const r = await app.rotinas.conciliar();
-    if (r && (r.corrigidas.length || r.divergencias.length || r.falhas.length)) app.log.warn({ conciliacao: r }, 'conciliação com o provedor de pagamento');
+    if (r) for (const l of alertas.lines(r)) app.log[l.nivel]({ conciliacao: l.contexto }, l.mensagem);
   } catch (e) {
     app.log.error({ err: e }, 'falha na conciliação com o provedor de pagamento');
   }

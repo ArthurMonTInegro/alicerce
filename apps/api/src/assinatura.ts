@@ -16,7 +16,10 @@
  * - pagamento recusado: a primeira cobrança não ativa nada; numa renovação, o acesso vai até o fim do período já pago;
  * - cancelar: para de renovar, e o acesso vai até o fim do período pago;
  * - desistir em até 7 dias do primeiro pagamento (CDC, art. 49): estorno integral e fim do acesso na hora;
- * - reembolso (pedido aqui ou feito no provedor): aquela assinatura deixa de dar acesso, e só ela.
+ * - reembolso de uma cobrança (feito no provedor): só aquela cobrança deixa de dar acesso; o
+ *   período que outra cobrança da mesma assinatura pagou continua valendo (cobrancas.ts);
+ * - desistência (estorno de todas as cobranças pagas, pedido aqui): a assinatura deixa de dar acesso,
+ *   e só ela.
  */
 import {
   createHmac,
@@ -27,6 +30,18 @@ import {
 import type { DatabaseSync } from "node:sqlite";
 import { PLANS } from "@alicerce/engine";
 import { enqueueEmail } from "./avisos.ts";
+import {
+  canMove,
+  CHARGE_STATUSES,
+  chargesOf,
+  chargeStatusOf,
+  deriveSubscription,
+  eventTypeFor,
+  latestCoverage,
+  recordCharge,
+  WAS_PAID,
+  type ChargeStatus,
+} from "./cobrancas.ts";
 import { recomputeAccess } from "./plans.ts";
 
 export type Period = "mensal" | "anual";
@@ -37,20 +52,59 @@ export type SubscriptionStatus =
   | "cancelada"
   | "recusada"
   | "reembolsada";
+/**
+ * Eventos do Alicerce. Com `chargeId`, o evento é de uma cobrança e muda só ela (cobrancas.ts);
+ * sem, vale para a assinatura toda (o provedor de teste antigo e a desistência, que estorna tudo).
+ * - pagamento_aprovado: a cobrança foi paga e cobre de `coversFrom` até `paidUntil`;
+ * - pagamento_recusado: a cobrança venceu ou o cartão foi recusado;
+ * - assinatura_cancelada: a assinatura não renova mais (o que foi pago continua valendo);
+ * - reembolso: estorno integral (da cobrança ou, sem `chargeId`, de tudo);
+ * - reembolso_pedido: estorno pedido ou em processamento;
+ * - reembolso_parcial: parte do valor da cobrança devolvida;
+ * - contestacao: contestação no cartão (chargeback) recebida ou em disputa.
+ */
 export type PaymentEventType =
   | "pagamento_aprovado"
   | "pagamento_recusado"
   | "assinatura_cancelada"
-  | "reembolso";
+  | "reembolso"
+  | "reembolso_pedido"
+  | "reembolso_parcial"
+  | "contestacao";
 
 export interface PaymentEvent {
   /** id do evento no provedor: o mesmo evento entregue duas vezes só vale uma */
   id: string;
   type: PaymentEventType;
   subscriptionId: string;
+  /** a cobrança do provedor a que o evento se refere */
+  chargeId?: string;
+  /**
+   * a situação exata da cobrança, quando o tipo do evento não basta (vencida ou recusada);
+   * precisa combinar com o tipo (cobrancas.ts, eventTypeFor)
+   */
+  chargeStatus?: ChargeStatus;
+  /** a situação da cobrança exatamente como o provedor a escreve */
+  providerStatus?: string;
+  /** em pagamento_aprovado com cobrança: desde quando o pagamento cobre */
+  coversFrom?: number;
   /** só em pagamento_aprovado: até quando o pagamento cobre */
   paidUntil?: number;
+  /** quando a cobrança foi paga (o prazo de desistência conta daqui); sem isso, `at` */
+  paidAt?: number;
+  /** quando a situação foi lida no provedor */
   at: number;
+}
+
+/** Uma cobrança segundo o provedor (conciliação). */
+export interface ProviderCharge {
+  id: string;
+  status: ChargeStatus;
+  providerStatus?: string;
+  coversFrom: number | null;
+  coversUntil: number | null;
+  paidAt: number | null;
+  refundedAt: number | null;
 }
 
 /** A situação de uma assinatura segundo o provedor (para a conciliação: conciliacao.ts). */
@@ -60,6 +114,11 @@ export interface ProviderSubscriptionState {
   firstPaidAt: number | null;
   canceledAt: number | null;
   refundedAt: number | null;
+  /**
+   * Todas as cobranças da assinatura, quando o provedor as lista. Com elas, a conciliação
+   * acerta cobrança por cobrança; sem, só a assinatura (provedor que não diz as cobranças).
+   */
+  charges?: ProviderCharge[];
 }
 
 /**
@@ -72,8 +131,8 @@ export class ProviderUnavailable extends Error {}
  * O que um adaptador de provedor de pagamento precisa cumprir (docs/PAGAMENTO.md,
  * "Contrato do adaptador"; testes em test/contrato-provedor.ts):
  * - nada de dados de cartão ou de Pix aqui: a cobrança acontece na página do provedor;
- * - cada mudança chega por webhook autenticado, traduzida para um dos quatro eventos, com o id
- *   do evento no provedor (o mesmo evento entregue de novo traz o mesmo id). Um webhook
+ * - cada mudança chega por webhook autenticado, traduzida para um dos eventos acima (com a
+ *   cobrança, quando o provedor tem cobranças), com o id do evento no provedor (o mesmo evento entregue de novo traz o mesmo id). Um webhook
  *   adulterado é recusado ou não muda nada: se o provedor não assina o corpo, o adaptador
  *   confere a situação na API dele antes de traduzir;
  * - cancel e refund podem ser chamados de novo para a mesma assinatura sem efeito duplicado
@@ -196,7 +255,11 @@ const EVENT_TYPES: readonly PaymentEventType[] = [
   "pagamento_recusado",
   "assinatura_cancelada",
   "reembolso",
+  "reembolso_pedido",
+  "reembolso_parcial",
+  "contestacao",
 ];
+const optionalNumber = (v: unknown) => v === undefined || (typeof v === "number" && Number.isFinite(v));
 function parseEvent(rawBody: string): PaymentEvent {
   const b = JSON.parse(rawBody) as Record<string, unknown>;
   const ok =
@@ -208,14 +271,24 @@ function parseEvent(rawBody: string): PaymentEvent {
     typeof b.at === "number" &&
     Number.isFinite(b.at) &&
     (b.type !== "pagamento_aprovado" ||
-      (typeof b.paidUntil === "number" && Number.isFinite(b.paidUntil)));
+      (typeof b.paidUntil === "number" && Number.isFinite(b.paidUntil))) &&
+    (b.chargeId === undefined || (typeof b.chargeId === "string" && b.chargeId.length > 0 && b.chargeId.length <= 200)) &&
+    (b.providerStatus === undefined || (typeof b.providerStatus === "string" && b.providerStatus.length <= 60)) &&
+    optionalNumber(b.coversFrom) &&
+    optionalNumber(b.paidAt) &&
+    (b.chargeStatus === undefined || CHARGE_STATUSES.includes(b.chargeStatus as ChargeStatus));
   if (!ok) throw new Error("evento malformado");
   return {
     id: b.id as string,
     type: b.type as PaymentEventType,
     subscriptionId: b.subscriptionId as string,
     at: b.at as number,
+    ...(typeof b.chargeId === "string" ? { chargeId: b.chargeId } : {}),
+    ...(typeof b.chargeStatus === "string" ? { chargeStatus: b.chargeStatus as ChargeStatus } : {}),
+    ...(typeof b.providerStatus === "string" ? { providerStatus: b.providerStatus } : {}),
+    ...(typeof b.coversFrom === "number" ? { coversFrom: b.coversFrom } : {}),
     ...(typeof b.paidUntil === "number" ? { paidUntil: b.paidUntil } : {}),
+    ...(typeof b.paidAt === "number" ? { paidAt: b.paidAt } : {}),
   };
 }
 
@@ -236,7 +309,7 @@ export const TEST_RESULTS: readonly TestResult[] = [
 export class TestPaymentProvider implements PaymentProvider {
   readonly name = "teste";
   private readonly secret: string;
-  private readonly state = new Map<string, ProviderSubscriptionState>();
+  private readonly state = new Map<string, ProviderSubscriptionState & { charges: ProviderCharge[] }>();
   /** estornos feitos de verdade por assinatura (um segundo pedido não estorna de novo) */
   readonly refunds = new Map<string, number>();
   private lostDeliveries = 0;
@@ -287,7 +360,11 @@ export class TestPaymentProvider implements PaymentProvider {
   async fetchState(subscriptionId: string) {
     this.check("fetchState");
     const st = this.state.get(subscriptionId);
-    return st ? { ...st } : null;
+    return st ? { ...st, charges: st.charges.map((c) => ({ ...c })) } : null;
+  }
+  /** As cobranças que o provedor de teste registrou para a assinatura (para os testes). */
+  chargesOf(subscriptionId: string): ProviderCharge[] {
+    return (this.state.get(subscriptionId)?.charges ?? []).map((c) => ({ ...c }));
   }
   /** O que a "página de pagamento" de teste faz: aprova, recusa, renova ou falha a renovação. */
   async simulate(
@@ -304,7 +381,10 @@ export class TestPaymentProvider implements PaymentProvider {
         {
           type: "pagamento_aprovado",
           subscriptionId: sub.id,
+          chargeId: `cob_${randomUUID()}`,
+          coversFrom: from,
           paidUntil: addPeriod(from, sub.period),
+          paidAt: now,
         },
         now,
       );
@@ -313,6 +393,29 @@ export class TestPaymentProvider implements PaymentProvider {
         { type: "pagamento_recusado", subscriptionId: sub.id },
         now,
       );
+  }
+  /**
+   * Um acontecimento numa cobrança feito do lado do provedor, como no painel dele: estorno
+   * integral, parcial ou pedido, contestação, ou a cobrança voltando a paga (contestação ganha).
+   */
+  async chargeEvent(
+    subscriptionId: string,
+    chargeId: string,
+    type: "reembolso" | "reembolso_pedido" | "reembolso_parcial" | "contestacao" | "pagamento_aprovado",
+    now = Date.now(),
+  ) {
+    const c = this.state.get(subscriptionId)?.charges.find((x) => x.id === chargeId);
+    if (!c) throw new Error(`provedor de teste: cobrança ${chargeId} desconhecida`);
+    if (type === "reembolso") this.refunds.set(subscriptionId, (this.refunds.get(subscriptionId) ?? 0) + 1);
+    await this.emit(
+      {
+        type,
+        subscriptionId,
+        chargeId,
+        ...(type === "pagamento_aprovado" ? { coversFrom: c.coversFrom ?? undefined, paidUntil: c.coversUntil ?? undefined, paidAt: c.paidAt ?? undefined } : {}),
+      },
+      now,
+    );
   }
   parseWebhook(
     rawBody: string,
@@ -330,10 +433,10 @@ export class TestPaymentProvider implements PaymentProvider {
       throw new Error("assinatura do webhook não confere");
     return parseEvent(rawBody);
   }
-  private track(id: string): ProviderSubscriptionState {
+  private track(id: string) {
     let st = this.state.get(id);
     if (!st) {
-      st = { status: "pendente", paidUntil: null, firstPaidAt: null, canceledAt: null, refundedAt: null };
+      st = { status: "pendente", paidUntil: null, firstPaidAt: null, canceledAt: null, refundedAt: null, charges: [] };
       this.state.set(id, st);
     }
     return st;
@@ -341,24 +444,52 @@ export class TestPaymentProvider implements PaymentProvider {
   /** A mesma regra de applyPaymentEvent, do lado do provedor. */
   private record(ev: Omit<PaymentEvent, "id" | "at">, now: number) {
     const st = this.track(ev.subscriptionId);
-    if (st.status === "reembolsada") return;
-    if (ev.type === "pagamento_aprovado") {
-      st.paidUntil = Math.max(st.paidUntil ?? 0, ev.paidUntil!);
-      st.firstPaidAt ??= now;
-      st.status = st.canceledAt !== null ? "cancelada" : "ativa";
+    const status = ev.chargeId ? (ev.chargeStatus ?? chargeStatusOf(ev.type, ev.providerStatus)) : null;
+    if (ev.chargeId && status) {
+      const c = st.charges.find((x) => x.id === ev.chargeId);
+      if (!c)
+        st.charges.push({
+          id: ev.chargeId,
+          status,
+          coversFrom: ev.coversFrom ?? null,
+          coversUntil: ev.paidUntil ?? null,
+          paidAt: WAS_PAID.has(status) ? (ev.paidAt ?? now) : null,
+          refundedAt: status === "estornada" ? now : null,
+        });
+      else if (canMove(c.status, status)) {
+        c.status = status;
+        if (ev.paidUntil !== undefined) c.coversUntil = ev.paidUntil;
+        if (status === "estornada") c.refundedAt ??= now;
+      } else return;
     } else if (ev.type === "pagamento_recusado") {
       if (st.status === "pendente") st.status = "recusada";
+      return;
     } else if (ev.type === "assinatura_cancelada") {
-      if (st.status === "ativa" || st.status === "pendente") {
-        st.status = st.status === "pendente" ? "recusada" : "cancelada";
-        st.canceledAt = now;
+      if (st.status === "pendente") st.status = "recusada";
+      if (st.status === "recusada" || st.canceledAt !== null) {
+        st.canceledAt ??= now;
+        return;
       }
-    } else {
-      st.status = "reembolsada";
-      st.refundedAt = now;
+      st.canceledAt = now;
+    } else if (ev.type === "reembolso") {
+      // a desistência: estorna tudo o que foi pago e para de renovar
+      for (const c of st.charges)
+        if (WAS_PAID.has(c.status) && c.status !== "estornada") {
+          c.status = "estornada";
+          c.refundedAt ??= now;
+        }
       st.canceledAt ??= now;
-      if (st.paidUntil !== null && st.paidUntil > now) st.paidUntil = now;
-    }
+      st.refundedAt ??= now;
+    } else return;
+    const d = deriveSubscription(
+      st,
+      st.charges.map((c) => ({ status: c.status, covers_until: c.coversUntil, paid_at: c.paidAt })),
+      { type: ev.type, at: now },
+    );
+    st.status = d.status as SubscriptionStatus;
+    st.paidUntil = d.paidUntil;
+    st.firstPaidAt = d.firstPaidAt;
+    if (st.status === "reembolsada") st.refundedAt ??= now;
   }
   private async emit(ev: Omit<PaymentEvent, "id" | "at">, now = Date.now()) {
     this.record(ev, now);
@@ -515,13 +646,21 @@ export function subscriptionView(
 }
 
 /**
- * Aplica um evento do provedor, uma vez só (payment_events). Muda a assinatura do evento
- * e recalcula o plano da conta, na mesma transação: ou fica tudo, ou nada (e então o
+ * Aplica um evento do provedor, uma vez só (payment_events). Muda a cobrança ou a assinatura do
+ * evento e recalcula o plano da conta, na mesma transação: ou fica tudo, ou nada (e então o
  * evento não fica registrado, e o provedor pode entregá-lo de novo).
  *
- * Eventos fora de ordem: o período pago só cresce (o maior paid_until vale); um reembolso
- * é final (o que chega depois dele é ignorado); um pagamento que chega depois do
- * cancelamento conta, mas a assinatura continua sem renovar.
+ * Evento de uma cobrança (`chargeId`): muda só aquela cobrança (cobrancas.ts, recordCharge);
+ * a situação e o "pago até" da assinatura são recalculados das cobranças dela. Uma leitura mais
+ * antiga que a já aplicada, ou uma transição que não vale (estornada para paga), não muda nada.
+ *
+ * Evento da assinatura toda (sem `chargeId`): o período pago só cresce (o maior paid_until vale);
+ * um reembolso da assinatura toda é final (o pagamento sem cobrança que chega depois dele é
+ * ignorado); um pagamento que chega depois do cancelamento conta, mas a assinatura continua sem
+ * renovar.
+ *
+ * "aplicado": mudou algo; "ignorado": nada a mudar (assinatura desconhecida, leitura antiga,
+ * transição proibida); "repetido": o mesmo id já veio.
  */
 export function applyPaymentEvent(
   db: DatabaseSync,
@@ -541,51 +680,133 @@ export function applyPaymentEvent(
     const s = db
       .prepare("SELECT * FROM subscriptions WHERE id = ? AND provider = ?")
       .get(ev.subscriptionId, provider) as SubscriptionRow | undefined;
-    let result: "aplicado" | "ignorado" = "ignorado";
-    if (s && s.status !== "reembolsada") {
-      result = "aplicado";
-      if (ev.type === "pagamento_aprovado") {
-        const paidUntil = Math.max(s.paid_until ?? 0, ev.paidUntil!);
-        const status: SubscriptionStatus =
-          s.canceled_at !== null ? "cancelada" : "ativa";
-        db.prepare(
-          "UPDATE subscriptions SET status = ?, paid_until = ?, first_paid_at = COALESCE(first_paid_at, ?), updated_at = ? WHERE id = ?",
-        ).run(status, paidUntil, ev.at, now, s.id);
-      } else if (ev.type === "pagamento_recusado") {
-        // Primeira cobrança recusada: nada é ativado. Numa renovação, o acesso vai até o fim do que já foi pago.
-        db.prepare(
-          "UPDATE subscriptions SET status = ?, updated_at = ? WHERE id = ?",
-        ).run(s.status === "pendente" ? "recusada" : s.status, now, s.id);
-      } else if (ev.type === "assinatura_cancelada") {
-        if (s.status === "ativa" || s.status === "pendente")
-          db.prepare(
-            "UPDATE subscriptions SET status = ?, canceled_at = ?, updated_at = ? WHERE id = ?",
-          ).run(
-            s.status === "pendente" ? "recusada" : "cancelada",
-            ev.at,
-            now,
-            s.id,
-          );
-      } else if (ev.type === "reembolso") {
-        // O fim do período pago encolhe até o reembolso (um reembolso de algo já vencido não o estica).
-        db.prepare(
-          "UPDATE subscriptions SET status = 'reembolsada', paid_until = CASE WHEN paid_until > ? THEN ? ELSE paid_until END, canceled_at = COALESCE(canceled_at, ?), updated_at = ? WHERE id = ?",
-        ).run(ev.at, ev.at, ev.at, now, s.id);
-      }
+    const changed = s
+      ? ev.chargeId && ev.type !== "assinatura_cancelada"
+        ? applyChargeEvent(db, provider, s, ev, now)
+        : applySubscriptionEvent(db, provider, s, ev, now)
+      : false;
+    if (s && changed) {
       const access = recomputeAccess(
         db,
         s.user_id,
-        `${ev.type === "reembolso" ? "reembolso" : "pagamento"}:${provider}`,
+        `${ev.type.startsWith("reembolso") || ev.type === "contestacao" ? "reembolso" : "pagamento"}:${provider}`,
         now,
       );
       queueSubscriptionEmail(db, ev, s, getSubscription(db, s.id)!, access, now);
     }
     db.exec("COMMIT");
-    return result;
+    return changed ? "aplicado" : "ignorado";
   } catch (e) {
     db.exec("ROLLBACK");
     throw e;
   }
+}
+
+/** Evento de uma cobrança: grava a cobrança e recalcula a assinatura a partir das cobranças. */
+function applyChargeEvent(db: DatabaseSync, provider: string, s: SubscriptionRow, ev: PaymentEvent, now: number) {
+  const status = ev.chargeStatus ?? chargeStatusOf(ev.type, ev.providerStatus);
+  if (!status || eventTypeFor(status) !== ev.type) return false; // situação que não combina com o tipo: nada muda
+  const r = recordCharge(
+    db,
+    provider,
+    s.id,
+    {
+      chargeId: ev.chargeId!,
+      status,
+      ...(ev.providerStatus !== undefined ? { providerStatus: ev.providerStatus } : {}),
+      ...(ev.paidUntil !== undefined ? { coversFrom: ev.coversFrom ?? null, coversUntil: ev.paidUntil } : {}),
+      ...(WAS_PAID.has(status) ? { paidAt: ev.paidAt ?? ev.at } : {}),
+      ...(status === "estornada" ? { refundedAt: ev.at } : {}),
+      observedAt: ev.at,
+    },
+    now,
+  );
+  if (r !== "mudou") return false;
+  syncSubscription(db, s.id, ev, now);
+  return true;
+}
+
+/** Evento da assinatura toda (provedor sem cobranças, desistência, cancelamento). */
+function applySubscriptionEvent(db: DatabaseSync, provider: string, s: SubscriptionRow, ev: PaymentEvent, now: number) {
+  if (ev.type === "pagamento_aprovado") {
+    if (s.status === "reembolsada") return false; // o reembolso da assinatura toda é final
+    // Sem a cobrança, o pagamento vira uma cobrança "desde sempre até paidUntil"; o mesmo
+    // pagamento reenviado, ou um que não vai além do que já está pago, não acrescenta nada.
+    if (ev.paidUntil! > (latestCoverage(chargesOf(db, s.id)) ?? 0))
+      recordCharge(db, provider, s.id, { chargeId: `${s.id}@${ev.paidUntil}`, status: "paga", coversFrom: null, coversUntil: ev.paidUntil!, paidAt: ev.paidAt ?? ev.at, observedAt: ev.at }, now);
+    const paidUntil = Math.max(s.paid_until ?? 0, ev.paidUntil!);
+    db.prepare(
+      "UPDATE subscriptions SET status = ?, paid_until = ?, first_paid_at = COALESCE(first_paid_at, ?), updated_at = ? WHERE id = ?",
+    ).run(s.canceled_at !== null ? "cancelada" : "ativa", paidUntil, ev.paidAt ?? ev.at, now, s.id);
+    return true;
+  }
+  if (s.status === "reembolsada") return false;
+  if (ev.type === "pagamento_recusado") {
+    // Primeira cobrança recusada: nada é ativado. Numa renovação, o acesso vai até o fim do que já foi pago.
+    db.prepare("UPDATE subscriptions SET status = ?, updated_at = ? WHERE id = ?").run(s.status === "pendente" ? "recusada" : s.status, now, s.id);
+    return true;
+  }
+  if (ev.type === "assinatura_cancelada") {
+    if (s.status === "ativa" || s.status === "pendente")
+      db.prepare("UPDATE subscriptions SET status = ?, canceled_at = ?, updated_at = ? WHERE id = ?").run(
+        s.status === "pendente" ? "recusada" : "cancelada",
+        ev.at,
+        now,
+        s.id,
+      );
+  } else if (ev.type === "reembolso") {
+    // A desistência: todas as cobranças pagas são estornadas, e o fim do período pago encolhe
+    // até o reembolso (um reembolso de algo já vencido não o estica).
+    db.prepare(
+      "UPDATE subscription_charges SET status = 'estornada', refunded_at = COALESCE(refunded_at, ?), observed_at = MAX(observed_at, ?), transitions = transitions + 1, updated_at = ? WHERE subscription_id = ? AND status IN ('paga', 'estorno_parcial', 'estorno_pedido', 'contestada')",
+    ).run(ev.at, ev.at, now, s.id);
+    db.prepare(
+      "UPDATE subscriptions SET status = 'reembolsada', paid_until = CASE WHEN paid_until > ? THEN ? ELSE paid_until END, canceled_at = COALESCE(canceled_at, ?), updated_at = ? WHERE id = ?",
+    ).run(ev.at, ev.at, ev.at, now, s.id);
+    return true;
+  } else return false; // estorno parcial, pedido ou contestação sem dizer de qual cobrança: nada a mudar
+  if (chargesOf(db, s.id).length) syncSubscription(db, s.id, ev, now);
+  return true;
+}
+
+/**
+ * Tira a cobrança 'legado:' que a migração 9 criou para a assinatura, quando o provedor já
+ * listou as cobranças de verdade dela (conciliacao.ts). Recalcula a assinatura e o plano na
+ * mesma transação. Devolve true se havia uma.
+ */
+export function replaceLegacyCharges(db: DatabaseSync, provider: string, subscriptionId: string, now = Date.now()) {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const gone = db
+      .prepare("DELETE FROM subscription_charges WHERE subscription_id = ? AND provider = ? AND charge_id = ?")
+      .run(subscriptionId, provider, `legado:${subscriptionId}`).changes;
+    if (gone) {
+      syncSubscription(db, subscriptionId, { id: "legado", type: "pagamento_aprovado", subscriptionId, at: now }, now);
+      recomputeAccess(db, getSubscription(db, subscriptionId)!.user_id, `conciliacao:${provider}`, now);
+    }
+    db.exec("COMMIT");
+    return gone > 0;
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+}
+
+/** Recalcula a situação, o "pago até" e o primeiro pagamento da assinatura pelas cobranças dela. */
+function syncSubscription(db: DatabaseSync, id: string, ev: PaymentEvent, now: number) {
+  const s = getSubscription(db, id)!;
+  const d = deriveSubscription(
+    { status: s.status, canceledAt: s.canceled_at, paidUntil: s.paid_until, firstPaidAt: s.first_paid_at },
+    chargesOf(db, id),
+    ev,
+  );
+  db.prepare("UPDATE subscriptions SET status = ?, paid_until = ?, first_paid_at = ?, updated_at = ? WHERE id = ?").run(
+    d.status,
+    d.paidUntil,
+    d.firstPaidAt,
+    now,
+    id,
+  );
 }
 
 /** O e-mail que o evento pede, se pede algum (avisos.ts), na mesma transação. */
@@ -640,7 +861,7 @@ function queueSubscriptionEmail(
       db,
       after.user_id,
       "reembolso",
-      `reembolso:${after.id}`,
+      ev.chargeId ? `reembolso:${after.id}:${ev.chargeId}` : `reembolso:${after.id}`,
       {
         ...data,
         premiumAte: access.plan === "premium" ? access.expiresAt : null,

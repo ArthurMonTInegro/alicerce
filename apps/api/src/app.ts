@@ -156,6 +156,10 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
   };
   // Provedor de pagamento: o simulado ou o Asaas. Os webhooks do simulado passam pela mesma rota
   // de um provedor real (app.inject), com a assinatura conferida do mesmo jeito.
+  const ASAAS_NOTICES = {
+    cobranca_sem_vinculo: 'cobrança do Asaas sem assinatura do Alicerce ligada a ela: confira no painel se alguém pagou sem receber acesso (docs/PAGAMENTO.md, "Investigar uma divergência")',
+    cobranca_desconhecida: 'webhook do Asaas aponta uma cobrança que a API não conhece: nada foi mudado',
+  } as const;
   const payments: PaymentProvider | null =
     config.paymentProvider === 'teste'
       ? new TestPaymentProvider(config.paymentWebhookSecret, async (payload, headers) => {
@@ -163,7 +167,9 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
           if (r.statusCode !== 200) throw new Error(`webhook de teste recusado (${r.statusCode})`);
         })
       : config.paymentProvider === 'asaas'
-        ? new AsaasPaymentProvider({ ...config.asaas!, appUrl: config.appUrl }, asaasRefs(db), paymentFetch)
+        ? new AsaasPaymentProvider({ ...config.asaas!, appUrl: config.appUrl }, asaasRefs(db), paymentFetch, (kind, ctx) =>
+            app.log.warn({ pagamento: { tipo: kind, ...ctx } }, ASAAS_NOTICES[kind]),
+          )
         : null;
   /** Depois de cancelar ou estornar: aplica já o que o provedor confirmou, sem esperar o webhook. */
   const settle = async (id: string, log: FastifyRequest['log']) => {
@@ -542,6 +548,9 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
       req.log.error({ err: e, evento: ev.id }, 'falha ao aplicar evento de pagamento');
       return reply.code(500).send({ error: 'Não consegui registrar o evento agora.' });
     }
+    // Estorno parcial e contestação mudam o acesso pela regra proposta, à espera de uma decisão: ficam no log.
+    if (result === 'aplicado' && (ev.type === 'reembolso_parcial' || ev.type === 'contestacao'))
+      req.log.warn({ pagamento: { assinatura: ev.subscriptionId, cobranca: ev.chargeId ?? null, evento: ev.type } }, `${ev.type === 'contestacao' ? 'contestação no cartão' : 'estorno parcial'}: aplicada a regra proposta, à espera da decisão do Arthur (docs/PAGAMENTO.md)`);
     // E-mails que o evento pôs na fila: saem logo, sem segurar a resposta ao provedor.
     if (result === 'aplicado') setImmediate(() => void sendEmails().catch((e) => app.log.error({ err: e }, 'falha ao enviar os e-mails da fila')));
     return { ok: true, result };

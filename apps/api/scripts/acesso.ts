@@ -1,6 +1,6 @@
 /**
  * Confere o acesso das contas: a cópia do plano em users contra os direitos de cada uma
- * (assinaturas pagas e concessões manuais). O servidor decide pelos direitos (plans.ts,
+ * (as cobranças pagas de cada assinatura e as concessões manuais). O servidor decide pelos direitos (plans.ts,
  * computeAccess); a cópia serve aos scripts e ao código anterior à migração 6.
  *
  * Uso:
@@ -13,6 +13,7 @@
 import { effectivePlan } from '@alicerce/engine';
 import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db.ts';
+import { chargesOf } from '../src/cobrancas.ts';
 import { accessRights, computeAccess, recomputeAccess } from '../src/plans.ts';
 
 const quando = (t: number | null, semFim = '—') => (t === null ? semFim : `${new Date(t).toISOString().slice(0, 16).replace('T', ' ')} UTC`);
@@ -35,8 +36,13 @@ if (arg && arg !== '--corrigir') {
   console.log('Direitos:');
   const rights = accessRights(db, u.id, now);
   if (rights.length === 0) console.log('  nenhum');
-  for (const r of rights)
+  for (const r of rights) {
     console.log(`  ${r.kind === 'assinatura' ? 'assinatura' : 'concessão'} ${r.id} (${r.source}): ${r.status}, até ${quando(r.until, r.kind === 'assinatura' ? '—' : 'sem fim')}${r.valid ? ' (vale agora)' : ''}`);
+    // cada cobrança da assinatura, com o período que ela cobre (o acesso vem delas: cobrancas.ts)
+    if (r.kind === 'assinatura')
+      for (const c of chargesOf(db, r.id))
+        console.log(`    cobrança ${c.charge_id}: ${c.status}${c.provider_status ? ` (${c.provider_status} no provedor)` : ''}, cobre ${quando(c.covers_from, 'desde sempre')} até ${quando(c.covers_until)}, lida em ${quando(c.observed_at)}`);
+  }
   console.log(`Plano pelos direitos: ${plano(computeAccess(db, u.id, now))}`);
   console.log(`Cópia em users: ${plano({ plan: effectivePlan(u.plan, u.plan_expires_at, now), expiresAt: u.plan_expires_at })}`);
   console.log('Últimas mudanças do plano:');

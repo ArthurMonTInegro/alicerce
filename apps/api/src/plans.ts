@@ -1,7 +1,10 @@
 /**
  * Plano de cada conta, calculado sempre pela mesma regra (docs/PAGAMENTO.md, "Acesso efetivo"):
  *
- * - cada assinatura paga ('ativa' ou 'cancelada') dá Premium até paid_until; reembolsada não dá nada;
+ * - cada assinatura dá Premium enquanto alguma cobrança dela, paga e não estornada, cobre o momento
+ *   (cobrancas.ts): o estorno de uma cobrança antiga não apaga o período que outra cobrança pagou.
+ *   Uma assinatura sem cobranças registradas (anterior à migração 9 e não migrada) segue a regra
+ *   antiga: 'ativa' ou 'cancelada' dá Premium até paid_until;
  * - cada concessão manual (access_grants: script de administração, testes, Premium legado) dá Premium
  *   até expires_at (null = sem fim), enquanto não for revogada;
  * - a conta é Premium enquanto algum desses direitos vale, até o fim do que vai mais longe.
@@ -13,6 +16,7 @@
  */
 import type { DatabaseSync } from 'node:sqlite';
 import { entitlements, type Entitlements, type PlanId } from '@alicerce/engine';
+import { chargesOf, coverage } from './cobrancas.ts';
 
 export interface AccessRight {
   kind: 'assinatura' | 'concessao';
@@ -36,14 +40,21 @@ export function accessRights(db: DatabaseSync, userId: string, now = Date.now())
     .prepare('SELECT id, plan, source, starts_at, expires_at, revoked_at FROM access_grants WHERE user_id = ? ORDER BY id')
     .all(userId) as Array<{ id: number; plan: string; source: string; starts_at: number; expires_at: number | null; revoked_at: number | null }>;
   return [
-    ...subs.map((s) => ({
-      kind: 'assinatura' as const,
-      id: s.id,
-      source: s.provider,
-      status: s.status,
-      until: s.paid_until,
-      valid: (s.status === 'ativa' || s.status === 'cancelada') && s.paid_until !== null && s.paid_until > now,
-    })),
+    ...subs.map((s) => {
+      const charges = chargesOf(db, s.id);
+      if (charges.length) {
+        const c = coverage(charges, now);
+        return { kind: 'assinatura' as const, id: s.id, source: s.provider, status: s.status, until: c.until ?? s.paid_until, valid: c.valid };
+      }
+      return {
+        kind: 'assinatura' as const,
+        id: s.id,
+        source: s.provider,
+        status: s.status,
+        until: s.paid_until,
+        valid: (s.status === 'ativa' || s.status === 'cancelada') && s.paid_until !== null && s.paid_until > now,
+      };
+    }),
     ...grants.map((g) => ({
       kind: 'concessao' as const,
       id: String(g.id),

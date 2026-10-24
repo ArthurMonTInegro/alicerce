@@ -5,17 +5,26 @@
  * caminho do webhook (applyPaymentEvent), com um id fixo para a correção: rodar de novo
  * não aplica nada duas vezes, e o webhook original que chegar depois não muda o resultado.
  *
- * A conciliação só faz o banco alcançar o provedor. Ela nunca encurta um período nem
- * desfaz um reembolso; o que pediria isso vai para `divergencias`, para alguém olhar
- * (docs/PAGAMENTO.md, "Investigar uma divergência").
+ * Com um provedor que lista as cobranças (o Asaas), a conferência é cobrança por cobrança: cada
+ * cobrança que mudou lá vira o evento dela, e só ela muda aqui (cobrancas.ts).
+ *
+ * A conciliação só faz o banco alcançar o provedor. Ela nunca desfaz um estorno concluído nem
+ * faz uma cobrança voltar atrás numa transição que não vale; o que pediria isso vai para
+ * `divergencias`, para alguém olhar (docs/PAGAMENTO.md, "Investigar uma divergência").
+ *
+ * `alertas` (ReconcileAlerts) transforma o relatório de cada rodada nas linhas de log: o que
+ * precisa de alguém sai como aviso uma vez por dia por caso, e o esperado (tentativas sem
+ * pagamento) só entra na contagem.
  */
 import type { DatabaseSync } from "node:sqlite";
 import {
   applyPaymentEvent,
+  replaceLegacyCharges,
   type PaymentEvent,
   type PaymentProvider,
   type SubscriptionStatus,
 } from "./assinatura.ts";
+import { canMove, chargesOf, eventTypeFor, WAS_PAID } from "./cobrancas.ts";
 
 /**
  * Tentativas pendentes ou recusadas, reembolsos e cancelamentos vencidos há mais que isto não
@@ -27,8 +36,16 @@ export interface ReconcileReport {
   conferidas: number;
   /** eventos aplicados, por assinatura */
   corrigidas: Array<{ assinatura: string; eventos: PaymentEvent["type"][] }>;
-  /** o provedor não conhece a assinatura: nada muda */
+  /** o provedor não conhece a assinatura: nada muda (as esperadas e as que não deveriam acontecer) */
   desconhecidas: string[];
+  /**
+   * Das desconhecidas, as que já tiveram pagamento registrado aqui: o provedor deveria
+   * conhecê-las. A tentativa que nunca foi paga (página de pagamento aberta ou abandonada) é
+   * esperada e fica só em `desconhecidas`.
+   */
+  semVinculo: Array<{ assinatura: string; situacao: SubscriptionStatus }>;
+  /** mudanças que pedem uma decisão de política, não um conserto: estorno parcial e contestação */
+  avisos: Array<{ assinatura: string; cobranca: string; evento: PaymentEvent["type"] }>;
   /** banco e provedor discordam de um jeito que a conciliação não corrige sozinha */
   divergencias: Array<{ assinatura: string; motivo: string }>;
   /** o provedor não respondeu: fica para a próxima rodada */
@@ -41,6 +58,7 @@ interface Row {
   paid_until: number | null;
   first_paid_at: number | null;
 }
+const COLUMNS = "id, status, paid_until, first_paid_at";
 
 export async function reconcile(
   db: DatabaseSync,
@@ -49,7 +67,7 @@ export async function reconcile(
 ): Promise<ReconcileReport> {
   const rows = db
     .prepare(
-      "SELECT id, status, paid_until, first_paid_at FROM subscriptions WHERE provider = ? AND (status = 'ativa' OR (status = 'cancelada' AND paid_until > ?) OR (status IN ('pendente', 'recusada', 'reembolsada') AND updated_at > ?)) ORDER BY created_at, rowid",
+      `SELECT ${COLUMNS} FROM subscriptions WHERE provider = ? AND (status = 'ativa' OR (status = 'cancelada' AND paid_until > ?) OR (status IN ('pendente', 'recusada', 'reembolsada') AND updated_at > ?)) ORDER BY created_at, rowid`,
     )
     .all(provider.name, now - ABANDONED_AFTER_MS, now - ABANDONED_AFTER_MS) as unknown as Row[];
   const report = emptyReport();
@@ -69,7 +87,7 @@ export async function reconcileOne(
 ): Promise<ReconcileReport> {
   const report = emptyReport();
   const s = db
-    .prepare("SELECT id, status, paid_until, first_paid_at FROM subscriptions WHERE id = ? AND provider = ?")
+    .prepare(`SELECT ${COLUMNS} FROM subscriptions WHERE id = ? AND provider = ?`)
     .get(id, provider.name) as Row | undefined;
   if (s) await reconcileRow(db, provider, s, now, report);
   return report;
@@ -79,7 +97,9 @@ const emptyReport = (): ReconcileReport => ({
   conferidas: 0,
   corrigidas: [],
   desconhecidas: [],
+  semVinculo: [],
   divergencias: [],
+  avisos: [],
   falhas: [],
 });
 
@@ -100,8 +120,11 @@ async function reconcileRow(
   report.conferidas++;
   if (!p) {
     report.desconhecidas.push(s.id);
+    if (s.first_paid_at !== null || s.status === "ativa" || s.status === "cancelada" || s.status === "reembolsada")
+      report.semVinculo.push({ assinatura: s.id, situacao: s.status });
     return;
   }
+  if (p.charges) return reconcileCharges(db, provider, s, p, now, report);
   const events: PaymentEvent[] = [];
   if (p.paidUntil !== null && p.paidUntil > (s.paid_until ?? 0))
     events.push({
@@ -158,4 +181,135 @@ async function reconcileRow(
       assinatura: s.id,
       eventos: applied.map((ev) => ev.type),
     });
+}
+
+/** Conferência cobrança por cobrança, para o provedor que lista as cobranças da assinatura. */
+function reconcileCharges(
+  db: DatabaseSync,
+  provider: PaymentProvider,
+  s: Row,
+  p: NonNullable<Awaited<ReturnType<PaymentProvider["fetchState"]>>>,
+  now: number,
+  report: ReconcileReport,
+) {
+  const local = new Map(chargesOf(db, s.id).map((c) => [c.charge_id, c]));
+  const events: PaymentEvent[] = [];
+  for (const c of p.charges!) {
+    const type = eventTypeFor(c.status);
+    if (!type) continue; // pendente ou removida: nada a registrar
+    const cur = local.get(c.id);
+    if (cur && cur.status === c.status && (cur.covers_until === c.coversUntil || !WAS_PAID.has(c.status))) continue;
+    if (cur && !canMove(cur.status, c.status)) {
+      report.divergencias.push({
+        assinatura: s.id,
+        motivo:
+          s.status === "reembolsada" && cur.status === "estornada"
+            ? `reembolsada no banco, mas o provedor diz que a cobrança ${c.id} está ${c.providerStatus ?? c.status}`
+            : `cobrança ${c.id}: ${cur.status} no banco, mas o provedor diz ${c.providerStatus ?? c.status}`,
+      });
+      continue;
+    }
+    events.push({
+      // a mesma correção tem sempre o mesmo id; uma volta (contestação ganha, por exemplo) tem outro
+      id: `conciliacao:${s.id}:${c.id}:${c.status}:${cur?.transitions ?? 0}`,
+      type,
+      subscriptionId: s.id,
+      chargeId: c.id,
+      chargeStatus: c.status,
+      ...(c.providerStatus ? { providerStatus: c.providerStatus } : {}),
+      ...(WAS_PAID.has(c.status) && c.coversUntil !== null ? { coversFrom: c.coversFrom ?? undefined, paidUntil: c.coversUntil } : {}),
+      ...(c.paidAt !== null ? { paidAt: c.paidAt } : {}),
+      at: now,
+    });
+  }
+  const applied = events.filter((ev) => applyPaymentEvent(db, provider.name, ev, now) === "aplicado");
+  // A cobrança 'legado:' da migração 9 sai quando o provedor lista as cobranças de verdade.
+  if (p.charges!.some((c) => WAS_PAID.has(c.status))) replaceLegacyCharges(db, provider.name, s.id, now);
+  // Depois das cobranças, a assinatura: parou de renovar lá e aqui ainda não?
+  const after = db.prepare(`SELECT ${COLUMNS} FROM subscriptions WHERE id = ?`).get(s.id) as unknown as Row;
+  const sub: PaymentEvent[] = [];
+  if (p.canceledAt !== null && (after.status === "ativa" || after.status === "pendente"))
+    sub.push({ id: `conciliacao:${s.id}:cancelada`, type: "assinatura_cancelada", subscriptionId: s.id, at: p.canceledAt });
+  else if (p.status === "recusada" && after.status === "pendente")
+    sub.push({ id: `conciliacao:${s.id}:recusado`, type: "pagamento_recusado", subscriptionId: s.id, at: now });
+  else if (p.status === "ativa" && after.status === "cancelada")
+    report.divergencias.push({ assinatura: s.id, motivo: "cancelada no banco, mas o provedor ainda renova" });
+  applied.push(...sub.filter((ev) => applyPaymentEvent(db, provider.name, ev, now) === "aplicado"));
+  if (applied.length) report.corrigidas.push({ assinatura: s.id, eventos: applied.map((ev) => ev.type) });
+  for (const ev of applied)
+    if (ev.type === "reembolso_parcial" || ev.type === "contestacao") report.avisos.push({ assinatura: s.id, cobranca: ev.chargeId!, evento: ev.type });
+}
+
+/** Uma linha de log que a rodada da conciliação pede. */
+export interface ReconcileLogLine {
+  nivel: "info" | "warn";
+  mensagem: string;
+  contexto: Record<string, unknown>;
+}
+
+/**
+ * Transforma cada relatório da conciliação nas linhas de log (main.ts). Sem dado pessoal: só os
+ * ids das assinaturas (aleatórios), situações e motivos.
+ *
+ * - aviso (warn), uma vez por caso a cada `repeatAfterMs` (24 h): divergência, assinatura com
+ *   pagamento que o provedor não conhece, provedor sem responder; e, uma vez cada, o webhook
+ *   perdido que a conciliação recuperou, o estorno parcial e a contestação (decisão pendente);
+ * - resumo (info) de cada rodada com o que foi esperado: tentativas sem pagamento que o
+ *   provedor não conhece (página aberta ou abandonada) entram só na contagem.
+ */
+export class ReconcileAlerts {
+  private readonly last = new Map<string, number>();
+  private readonly repeatAfterMs: number;
+  constructor(repeatAfterMs = 24 * 3_600_000) {
+    this.repeatAfterMs = repeatAfterMs;
+  }
+  lines(r: ReconcileReport, now = Date.now()): ReconcileLogLine[] {
+    for (const [k, at] of this.last) if (now - at >= this.repeatAfterMs) this.last.delete(k);
+    const out: ReconcileLogLine[] = [];
+    const once = (key: string, line: ReconcileLogLine) => {
+      if (this.last.has(key)) return;
+      this.last.set(key, now);
+      out.push(line);
+    };
+    for (const c of r.corrigidas)
+      out.push({ nivel: "warn", mensagem: "conciliação aplicou o que um webhook perdido traria (confira a entrega dos webhooks)", contexto: { assinatura: c.assinatura, eventos: c.eventos } });
+    for (const a of r.avisos)
+      out.push({
+        nivel: "warn",
+        mensagem:
+          a.evento === "contestacao"
+            ? "contestação no cartão: o acesso daquela cobrança está suspenso pela regra proposta, à espera da decisão do Arthur (docs/PAGAMENTO.md)"
+            : "estorno parcial: o acesso continua pela regra proposta, à espera da decisão do Arthur (docs/PAGAMENTO.md)",
+        contexto: a,
+      });
+    for (const d of r.divergencias)
+      once(`div:${d.assinatura}:${d.motivo}`, { nivel: "warn", mensagem: "conciliação: banco e provedor discordam; alguém precisa olhar (docs/PAGAMENTO.md, \"Investigar uma divergência\")", contexto: d });
+    for (const v of r.semVinculo)
+      once(`sem-vinculo:${v.assinatura}`, {
+        nivel: "warn",
+        mensagem: "conciliação: assinatura com pagamento registrado que o provedor não acha; confira no painel dele",
+        contexto: v,
+      });
+    if (r.falhas.length)
+      once(`falhas:${r.falhas[0]!.erro.slice(0, 80)}`, {
+        nivel: "warn",
+        mensagem: "conciliação: o provedor não respondeu; fica para a próxima rodada",
+        contexto: { assinaturas: r.falhas.length, primeiroErro: r.falhas[0]!.erro.slice(0, 300) },
+      });
+    const esperadas = r.desconhecidas.length - r.semVinculo.length;
+    if (r.conferidas || r.falhas.length)
+      out.push({
+        nivel: "info",
+        mensagem: "conciliação com o provedor de pagamento",
+        contexto: {
+          conferidas: r.conferidas,
+          corrigidas: r.corrigidas.length,
+          divergencias: r.divergencias.length,
+          semVinculo: r.semVinculo.length,
+          tentativasSemPagamento: esperadas,
+          falhas: r.falhas.length,
+        },
+      });
+    return out;
+  }
 }

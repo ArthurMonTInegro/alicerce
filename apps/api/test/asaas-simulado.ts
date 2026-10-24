@@ -59,6 +59,19 @@ interface Payment {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const erro = (status: number, code: string, description: string) => json(status, { errors: [{ code, description }] });
+/**
+ * Uma página de uma listagem, como a documentação descreve ("Listagem e paginação"): `limit`
+ * de 1 a 100, 10 se não vier; `offset` a partir de 0; `hasMore` diz se há mais. Suposição: a
+ * ordem é a de criação, a mais antiga primeiro (a documentação não diz).
+ */
+function pagina<T>(todos: T[], q: URLSearchParams) {
+  const limit = q.has('limit') ? Number(q.get('limit')) : 10;
+  const offset = q.has('offset') ? Number(q.get('offset')) : 0;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0)
+    return erro(400, 'invalid_parameter', 'limit de 1 a 100 e offset a partir de 0');
+  const data = todos.slice(offset, offset + limit);
+  return json(200, { object: 'list', hasMore: offset + limit < todos.length, totalCount: todos.length, limit, offset, data });
+}
 const isDate = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /** Um ciclo depois de "AAAA-MM-DD", sem pular o fim do mês (Suposição: o Asaas faz igual). */
@@ -86,6 +99,11 @@ export class AsaasSimulado {
    * pelos webhooks.
    */
   propagaReferencia = true;
+  /**
+   * O filtro `checkoutSession` de GET /payments, que a documentação lista ("Listar cobranças").
+   * Com false, a simulação o ignora e devolve a lista vazia (para testar o caminho sem ele).
+   */
+  filtraPorCheckout = true;
   /** Suposição: uma assinatura removida ainda volta no GET, com deleted: true. Com true, dá 404. */
   removidaSome = false;
   /** toda chamada responde 503 */
@@ -127,11 +145,15 @@ export class AsaasSimulado {
       return p ? json(200, p) : erro(404, 'not_found', 'Cobrança não encontrada');
     }
     if (method === 'POST' && (m = path.match(/^\/payments\/([^/]+)\/refund$/))) return this.refund(decodeURIComponent(m[1]!));
+    if (method === 'GET' && path === '/payments') {
+      const checkout = q.get('checkoutSession');
+      if (checkout === null || !this.filtraPorCheckout) return pagina([], q);
+      return pagina([...this.payments.values()].filter((p) => p.checkoutSession === checkout && !p.deleted), q);
+    }
     if (method === 'GET' && (m = path.match(/^\/subscriptions\/([^/]+)\/payments$/))) {
       const s = this.subscriptions.get(decodeURIComponent(m[1]!));
       if (!s) return erro(404, 'not_found', 'Assinatura não encontrada');
-      const data = [...this.payments.values()].filter((p) => p.subscription === s.id && !p.deleted);
-      return json(200, { object: 'list', hasMore: false, totalCount: data.length, limit: 10, offset: 0, data });
+      return pagina([...this.payments.values()].filter((p) => p.subscription === s.id && !p.deleted), q);
     }
     if ((m = path.match(/^\/subscriptions\/([^/]+)$/))) {
       const s = this.subscriptions.get(decodeURIComponent(m[1]!));
@@ -151,10 +173,12 @@ export class AsaasSimulado {
     }
     if (method === 'GET' && path === '/subscriptions') {
       const ref = q.get('externalReference');
-      const data = [...this.subscriptions.values()].filter(
-        (s) => (ref === null || s.externalReference === ref) && (!s.deleted || q.get('includeDeleted') === 'true'),
+      return pagina(
+        [...this.subscriptions.values()].filter(
+          (s) => (ref === null || s.externalReference === ref) && (!s.deleted || q.get('includeDeleted') === 'true'),
+        ),
+        q,
       );
-      return json(200, { object: 'list', hasMore: false, totalCount: data.length, limit: 10, offset: 0, data });
     }
     return erro(404, 'not_found', `rota não simulada: ${method} ${path}`);
   }
@@ -273,11 +297,53 @@ export class AsaasSimulado {
     return p.id;
   }
 
+  /**
+   * Um estorno feito no painel do Asaas, sem passar pelo Alicerce: integral (sem `valor`) ou
+   * parcial. A documentação lista PAYMENT_REFUNDED e PAYMENT_PARTIALLY_REFUNDED e diz que só o
+   * estorno com status DONE em `refunds` conta como devolvido. Suposição: num estorno parcial,
+   * a cobrança continua com o status de paga (a documentação não diz qual fica).
+   */
+  estornarNoPainel(cobranca: string, valor?: number) {
+    const p = this.payments.get(cobranca)!;
+    if (!PAID.includes(p.status)) throw new Error(`cobrança ${p.status} não pode ser estornada`);
+    p.refunds = [...(p.refunds ?? []), { dateCreated: this.stamp(), status: 'DONE', value: valor ?? p.value }];
+    const devolvido = p.refunds.filter((r) => r.status === 'DONE').reduce((t, r) => t + r.value, 0);
+    this.estornos.set(p.id, (this.estornos.get(p.id) ?? 0) + 1);
+    if (devolvido >= p.value) {
+      p.status = 'REFUNDED';
+      this.emit('PAYMENT_REFUNDED', { payment: p });
+    } else this.emit('PAYMENT_PARTIALLY_REFUNDED', { payment: p });
+  }
+
   /** A pessoa contesta a compra no cartão (chargeback). */
   contestar(cobranca: string) {
     const p = this.payments.get(cobranca)!;
     p.status = 'CHARGEBACK_REQUESTED';
     this.emit('PAYMENT_CHARGEBACK_REQUESTED', { payment: p });
+  }
+
+  /** O Alicerce apresenta documentos e a contestação fica em disputa. */
+  disputar(cobranca: string) {
+    const p = this.payments.get(cobranca)!;
+    p.status = 'CHARGEBACK_DISPUTE';
+    this.emit('PAYMENT_CHARGEBACK_DISPUTE', { payment: p });
+  }
+
+  /**
+   * Fim da disputa. Ganha: AWAITING_CHARGEBACK_REVERSAL e depois CONFIRMED ou RECEIVED, como na
+   * documentação ("Disputa vencida, aguardando repasse da adquirente"). Perdida: REFUNDED.
+   */
+  encerrarDisputa(cobranca: string, resultado: 'ganha' | 'perdida') {
+    const p = this.payments.get(cobranca)!;
+    if (resultado === 'perdida') {
+      p.status = 'REFUNDED';
+      this.emit('PAYMENT_REFUNDED', { payment: p });
+      return;
+    }
+    p.status = 'AWAITING_CHARGEBACK_REVERSAL';
+    this.emit('PAYMENT_AWAITING_CHARGEBACK_REVERSAL', { payment: p });
+    p.status = 'RECEIVED';
+    this.emit('PAYMENT_RECEIVED', { payment: p });
   }
 
   /**

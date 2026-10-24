@@ -21,6 +21,7 @@ import {
 import { reconcile } from '../src/conciliacao.ts';
 import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db.ts';
+import { chargesOf } from '../src/cobrancas.ts';
 import { computeAccess } from '../src/plans.ts';
 import { AsaasSimulado, nextCycle } from './asaas-simulado.ts';
 import { providerContract, type Delivery } from './contrato-provedor.ts';
@@ -48,7 +49,7 @@ providerContract('asaas (simulação local da API documentada)', async (db) => {
 });
 
 /** Banco, simulação e adaptador ligados, com uma conta (u1) pronta para assinar. */
-function cenario(opcoes: Partial<Pick<AsaasSimulado, 'propagaReferencia' | 'removidaSome'>> = {}) {
+function cenario(opcoes: Partial<Pick<AsaasSimulado, 'propagaReferencia' | 'removidaSome' | 'filtraPorCheckout'>> = {}) {
   const sim = Object.assign(new AsaasSimulado(), opcoes);
   const db = openDb(':memory:');
   db.prepare("INSERT INTO users (id, email, password_hash, created_at) VALUES ('u1', 'a@exemplo.com', 'x', 0)").run();
@@ -170,14 +171,17 @@ describe('Asaas: pagamentos e renovações', () => {
     expect(sub(id).status).toBe('ativa');
   });
 
-  it('contestação no cartão (chargeback) encerra o acesso', async () => {
+  it('contestação no cartão (chargeback) suspende o acesso daquela cobrança; a assinatura continua renovando', async () => {
     const { sim, abrir, drain, sub, db } = cenario();
     const { id } = await abrir();
     const { cobranca } = sim.pagar(id);
     await drain();
     sim.contestar(cobranca);
     await drain();
-    expect(sub(id).status).toBe('reembolsada');
+    // Antes, a contestação virava reembolso da assinatura inteira, que era final: a disputa
+    // ganha (que volta a CONFIRMED ou RECEIVED, pela documentação) não devolvia o acesso.
+    expect(chargesOf(db, id).map((c) => c.status)).toEqual(['contestada']);
+    expect(sub(id).status).toBe('ativa');
     expect(computeAccess(db, 'u1').plan).toBe('free');
   });
 
@@ -205,8 +209,18 @@ describe('Asaas: webhooks perdidos e divergências', () => {
     expect(sub(id)).toMatchObject({ status: 'ativa', provider_subscription: sim.assinaturaDe(id).id });
   });
 
-  it('sem a referência externa na assinatura, a conciliação não adivinha; o próximo webhook resolve', async () => {
-    const { sim, abrir, sub, db, provider, drain } = cenario({ propagaReferencia: false });
+  it('sem a referência externa na assinatura, a conciliação acha a assinatura pelas cobranças do Checkout', async () => {
+    const { sim, abrir, sub, db, provider } = cenario({ propagaReferencia: false });
+    const { id } = await abrir();
+    sim.perderProximos = 100;
+    sim.pagar(id);
+    expect((await reconcile(db, provider)).corrigidas).toEqual([{ assinatura: id, eventos: ['pagamento_aprovado'] }]);
+    expect(sub(id)).toMatchObject({ status: 'ativa', provider_subscription: sim.assinaturaDe(id).id });
+    expect(sim.calls.some((c) => c.path.startsWith(`/payments?checkoutSession=${sim.checkoutDe(id).id}`))).toBe(true);
+  });
+
+  it('sem a referência externa nem o filtro por Checkout, a conciliação não adivinha; o próximo webhook resolve', async () => {
+    const { sim, abrir, sub, db, provider, drain } = cenario({ propagaReferencia: false, filtraPorCheckout: false });
     const { id } = await abrir();
     sim.perderProximos = 100;
     const { cobranca } = sim.pagar(id);

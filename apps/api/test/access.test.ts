@@ -171,8 +171,10 @@ describe('aulas pagas: sessão válida + Premium ativo no banco, a cada pedido',
       await f.app.inject({ method: 'PUT', url: '/api/progress', headers: f.headers, payload: { expectedUserId: f.id, progress: { lessons: { [freeLesson.id]: { visited: ['conceito'], completedAt: Date.now() } } } } });
       expect((await f.app.inject({ url: lessonUrl, headers: f.headers })).statusCode).toBe(200);
 
-      // o período pago acaba e nenhum evento chega (renovação ainda não cobrada)
+      // o período pago acaba e nenhum evento chega (renovação ainda não cobrada); o acesso vem
+      // do período da cobrança (cobrancas.ts), e a assinatura guarda uma cópia do fim
       f.db.prepare('UPDATE subscriptions SET paid_until = ? WHERE id = ?').run(Date.now() - 1, sub);
+      f.db.prepare('UPDATE subscription_charges SET covers_until = ? WHERE subscription_id = ?').run(Date.now() - 1, sub);
       expect(f.db.prepare('SELECT plan FROM users WHERE id = ?').get(f.id)).toEqual({ plan: 'premium' });
       const after = await f.app.inject({ url: lessonUrl, headers: f.headers });
       expect(after.statusCode).toBe(403);
