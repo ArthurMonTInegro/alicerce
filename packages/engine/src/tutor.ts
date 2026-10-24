@@ -43,10 +43,21 @@ export function offlineTutor(input: TutorInput): string {
   const parts: string[] = [];
 
   if (WANTS_ANSWER.test(msg)) {
+    // Pedido explícito com as dicas já vistas: o caminho para a solução é o botão do exercício
+    // (que mostra a explicação e põe o exercício na Revisão), não o tutor escrevendo o código.
+    if (ex && !nextHint) {
+      parts.push(`Você já viu as ${ex.hints.length} dicas, então dá para ver a solução completa: use o botão **Ver solução**, no próprio exercício. Ele mostra a solução com a explicação, e o exercício volta na Revisão para você refazer sem ajuda.`);
+      parts.push('Se o botão ainda não aparece, abra as dicas no exercício (ele aparece com todas abertas, ou depois de duas tentativas erradas). Antes, se quiser, cole sua tentativa e eu aponto onde ela diverge.');
+      return parts.join('\n\n');
+    }
     parts.push('Eu não vou te dar a solução pronta: você aprende muito mais chegando lá, e eu te acompanho no caminho. 🙂');
     if (nextHint) parts.push(`Uma pista: ${nextHint}`);
     else parts.push('Vamos por partes: descreva em português, passo a passo, o que o programa precisa fazer. Depois transformamos cada passo em uma linha de código.');
-    parts.push('Se mesmo assim você travar, o botão "Ver solução" aparece depois de algumas tentativas, e a explicação vem junto.');
+    parts.push(
+      ex
+        ? 'Se preferir ver a solução agora, o botão **Ver solução** fica no exercício: ele aparece depois de duas tentativas erradas ou quando você abre todas as dicas, e mostra a explicação junto.'
+        : 'Se for um exercício do Alicerce, abra o tutor dentro dele para eu receber o enunciado e as dicas.',
+    );
     return parts.join('\n\n');
   }
 
@@ -86,12 +97,13 @@ export const TUTOR_SYSTEM_PROMPT = `Você é o tutor da Alicerce, uma plataforma
 Fale em português do Brasil, com frases curtas e tom acolhedor. Ao usar um termo técnico, dê também o termo em inglês entre parênteses na primeira vez.
 
 Regras pedagógicas (obrigatórias):
-1. Nunca entregue a solução completa de um exercício, nem código que resolva o exercício. Se pedirem, recuse com gentileza e ofereça a próxima pista.
+1. Nunca entregue a solução completa de um exercício, nem código que resolva o exercício. Se pedirem, recuse com gentileza e ofereça a próxima pista. Se o aluno já viu todas as dicas e pede a solução, respeite o pedido indicando o botão "Ver solução" do exercício (ele mostra a solução com a explicação), sem escrevê-la.
 2. Prefira perguntas que levem o estudante a descobrir (método socrático). No máximo uma pergunta principal por resposta.
 3. Dê pistas graduais: comece pela mais vaga. Use as dicas do exercício como referência de progressão, sem revelar mais do que a próxima.
-4. Para erros: explique o que a mensagem significa (traduza do inglês), onde olhar e como investigar. Não corrija o código pelo estudante.
+4. Para erros: explique o que a mensagem significa (traduza do inglês), onde olhar e como investigar. Não corrija o código pelo estudante. Se faltar o código, a mensagem de erro exata ou o resultado esperado e o obtido, peça só o que falta, numa lista curta, em vez de passos genéricos.
 5. Pode mostrar exemplos de código curtos sobre o CONCEITO, desde que não sejam a solução do exercício atual.
 6. Se o estudante estiver frustrado, reconheça e sugira um passo pequeno e concreto.
 7. Se a pergunta não for sobre computação ou sobre os estudos, redirecione com educação.
-8. Seja honesto: se não tiver certeza, diga isso e indique a documentação oficial.
-Responda em no máximo 150 palavras, usando Markdown simples (negrito, listas, \`código\`).`;
+8. Seja honesto: se não tiver certeza, diga isso e indique a documentação oficial. Não invente lições, links, recursos nem o progresso do estudante: você só recebe esta conversa e não vê o histórico dele.
+9. Plano de estudo: use o tempo que o estudante informou (sem tempo informado, proponha 25 minutos e pergunte quanto ele tem), em blocos de minutos com prática e revisão. Não prometa emprego, fluência nem prazo.
+Tamanho: para um pedido simples (uma definição, uma dúvida curta), até 80 palavras; nos outros, até 150. Use Markdown simples (negrito, listas, \`código\`).`;

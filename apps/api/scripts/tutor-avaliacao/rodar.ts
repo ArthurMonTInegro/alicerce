@@ -1,16 +1,18 @@
 /**
  * Avaliação do tutor pela linha de comando (docs/TUTOR-AVALIACAO.md).
  *
- *   node apps/api/scripts/tutor-avaliacao/rodar.ts [offline|montagem] [--saida <pasta>]
+ *   node apps/api/scripts/tutor-avaliacao/rodar.ts [offline|montagem] [--conjunto desenvolvimento|reservado|todos] [--saida <pasta>]
  *   node apps/api/scripts/tutor-avaliacao/rodar.ts real --max-chamadas <n> --teto-usd <x> --saida <pasta fora do repositório>
- *        [--repeticoes <n>] [--modelo <id>] [--esforco low|medium|high] [--preco-entrada <USD por milhão>] [--preco-saida <USD por milhão>]
+ *        [--conjunto ..] [--repeticoes <n>] [--modelo <id>] [--esforco low|medium|high] [--preco-entrada <USD por milhão>] [--preco-saida <USD por milhão>]
+ *   node apps/api/scripts/tutor-avaliacao/rodar.ts estimar [--conjunto ..] [--repeticoes <n>] [--modelo <id>]
  *   node apps/api/scripts/tutor-avaliacao/rodar.ts resumir <pasta> [--preco-entrada ..] [--preco-saida ..]
  *
- * offline e montagem não saem para a rede. O modo real é PAGO: só roda com
+ * offline, montagem e estimar não saem para a rede (estimar mostra o lote e o gasto máximo da rodada real). O modo real é PAGO: só roda com
  * TUTOR_AVALIACAO_AUTORIZADA=sim e ANTHROPIC_API_KEY no ambiente, depois que o responsável
  * autorizou aquele consumo. Antes da primeira chamada ele calcula o máximo que a rodada pode
- * custar e recusa se passar de --teto-usd, ou se as chamadas passarem de --max-chamadas.
- * Respostas vão para --saida (fora do repositório: podem citar aulas pagas), com uma planilha
+ * custar e recusa se passar de --teto-usd, ou se as chamadas passarem de --max-chamadas. Durante a
+ * rodada, soma o custo medido de cada chamada e para antes da próxima se ela puder passar do teto.
+ * Os conjuntos de desenvolvimento e reservado são resumidos em separado. Respostas vão para --saida (fora do repositório: podem citar aulas pagas), com uma planilha
  * de notas para a revisão humana; `resumir` junta resultados, notas, latência e custo.
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -21,7 +23,8 @@ import { resolvePremiumDir } from '@alicerce/content/completo';
 import { TUTOR_EFFORTS, type TutorEffort } from '../../src/config.ts';
 import { loadContentStore } from '../../src/conteudo.ts';
 import { TUTOR_MAX_TOKENS } from '../../src/tutor.ts';
-import { CASOS } from './casos.ts';
+import type { Caso } from './casos.ts';
+import { casoPorId, escolherCasos, type Conjunto } from './conjuntos.ts';
 import { executarTodos, falhas, type Execucao, type Modo } from './executar.ts';
 import { entradaEstimada } from './verificacoes.ts';
 
@@ -84,14 +87,20 @@ function lerCsv(texto: string): string[][] {
   if (campo || linha.length) linha.push(campo), linhas.push(linha);
   return linhas;
 }
-const DIMENSOES = ['correcao', 'aderencia', 'clareza', 'proximo_passo', 'autonomia'] as const;
-const CABECALHO_NOTAS = ['caso', 'repeticao', ...DIMENSOES, 'falha_critica', 'observacao'];
+/**
+ * Rubrica da revisão humana (docs/TUTOR-AVALIACAO.md): 0, 1 ou 2 em cada dimensão, ou "na" quando a
+ * dimensão não se aplica ao caso (qualidade da pista sem exercício, por exemplo).
+ */
+export const DIMENSOES = ['correcao', 'clareza', 'adaptacao', 'qualidade_da_pista', 'relevancia_curricular', 'seguranca', 'privacidade', 'acesso'] as const;
+/** Uma resposta é boa com pelo menos 80% do máximo nas dimensões que se aplicam (a meta antiga era 8 de 10). */
+const BOA = 0.8;
+const CABECALHO_NOTAS = ['caso', 'conjunto', 'repeticao', ...DIMENSOES, 'falha_critica', 'observacao'];
 
 function revisao(e: Execucao): string {
-  const c = CASOS.find((x) => x.id === e.caso)!;
+  const c = casoPorId(e.caso)!;
   const ctx = c.pedido.context ?? {};
   const linhas = [
-    `## ${e.caso} (${c.categoria}, conta ${c.conta}${c.ia ? ', IA fora do ar' : ''}${c.cota ? ', cota esgotada' : ''}) · repetição ${e.repeticao}`,
+    `## ${e.caso} (conjunto ${e.conjunto}; ${c.categoria}, conta ${c.conta}${c.ia ? ', IA fora do ar' : ''}${c.cota ? ', cota esgotada' : ''}) · repetição ${e.repeticao}`,
     '',
     `**Pedido** (modo ${c.pedido.mode ?? 'learn'}): ${c.pedido.message}`,
     ...(ctx.exerciseId ? [`Exercício ${ctx.exerciseId}, dicas já vistas: ${ctx.hintsSeen ?? 0}`] : []),
@@ -116,9 +125,9 @@ function revisao(e: Execucao): string {
 function gravar(pasta: string, execs: Execucao[], meta: Record<string, unknown>) {
   mkdirSync(pasta, { recursive: true });
   writeFileSync(join(pasta, 'resultados.jsonl'), execs.map((e) => JSON.stringify({ ...meta, ...e })).join('\n') + '\n');
-  writeFileSync(join(pasta, 'revisao.md'), `# Avaliação do tutor: respostas para revisão\n\n${JSON.stringify(meta)}\n\nRubrica: docs/TUTOR-AVALIACAO.md. Notas em notas.csv (0 a 2 por dimensão).\n\n${execs.map(revisao).join('\n')}`);
+  writeFileSync(join(pasta, 'revisao.md'), `# Avaliação do tutor: respostas para revisão\n\n${JSON.stringify(meta)}\n\nRubrica: docs/TUTOR-AVALIACAO.md. Notas em notas.csv (0, 1 ou 2 por dimensão; "na" quando não se aplica). Quem revisa não deve ajustar o tutor pelos casos do conjunto reservado.\n\n${execs.map(revisao).join('\n')}`);
   const notas = join(pasta, 'notas.csv');
-  if (!existsSync(notas)) writeFileSync(notas, [CABECALHO_NOTAS, ...execs.filter((e) => e.status === 200).map((e) => [e.caso, e.repeticao])].map((l) => l.map(csv).join(',')).join('\n') + '\n');
+  if (!existsSync(notas)) writeFileSync(notas, [CABECALHO_NOTAS, ...execs.filter((e) => e.status === 200).map((e) => [e.caso, e.conjunto, e.repeticao])].map((l) => l.map(csv).join(',')).join('\n') + '\n');
 }
 
 /* ---------- resumo ---------- */
@@ -136,10 +145,17 @@ function resumir(pasta: string) {
   const modos = [...new Set(execs.map((e) => e.modo))];
   console.log(`Avaliação do tutor · ${pasta}`);
   console.log(`${execs.length} execuções de ${new Set(execs.map((e) => e.caso)).size} casos · modo ${modos.join(', ')}${modos.includes('real') ? ` · modelo ${modelo}, esforço ${execs[0]?.esforco ?? '?'}` : ''}`);
-  const criticas = falhas(execs, 'critica');
-  console.log(`\nFalhas críticas automáticas: ${criticas.length}`);
-  for (const f of criticas) console.log(`  - ${f}`);
-  console.log(`Achados de qualidade (heurísticos): ${falhas(execs, 'qualidade').length} · problemas de montagem: ${falhas(execs, 'montagem').length}`);
+  // resultados antigos não tinham o campo: eram todos do conjunto de desenvolvimento
+  const conjunto = (e: Execucao): Conjunto => e.conjunto ?? 'desenvolvimento';
+  const conjuntos = (['desenvolvimento', 'reservado'] as const).filter((c) => execs.some((e) => conjunto(e) === c));
+  const criticasPor = new Map(conjuntos.map((c) => [c, falhas(execs.filter((e) => conjunto(e) === c), 'critica')]));
+  for (const c of conjuntos) {
+    const doConjunto = execs.filter((e) => conjunto(e) === c);
+    const criticas = criticasPor.get(c)!;
+    console.log(`\nConjunto ${c} (${new Set(doConjunto.map((e) => e.caso)).size} casos): falhas críticas automáticas ${criticas.length}`);
+    for (const f of criticas) console.log(`  - ${f}`);
+    console.log(`  achados de qualidade (heurísticos): ${falhas(doConjunto, 'qualidade').length} · problemas de montagem: ${falhas(doConjunto, 'montagem').length}`);
+  }
 
   // custo e latência: só chamadas que saíram de verdade
   const reais = modos.includes('real') ? execs.flatMap((e) => e.chamadas).filter((c) => !c.simulada) : [];
@@ -163,36 +179,53 @@ function resumir(pasta: string) {
   const linhas = existsSync(notas) ? lerCsv(readFileSync(notas, 'utf8')) : [];
   const cab = linhas[0] ?? [];
   const col = (nome: string) => cab.indexOf(nome);
-  const avaliadas = linhas.slice(1).filter((l) => DIMENSOES.every((d) => /^[012]$/.test((l[col(d)] ?? '').trim())));
-  if (!avaliadas.length) {
-    console.log('\nRevisão humana: nenhuma nota em notas.csv (0 a 2 em cada dimensão). Sem ela, não há resultado pedagógico.');
+  if (linhas.length && DIMENSOES.some((d) => col(d) < 0)) {
+    console.log(`\nRevisão humana: notas.csv não tem as colunas da rubrica atual (${DIMENSOES.join(', ')}). Planilhas da rubrica antiga, de 5 dimensões, não entram neste resumo.`);
     return;
   }
-  const nota = (l: string[]) => DIMENSOES.reduce((n, d) => n + Number(l[col(d)]), 0);
-  const humanas = avaliadas.filter((l) => /^s/i.test((l[col('falha_critica')] ?? '').trim()));
-  const boas = avaliadas.filter((l) => nota(l) >= 8).length;
-  const pct = (boas / avaliadas.length) * 100;
-  console.log(`\nRevisão humana: ${avaliadas.length} respostas com nota · média ${(avaliadas.reduce((n, l) => n + nota(l), 0) / avaliadas.length).toFixed(1)}/10 · ${pct.toFixed(0)}% com 8 ou mais`);
-  console.log(`Falhas críticas apontadas na revisão: ${humanas.length}${humanas.length ? ` (${humanas.map((l) => l[col('caso')]).join(', ')})` : ''}`);
-  const semCritica = criticas.length === 0 && humanas.length === 0;
-  console.log(`Metas de docs/TUTOR_IA_V2.md: zero falhas críticas ${semCritica ? 'atingida' : 'NÃO atingida'}; 90% com 8/10 ou mais ${pct >= 90 ? 'atingida' : 'NÃO atingida'}.`);
-  console.log('Estes são os casos de desenvolvimento: a meta vale de verdade só no conjunto reservado (ainda não escrito).');
-  if (new Set(avaliadas.map((l) => l[col('repeticao')])).size > 1) {
-    const porCaso = new Map<string, number[]>();
-    for (const l of avaliadas) porCaso.set(l[col('caso')]!, [...(porCaso.get(l[col('caso')]!) ?? []), nota(l)]);
-    const variam = [...porCaso].filter(([, ns]) => Math.max(...ns) - Math.min(...ns) >= 2);
-    console.log(`Variação entre repetições (2 pontos ou mais): ${variam.length ? variam.map(([c, ns]) => `${c} ${ns.join('/')}`).join(', ') : 'nenhuma'}`);
+  const valor = (l: string[], d: string) => (l[col(d)] ?? '').trim().toLowerCase();
+  // avaliada: todas as dimensões com 0, 1, 2 ou "na", e ao menos uma com nota
+  const avaliadas = linhas.slice(1).filter((l) => DIMENSOES.every((d) => /^([012]|na)$/.test(valor(l, d))) && DIMENSOES.some((d) => valor(l, d) !== 'na'));
+  if (!avaliadas.length) {
+    console.log('\nRevisão humana: nenhuma nota em notas.csv (0 a 2 em cada dimensão, ou "na"). Sem ela, não há resultado pedagógico.');
+    return;
+  }
+  const aplicaveis = (l: string[]) => DIMENSOES.filter((d) => valor(l, d) !== 'na');
+  const fracao = (l: string[]) => aplicaveis(l).reduce((n, d) => n + Number(valor(l, d)), 0) / (2 * aplicaveis(l).length);
+  for (const c of conjuntos) {
+    const doConjunto = avaliadas.filter((l) => (valor(l, 'conjunto') || 'desenvolvimento') === c);
+    if (!doConjunto.length) {
+      console.log(`\nRevisão humana, conjunto ${c}: nenhuma resposta com nota.`);
+      continue;
+    }
+    const humanas = doConjunto.filter((l) => /^s/i.test(valor(l, 'falha_critica')));
+    const pct = (doConjunto.filter((l) => fracao(l) >= BOA).length / doConjunto.length) * 100;
+    console.log(`\nRevisão humana, conjunto ${c}: ${doConjunto.length} respostas com nota · média ${((doConjunto.reduce((n, l) => n + fracao(l), 0) / doConjunto.length) * 100).toFixed(0)}% do máximo · ${pct.toFixed(0)}% com ${BOA * 100}% ou mais`);
+    for (const d of DIMENSOES) {
+      const ns = doConjunto.map((l) => valor(l, d)).filter((v) => v !== 'na').map(Number);
+      if (ns.length) console.log(`  ${d}: média ${(ns.reduce((a, b) => a + b, 0) / ns.length).toFixed(2)} de 2 (${ns.length} respostas)`);
+    }
+    console.log(`  falhas críticas apontadas na revisão: ${humanas.length}${humanas.length ? ` (${humanas.map((l) => l[col('caso')]).join(', ')})` : ''}`);
+    const semCritica = criticasPor.get(c)!.length === 0 && humanas.length === 0;
+    console.log(`  metas de docs/TUTOR_IA_V2.md: zero falhas críticas ${semCritica ? 'atingida' : 'NÃO atingida'}; 90% das respostas boas ${pct >= 90 ? 'atingida' : 'NÃO atingida'}.`);
+    if (c === 'desenvolvimento') console.log('  (no conjunto de desenvolvimento a meta só orienta: ele é usado para ajustar o tutor)');
+    if (new Set(doConjunto.map((l) => l[col('repeticao')])).size > 1) {
+      const porCaso = new Map<string, number[]>();
+      for (const l of doConjunto) porCaso.set(l[col('caso')]!, [...(porCaso.get(l[col('caso')]!) ?? []), fracao(l)]);
+      const variam = [...porCaso].filter(([, ns]) => Math.max(...ns) - Math.min(...ns) >= 0.2);
+      console.log(`  variação entre repetições (20 pontos ou mais): ${variam.length ? variam.map(([k, ns]) => `${k} ${ns.map((n) => Math.round(n * 100)).join('/')}`).join(', ') : 'nenhuma'}`);
+    }
   }
 }
 
 /* ---------- execução ---------- */
-const modo = (args[0] ?? 'offline') as Modo | 'resumir';
+const modo = (args[0] ?? 'offline') as Modo | 'resumir' | 'estimar';
 if (modo === 'resumir') {
   if (!args[1]) sair('Uso: rodar.ts resumir <pasta>');
   resumir(resolve(args[1]));
   process.exit(0);
 }
-if (!['offline', 'montagem', 'real'].includes(modo)) sair(`Modo desconhecido: ${modo}. Use offline, montagem, real ou resumir.`);
+if (!['offline', 'montagem', 'real', 'estimar'].includes(modo)) sair(`Modo desconhecido: ${modo}. Use offline, montagem, estimar, real ou resumir.`);
 
 const { store: content, warnings } = await loadContentStore(resolvePremiumDir());
 for (const w of warnings) console.error(`aviso: ${w}`);
@@ -201,15 +234,48 @@ const esforcoOpt = opt('esforco') ?? 'low';
 if (!TUTOR_EFFORTS.includes(esforcoOpt as TutorEffort)) sair(`--esforco precisa ser ${TUTOR_EFFORTS.join(', ')}.`);
 const esforco = esforcoOpt as TutorEffort;
 const saida = opt('saida') ? resolve(opt('saida')!) : undefined;
-const meta = { modelo, esforco, data: new Date().toISOString(), conteudo: content.premium === 'disponivel' ? 'com o pago' : 'só o gratuito' };
+let casos: Caso[] = [];
+try {
+  casos = escolherCasos(opt('conjunto'));
+} catch (e) {
+  sair((e as Error).message);
+}
+const meta = { modelo, esforco, conjunto: opt('conjunto') ?? 'todos', data: new Date().toISOString(), conteudo: content.premium === 'disponivel' ? 'com o pago' : 'só o gratuito' };
 const foraDoRepositorio = (pasta: string) => relative(RAIZ, pasta).startsWith('..');
 // Com o conteúdo pago carregado, as respostas podem citar aulas pagas: nunca dentro do repositório público.
 if (saida && content.premium === 'disponivel' && !foraDoRepositorio(saida)) sair(`--saida precisa ficar fora do repositório (${RAIZ}) quando o conteúdo pago está carregado.`);
 
+/**
+ * O lote da rodada real, sem rede: o pedido montado de cada caso dá a entrada estimada, e a saída
+ * conta pelo teto de cada resposta (o pior caso, pensamento incluído).
+ */
+async function loteReal(repeticoes: number, p: { entrada: number; saida: number; fonte: string }) {
+  const montados = await executarTodos({ modo: 'montagem', content, modelo, esforco }, casos);
+  const pagos = montados.filter((e) => casoPorId(e.caso)!.espera.ia === 'responde');
+  const chamadas = pagos.length * repeticoes;
+  const maxDaChamada = (e: Execucao) => (entradaEstimada(e.chamadas[0]!) * FOLGA_ENTRADA * p.entrada + TUTOR_MAX_TOKENS * p.saida) / 1e6;
+  const maximo = repeticoes * pagos.reduce((n, e) => n + maxDaChamada(e), 0);
+  const maiorChamada = pagos.length ? Math.max(...pagos.map(maxDaChamada)) : 0;
+  console.log(`Rodada real: ${pagos.length} casos chamam o modelo (${pagos.filter((e) => e.conjunto === 'desenvolvimento').length} de desenvolvimento, ${pagos.filter((e) => e.conjunto === 'reservado').length} reservados) × ${repeticoes} repetição(ões) = ${chamadas} chamadas a ${modelo} (esforço ${esforco}).`);
+  console.log(`Gasto máximo: ${usd(maximo)} (entrada estimada com folga de ${Math.round((FOLGA_ENTRADA - 1) * 100)}% + saída no teto de ${TUTOR_MAX_TOKENS}, a ${usd(p.entrada)}/${usd(p.saida)} por milhão; ${p.fonte}).`);
+  return { chamadas, maximo, maiorChamada };
+}
+
+if (modo === 'estimar') {
+  const repeticoes = Math.max(1, Math.floor(num('repeticoes') ?? 1));
+  const { chamadas, maximo } = await loteReal(repeticoes, precos(modelo));
+  console.log(`Para autorizar exatamente este lote: --max-chamadas ${chamadas} --teto-usd ${(Math.ceil(maximo * 100) / 100).toFixed(2)}${opt('conjunto') ? ` --conjunto ${opt('conjunto')}` : ''}${repeticoes > 1 ? ` --repeticoes ${repeticoes}` : ''}`);
+  process.exit(0);
+}
+
 if (modo !== 'real') {
-  const execs = await executarTodos({ modo, content, modelo, esforco });
-  console.log(`${modo}: ${execs.length} casos · falhas críticas ${falhas(execs, 'critica').length} · montagem ${falhas(execs, 'montagem').length} · achados de qualidade ${falhas(execs, 'qualidade').length}`);
-  for (const nivel of ['critica', 'montagem', 'qualidade'] as const) for (const f of falhas(execs, nivel)) console.log(`  [${nivel}] ${f}`);
+  const execs = await executarTodos({ modo, content, modelo, esforco }, casos);
+  for (const c of ['desenvolvimento', 'reservado'] as const) {
+    const doConjunto = execs.filter((e) => e.conjunto === c);
+    if (!doConjunto.length) continue;
+    console.log(`${modo}, conjunto ${c}: ${doConjunto.length} casos · falhas críticas ${falhas(doConjunto, 'critica').length} · montagem ${falhas(doConjunto, 'montagem').length} · achados de qualidade ${falhas(doConjunto, 'qualidade').length}`);
+    for (const nivel of ['critica', 'montagem', 'qualidade'] as const) for (const f of falhas(doConjunto, nivel)) console.log(`  [${nivel}] ${f}`);
+  }
   if (modo === 'montagem') {
     const est = execs.flatMap((e) => e.chamadas.filter((c) => !c.simulada).map(entradaEstimada));
     if (est.length) console.log(`Pedido ao modelo: entrada ESTIMADA (caracteres ÷ 3,5) média ${Math.round(est.reduce((a, b) => a + b, 0) / est.length)}, máxima ${Math.max(...est)} unidades; saída até ${TUTOR_MAX_TOKENS}.`);
@@ -233,13 +299,7 @@ const teto = num('teto-usd');
 if (maxChamadas === undefined || teto === undefined) sair('Faltam --max-chamadas e --teto-usd: o limite de chamadas e de gasto que foi autorizado.');
 const p = precos(modelo);
 
-// O pedido montado de cada caso (sem rede) dá a entrada estimada; a saída conta pelo teto.
-const montados = await executarTodos({ modo: 'montagem', content, modelo, esforco });
-const pagos = montados.filter((e) => CASOS.find((c) => c.id === e.caso)!.espera.ia === 'responde');
-const chamadas = pagos.length * repeticoes;
-const maximo = repeticoes * pagos.reduce((n, e) => n + (entradaEstimada(e.chamadas[0]!) * FOLGA_ENTRADA * p.entrada + TUTOR_MAX_TOKENS * p.saida) / 1e6, 0);
-console.log(`Rodada real: ${pagos.length} casos chamam o modelo × ${repeticoes} repetição(ões) = ${chamadas} chamadas a ${modelo} (esforço ${esforco}).`);
-console.log(`Gasto máximo: ${usd(maximo)} (entrada estimada com folga de ${Math.round((FOLGA_ENTRADA - 1) * 100)}% + saída no teto de ${TUTOR_MAX_TOKENS}, a ${usd(p.entrada)}/${usd(p.saida)} por milhão; ${p.fonte}).`);
+const { chamadas, maximo, maiorChamada } = await loteReal(repeticoes, p);
 if (chamadas > maxChamadas) sair(`Recusado: ${chamadas} chamadas passam de --max-chamadas ${maxChamadas}.`);
 if (maximo > teto) sair(`Recusado: o gasto máximo passa de --teto-usd ${teto}.`);
 
@@ -248,13 +308,29 @@ mkdirSync(saida, { recursive: true });
 const parcial = join(saida, 'resultados.jsonl');
 writeFileSync(parcial, '');
 let feitas = 0;
-const execs = await executarTodos({ modo: 'real', content, cliente, modelo, esforco }, CASOS, repeticoes, (e) => {
-  // grava a cada caso: uma interrupção não perde o que já foi pago
-  appendFileSync(parcial, JSON.stringify({ ...meta, ...e }) + '\n');
-  const c = e.chamadas.find((x) => !x.simulada);
-  const crit = e.verificacoes.filter((v) => v.nivel === 'critica' && v.ok === false).length;
-  console.log(`[${++feitas}/${CASOS.length * repeticoes}] ${e.caso}: ${e.modoResposta ?? e.status}${c ? ` · ${c.ms} ms · ${c.uso?.entrada ?? 0}/${c.uso?.saida ?? 0} unidades${c.erro ? ` · erro ${c.erro}` : ''}` : ''} · ${crit} falha(s) crítica(s)`);
-});
+// Corte durante a rodada: soma o custo medido (unidades devolvidas pela API) e não começa um caso
+// que, no pior caso (a maior chamada estimada), passaria do teto autorizado.
+let gasto = 0;
+let cortou = false;
+const execs = await executarTodos(
+  { modo: 'real', content, cliente, modelo, esforco },
+  casos,
+  repeticoes,
+  (e) => {
+    // grava a cada caso: uma interrupção não perde o que já foi pago
+    appendFileSync(parcial, JSON.stringify({ ...meta, ...e }) + '\n');
+    const c = e.chamadas.find((x) => !x.simulada);
+    if (c) gasto += ((c.uso?.entrada ?? 0) * p.entrada + (c.uso?.saida ?? 0) * p.saida) / 1e6;
+    const crit = e.verificacoes.filter((v) => v.nivel === 'critica' && v.ok === false).length;
+    console.log(`[${++feitas}/${casos.length * repeticoes}] ${e.caso}: ${e.modoResposta ?? e.status}${c ? ` · ${c.ms} ms · ${c.uso?.entrada ?? 0}/${c.uso?.saida ?? 0} unidades${c.erro ? ` · erro ${c.erro}` : ''}` : ''} · ${crit} falha(s) crítica(s) · gasto até aqui ${usd(gasto)}`);
+  },
+  (proximo) => {
+    if (proximo.espera.ia !== 'responde' || gasto + maiorChamada <= teto) return false;
+    cortou = true;
+    return true;
+  },
+);
+if (cortou) console.log(`\nRodada CORTADA antes de ${casos.length * repeticoes - feitas} caso(s): o próximo poderia passar do teto de ${usd(teto)} (gasto medido ${usd(gasto)}).`);
 gravar(saida, execs, { ...meta, modo: 'real' });
 console.log('');
 resumir(saida);

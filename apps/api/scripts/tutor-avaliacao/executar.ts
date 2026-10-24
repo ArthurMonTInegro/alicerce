@@ -15,12 +15,14 @@ import { loadConfig, type TutorEffort } from '../../src/config.ts';
 import type { ContentStore } from '../../src/conteudo.ts';
 import { openDb } from '../../src/db.ts';
 import { setPlan } from '../../src/plans.ts';
-import { CASOS, type Caso } from './casos.ts';
+import type { Caso } from './casos.ts';
+import { conjuntoDe, TODOS_OS_CASOS, type Conjunto } from './conjuntos.ts';
 import { verificar, type Chamada, type Modo, type Resultado } from './verificacoes.ts';
 
 export type { Modo } from './verificacoes.ts';
 export interface Execucao {
   caso: string;
+  conjunto: Conjunto;
   categoria: Caso['categoria'];
   conta: Caso['conta'];
   modo: Modo;
@@ -138,6 +140,7 @@ export async function executarCaso(caso: Caso, o: Opcoes, repeticao = 1): Promis
     };
     return {
       caso: caso.id,
+      conjunto: conjuntoDe(caso.id),
       categoria: caso.categoria,
       conta: caso.conta,
       modo: o.modo,
@@ -153,11 +156,15 @@ export async function executarCaso(caso: Caso, o: Opcoes, repeticao = 1): Promis
   }
 }
 
-/** Todos os casos (ou os escolhidos), um de cada vez, `repeticoes` vezes cada. */
-export async function executarTodos(o: Opcoes, casos: Caso[] = CASOS, repeticoes = 1, aoTerminar?: (e: Execucao) => void): Promise<Execucao[]> {
+/**
+ * Todos os casos (ou os escolhidos), um de cada vez, `repeticoes` vezes cada. `parar` é consultado
+ * antes de cada caso: devolvendo true, a rodada acaba ali (o corte de gasto do modo real).
+ */
+export async function executarTodos(o: Opcoes, casos: Caso[] = TODOS_OS_CASOS, repeticoes = 1, aoTerminar?: (e: Execucao) => void, parar?: (proximo: Caso) => boolean): Promise<Execucao[]> {
   const out: Execucao[] = [];
   for (let rep = 1; rep <= repeticoes; rep++)
     for (const caso of casos) {
+      if (parar?.(caso)) return out;
       const e = await executarCaso(caso, o, rep);
       out.push(e);
       aoTerminar?.(e);

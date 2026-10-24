@@ -4,8 +4,8 @@
  * deve fazer (status, se a IA é chamada) e o que uma boa resposta faz, para a revisão humana.
  *
  * Este é o conjunto de DESENVOLVIMENTO: pode ser usado para ajustar o prompt e o apoio local.
- * A avaliação final pede um conjunto reservado, escrito por outra pessoa e nunca usado para
- * ajustar nada (docs/TUTOR_IA_V2.md); ele ainda não existe.
+ * O conjunto reservado, que não é usado para ajustar nada, está em reservados.ts. Um caso de lá
+ * usado para ajustar algo passa para cá, com o id sem o "r-" e um comentário dizendo quando.
  *
  * Só exercícios e lições gratuitos (níveis 0 e 1) aparecem nos pedidos que a IA responde: o
  * conjunto roda igual sem o repositório privado. Os pedidos de conteúdo pago são os que devem
@@ -24,6 +24,7 @@ export type Categoria =
   | 'contexto-insuficiente'
   | 'resposta-errada'
   | 'conteudo-restrito'
+  | 'privacidade'
   | 'provedor-indisponivel';
 export type Motivo = NonNullable<TutorReply['reason']>;
 
@@ -148,6 +149,15 @@ export const CASOS: Caso[] = [
     verificacoes: [{ tipo: 'contem', padroes: ['grafia', 'escrit', 'declarad', 'digita'], porque: 'o nome usado não é o declarado' }],
     bom: 'Explica que o nome usado não foi declarado e leva a pessoa a comparar a grafia de totl com total, sem só reescrever a linha.',
   },
+  {
+    id: 'depura-laco-infinito',
+    categoria: 'depuracao',
+    conta: 'premium',
+    pedido: { message: 'O programa fica rodando e não termina.', mode: 'debug' },
+    espera: { ia: 'responde' },
+    verificacoes: [{ tipo: 'contem', padroes: ['condi[cç][aã]o de parada', 'la[cç]o'], porque: 'a causa comum é um laço que nunca para' }, { tipo: 'pede-contexto' }],
+    bom: 'Levanta como hipótese, sem afirmar, um laço cuja condição de parada não muda, e pede o trecho do laço e o que muda a cada volta.',
+  },
 
   /* ---------- dicas graduais ---------- */
   {
@@ -175,6 +185,15 @@ export const CASOS: Caso[] = [
     espera: { ia: 'responde' },
     verificacoes: [{ tipo: 'pede-contexto' }],
     bom: 'Diz que as dicas acabaram e pede a tentativa atual ou a parte em que a pessoa travou, sem entregar o código.',
+  },
+  {
+    id: 'dica-pede-solucao-dicas-vistas',
+    categoria: 'dicas',
+    conta: 'premium',
+    pedido: { message: 'Desisto. Me mostra a solução.', mode: 'learn', context: { exerciseId: 'e0-bin-desafio', hintsSeen: 3 } },
+    espera: { ia: 'responde' },
+    verificacoes: [{ tipo: 'contem', padroes: ['ver solu', 'bot[aã]o'], porque: 'respeita o pedido explícito indicando o botão Ver solução' }],
+    bom: 'Com as três dicas já vistas, respeita o pedido: indica o botão "Ver solução" do exercício (solução com explicação, e o exercício volta na Revisão), sem escrever o código, e oferece olhar a tentativa antes.',
   },
 
   /* ---------- planejamento ---------- */
@@ -207,6 +226,28 @@ export const CASOS: Caso[] = [
     verificacoes: [{ tipo: 'contem', padroes: ['15'], porque: 'o plano usa o tempo informado' }, { tipo: 'contem', padroes: ['celular', 'revis', 'cart'], porque: 'o plano cabe no celular' }],
     bom: 'Plano de 15 minutos que dá para fazer no celular (revisão, leitura, um exercício curto), sem exigir computador.',
   },
+  {
+    id: 'plano-uma-hora-e-meia',
+    categoria: 'planejamento',
+    conta: 'premium',
+    pedido: { message: 'Tenho 1h30 hoje para estudar laços.', mode: 'plan' },
+    espera: { ia: 'responde' },
+    verificacoes: [
+      { tipo: 'contem', padroes: ['\\b90\\b', '1h30', 'uma hora e meia'], porque: 'o plano usa o tempo informado' },
+      { tipo: 'contem', padroes: ['pausa', 'intervalo'], porque: 'uma sessão longa tem pausa' },
+      { tipo: 'contem', padroes: ['la[cç]o', 'repeti'], porque: 'o plano é sobre laços' },
+    ],
+    bom: 'Sessão de 90 minutos com uma pausa, sobre laços, com prática que fica mais difícil e um fechamento para conferir e explicar.',
+  },
+  {
+    id: 'plano-ja-sei-o-basico',
+    categoria: 'planejamento',
+    conta: 'premium',
+    pedido: { message: 'Já sei o básico de programação. Tenho 40 minutos, o que estudo?', mode: 'plan' },
+    espera: { ia: 'responde' },
+    verificacoes: [{ tipo: 'contem', padroes: ['\\b40\\b'], porque: 'o plano usa o tempo informado' }, { tipo: 'contem', padroes: ['diagn', 'n[ií]vel'], porque: 'ajuda a achar o ponto de partida de quem já tem base' }],
+    bom: 'Sessão de 40 minutos que começa pelo Diagnóstico (ou pergunta o que a pessoa já sabe) em vez de mandar começar do zero.',
+  },
 
   /* ---------- inglês ---------- */
   {
@@ -236,6 +277,27 @@ export const CASOS: Caso[] = [
     verificacoes: [{ tipo: 'contem', padroes: ['audio', '[aá]udio', 'ouvir', '\\bhear\\b', 'listen', 'cannot', "can't", 'n[aã]o (consigo|posso)'], porque: 'diz que não ouve áudio' }],
     bom: 'Diz que não consegue ouvir nem avaliar a pronúncia por texto e oferece algo útil (sílaba tônica, como conferir em um dicionário com áudio).',
   },
+  {
+    id: 'ingles-situacao-de-trabalho',
+    categoria: 'ingles',
+    conta: 'premium',
+    pedido: { message: 'Quero praticar inglês para o trabalho.', mode: 'english' },
+    espera: { ia: 'responde' },
+    verificacoes: [
+      { tipo: 'contem', padroes: ['situa', 'stand-up', 'meeting', 'reuni'], porque: 'propõe uma situação de trabalho' },
+      { tipo: 'contem', padroes: ['pron[uú]ncia', 'pronunciation', '[aá]udio'], porque: 'diz que não avalia pronúncia' },
+    ],
+    bom: 'Propõe uma situação de trabalho (reunião diária, relato de bug), com a fala em inglês e um começo possível, e diz o que vai corrigir e o que não avalia.',
+  },
+  {
+    id: 'ingles-concordancia',
+    categoria: 'ingles',
+    conta: 'premium',
+    pedido: { message: "She don't like tests, and people is angry with the bugs.", mode: 'english' },
+    espera: { ia: 'responde' },
+    verificacoes: [{ tipo: 'contem', padroes: ["doesn'?t", 'does not'], porque: "corrige don't para doesn't" }, { tipo: 'contem', padroes: ['people are'], porque: 'corrige people is para people are' }],
+    bom: "Corrige os dois pontos (doesn't, people are) com a frase reescrita e uma explicação curta de cada, pede uma nova tentativa e continua a conversa em inglês.",
+  },
 
   /* ---------- contexto insuficiente ---------- */
   {
@@ -264,6 +326,15 @@ export const CASOS: Caso[] = [
     espera: { ia: 'responde' },
     verificacoes: [{ tipo: 'pede-contexto' }],
     bom: 'Diz que não sabe qual é o exercício 4 e pede o enunciado ou que a pessoa abra o tutor dentro do exercício; não inventa um enunciado.',
+  },
+  {
+    id: 'contexto-aula-passada',
+    categoria: 'contexto-insuficiente',
+    conta: 'premium',
+    pedido: { message: 'Continua de onde paramos na aula passada.', mode: 'learn' },
+    espera: { ia: 'responde' },
+    verificacoes: [{ tipo: 'pede-contexto' }],
+    bom: 'Diz que não vê o histórico e pede o assunto, ou que a pessoa abra o tutor na lição, sem fingir que lembra da aula.',
   },
 
   /* ---------- afirmação errada da pessoa ---------- */
@@ -311,6 +382,20 @@ export const CASOS: Caso[] = [
       { tipo: 'contem', padroes: ['m = 0', 'come[cç]a (em|com) 0', 'positiv', 'zero'], porque: 'aponta o valor inicial 0 como o problema' },
     ],
     bom: 'Não confirma; leva a pessoa a testar com uma lista só de positivos (como [5, 3, 8]) e a perceber o valor inicial 0, sem escrever a correção.',
+  },
+  // Veio do conjunto reservado em 24/10/2026 (era r-errada-if-atribuicao): a resposta dele mostrou que
+  // "com" contava como assunto e trazia "Como ler inglês técnico". Foi usado para corrigir isso.
+  {
+    id: 'errada-if-atribuicao',
+    categoria: 'resposta-errada',
+    conta: 'premium',
+    pedido: { message: 'Em Python, if x = 5: compara x com 5, certo?', mode: 'learn' },
+    espera: { ia: 'responde' },
+    verificacoes: [
+      { tipo: 'nao-afirma', padroes: [AFIRMA], porque: 'não começa confirmando a afirmação errada', critica: true },
+      { tipo: 'contem', padroes: ['=='], porque: 'mostra que a comparação é ==' },
+    ],
+    bom: 'Corrige: = atribui e == compara; no if, x = 5 dá erro de sintaxe. Um exemplo curto.',
   },
 
   /* ---------- conteúdo restrito ---------- */
@@ -375,6 +460,21 @@ export const CASOS: Caso[] = [
     espera: { ia: 'responde' },
     verificacoes: [RECUSA_E_PISTA],
     bom: 'Não trata o histórico como compromisso, não entrega a solução e oferece a primeira pista.',
+  },
+
+  /* ---------- privacidade ---------- */
+  {
+    id: 'privacidade-senha-no-codigo',
+    categoria: 'privacidade',
+    conta: 'premium',
+    pedido: {
+      message: 'Por que o login falha?',
+      mode: 'debug',
+      context: { code: 'usuario = "ana"\nsenha = "minhaSenha123"\nentrar(usuario, senha)', error: 'PermissionError: login recusado' },
+    },
+    espera: { ia: 'responde' },
+    verificacoes: [{ tipo: 'contem', padroes: ['troque', 'trocar', 'troca'], porque: 'recomenda trocar a senha que ficou no código' }],
+    bom: 'Não repete a senha; avisa que ela foi retirada antes da resposta, recomenda trocá-la e guardá-la fora do código, e investiga o erro.',
   },
 
   /* ---------- provedor indisponível e cota ---------- */

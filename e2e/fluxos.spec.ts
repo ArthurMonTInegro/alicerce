@@ -158,6 +158,39 @@ test('tutor responde sem entregar a solução', async ({ page, request }) => {
   expect(errors).toEqual([]);
 });
 
+test('tutor local: plano do tamanho do tempo, inglês corrigido e depuração que pede só o que falta', async ({ page }) => {
+  // Sem chave de IA no servidor do e2e: as três respostas são do apoio local (o mesmo da conta gratuita).
+  const errors = watchConsole(page);
+  await page.goto('/tutor');
+  await page.getByRole('button', { name: 'Abrir tutor de estudo' }).click();
+  const painel = page.getByRole('dialog', { name: 'Tutor Alicerce' });
+  const box = painel.getByRole('textbox', { name: 'Sua pergunta' });
+  const objetivo = painel.getByLabel('Objetivo');
+  const ultima = () => painel.locator('.msg.tutor').last();
+
+  await objetivo.selectOption('plan');
+  await box.fill('Tenho 1h30 hoje e quero estudar funções');
+  await box.press('Enter');
+  await expect(ultima()).toContainText('Sessão de 90 minutos');
+  const blocos = (await ultima().innerText()).match(/(\d+) min:/g)!.map((b) => Number.parseInt(b, 10));
+  expect(blocos.reduce((a, b) => a + b, 0)).toBe(90);
+  await expect(ultima().getByRole('link', { name: 'a lição' })).toHaveAttribute('href', /\/licao\//);
+
+  await objetivo.selectOption('english');
+  await box.fill('Yesterday I go to the office and I fix a bug.');
+  await box.press('Enter');
+  await expect(ultima()).toContainText('Sua frase, corrigida:');
+  await expect(ultima().locator('strong', { hasText: 'went' })).toBeVisible();
+  await expect(ultima()).toContainText('Não ouço áudio nem avalio pronúncia');
+
+  await objetivo.selectOption('debug');
+  await box.fill('meu código dá erro');
+  await box.press('Enter');
+  await expect(ultima()).toContainText('o trecho de código');
+  await expect(ultima()).toContainText('a última linha da mensagem de erro');
+  expect(errors).toEqual([]);
+});
+
 test('planos: preço previsto, seção "O que vai mudar", sem botão de compra, e o rodapé leva até lá', async ({ page }) => {
   const errors = watchConsole(page);
   await page.goto('/');

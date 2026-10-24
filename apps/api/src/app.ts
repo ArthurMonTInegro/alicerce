@@ -59,6 +59,7 @@ import { getEntitlements } from './plans.ts';
 import { RateLimiter, securityHeaders } from './security.ts';
 import { publicContent, type ContentStore } from './conteudo.ts';
 import { ClaudeTutor, OfflineTutor, parseTutorRequest, tutorSources, type TutorProvider, type TutorReply } from './tutor.ts';
+import { reservarChamadaDaIa } from './cota-ia.ts';
 
 export interface AppDeps {
   config: Config;
@@ -602,30 +603,22 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     // IA só para quem tem conta (controla custo e abuso), com limite diário e do mês por conta,
     // e um teto diário de chamadas no Alicerce todo (TUTOR_GLOBAL_DAILY_LIMIT).
     if (ai && u && rights && plan === 'premium') {
-      const day = today();
-      const used = (db.prepare('SELECT count FROM tutor_usage WHERE user_id = ? AND day = ?').get(u.id, day) as { count: number } | undefined)?.count ?? 0;
-      const monthly=(db.prepare('SELECT COALESCE(SUM(count),0) AS total FROM tutor_usage WHERE user_id = ? AND day LIKE ?').get(u.id,day.slice(0,7)+'%') as {total:number}).total;
-      const global = (db.prepare('SELECT calls FROM tutor_ai_daily WHERE day = ?').get(day) as { calls: number } | undefined)?.calls ?? 0;
-      if(monthly>=rights.tutorMonthlyLimit)reason='monthly_limit';
-      if (used < rights.tutorDailyLimit && monthly < rights.tutorMonthlyLimit) {
-        if (global >= config.tutorGlobalDailyLimit) reason = 'budget_limit';
-        else {
-          // Reserva antes de chamar (pedidos simultâneos não passam do limite). Falha depois do envio
-          // também conta (docs/ESTRATEGIA_ASSINATURA.md): o provedor pode ter cobrado.
-          db.prepare('INSERT INTO tutor_usage (user_id, day, count) VALUES (?, ?, 1) ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1').run(u.id, day);
-          aiDaily(1, 0, 0, 0);
-          // Latência de cada chamada no log (sem o conteúdo da conversa), para medir p50 e p95 no uso real.
-          const started = performance.now();
-          const ms = () => Math.round(performance.now() - started);
-          try {
-            const text = await ai.answer(parsed, sources);
-            req.log.info({ tutorIa: { ms: ms(), ok: true } }, 'tutor IA respondeu');
-            return { reply: text, mode: 'ia' };
-          } catch {
-            reason='provider_unavailable';
-            aiDaily(0, 1, 0, 0);
-            req.log.warn({ tutorIa: { ms: ms(), ok: false } }, 'tutor IA indisponível; usando apoio local');
-          }
+      // Reserva antes de chamar, numa transação (cota-ia.ts): pedidos simultâneos, inclusive de outro
+      // processo, não passam do limite. Falha depois do envio também conta: o provedor pode ter cobrado.
+      const blocked = reservarChamadaDaIa(db, u.id, today(), { diario: rights.tutorDailyLimit, mensal: rights.tutorMonthlyLimit, global: config.tutorGlobalDailyLimit });
+      if (blocked) reason = blocked;
+      else {
+        // Latência de cada chamada no log (sem o conteúdo da conversa), para medir p50 e p95 no uso real.
+        const started = performance.now();
+        const ms = () => Math.round(performance.now() - started);
+        try {
+          const text = await ai.answer(parsed, sources);
+          req.log.info({ tutorIa: { ms: ms(), ok: true } }, 'tutor IA respondeu');
+          return { reply: text, mode: 'ia' };
+        } catch {
+          reason = 'provider_unavailable';
+          aiDaily(0, 1, 0, 0);
+          req.log.warn({ tutorIa: { ms: ms(), ok: false } }, 'tutor IA indisponível; usando apoio local');
         }
       }
     }
