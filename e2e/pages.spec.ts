@@ -41,15 +41,13 @@ function vigiarConsole(page: Page) {
 }
 
 /**
- * Abre a lição e vai à etapa de exercícios pela navegação da página, como nos testes de
- * fluxos. Carregar direto com ?etapa=exercicio dá erro de hidratação (#418) já em main,
- * fora do escopo do isolamento (registrado nas pendências).
+ * Abre a lição e vai à etapa de exercícios pela navegação da página, como uma pessoa faria: o
+ * clique pode sair antes de o JavaScript assumir (então o link recarrega a página já na etapa,
+ * e2e/fluxos.spec.ts confere que sem erro). Segue só com a etapa na tela.
  */
 async function exercicios(page: Page, licao: string) {
   await page.goto(srv.url(`licao/${licao}/`));
-  const etapas = page.getByRole('navigation', { name: 'Etapas da lição' });
-  await page.waitForFunction(() => Object.keys(document.querySelector('#stage-title') ?? {}).some((k) => k.startsWith('__reactFiber')));
-  await etapas.getByRole('link', { name: /Exercícios/ }).click();
+  await page.getByRole('navigation', { name: 'Etapas da lição' }).getByRole('link', { name: /Exercícios/ }).click();
   await expect(page.locator('#stage-title')).toContainText('Exercícios');
 }
 

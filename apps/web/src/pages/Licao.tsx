@@ -35,14 +35,18 @@ function LessonBody({ id }: { id: string }) {
   const d = useDerived();
 
   const stages = useMemo(() => lesson?.stages ?? [], [lesson]);
-  const stage: Stage = stageParam && stages.includes(stageParam) ? stageParam : (stages[0] ?? 'conceito');
+  const stageOf = (param: string | null): Stage => (param && stages.includes(param as Stage) ? (param as Stage) : (stages[0] ?? 'conceito'));
+  const stage = stageOf(stageParam);
   const idx = stages.indexOf(stage);
   const section = full?.sections[idx];
+  // Aberta com ?etapa=, a lição hidrata na etapa do HTML pré-renderizado (a primeira) e logo passa à
+  // da URL (lib/router.tsx). Essa passagem não é uma escolha do aluno: não conta visita nem move o foco.
+  const urlStage = () => stageOf(new URLSearchParams(window.location.search).get('etapa'));
 
-  const firstStage = useRef(true);
+  const settled = useRef(false);
   useEffect(() => {
-    if (firstStage.current) {
-      firstStage.current = false;
+    if (!settled.current) {
+      settled.current = stage === urlStage();
       return;
     }
     const h = document.getElementById('stage-title');
@@ -53,7 +57,7 @@ function LessonBody({ id }: { id: string }) {
 
   useEffect(() => {
     if (!lesson) return;
-    visitStage(lesson.id, stage);
+    if (stage === urlStage()) visitStage(lesson.id, stage);
     resetTutorContext({ lessonId: lesson.id });
     return () => resetTutorContext();
   }, [lesson, stage]);

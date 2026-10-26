@@ -78,5 +78,4 @@ O painel para escolas e ONGs saiu do backlog com a UP35.
 - Limitador compartilhado para mais de uma instância (8).
 - Remover `style-src 'unsafe-inline'` (10).
 - Teste com leitores de tela reais (11).
-- Erro de hidratação (#418) ao abrir uma lição direto em `?etapa=exercicio` no build estático (visto em `e2e/pages.spec.ts`, que navega pela barra de etapas para evitá-lo; não reconferido).
 - No GitHub Pages, a demonstração divide a origem com os outros sites do dono, que conseguem ler o `localStorage` dela ([SEGURANCA.md](SEGURANCA.md)).

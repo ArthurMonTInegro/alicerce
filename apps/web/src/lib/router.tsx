@@ -68,11 +68,26 @@ function parseUrl(url: string): Loc {
   return { path: u.pathname, search: u.search, hash: u.hash };
 }
 
+let hydrationLoc: Loc | null = null;
+/**
+ * A URL que o HTML pré-renderizado mostra: o caminho real, sem ?busca nem #âncora (a
+ * pré-renderização não as tem). Com elas na hidratação, uma lição aberta em ?etapa=exercicio (um
+ * link compartilhado, ou o clique numa etapa antes de o JavaScript assumir, que recarrega a página)
+ * não batia com o HTML, e o React descartava a página inteira para refazê-la (erro #418). Logo
+ * depois da hidratação, o React confere a URL de novo e mostra o que ela pede.
+ */
+function hydrationSnapshot(): Loc {
+  const real = snapshot();
+  if (!real.search && !real.hash) return real;
+  if (!hydrationLoc || hydrationLoc.path !== real.path) hydrationLoc = { path: real.path, search: '', hash: '' };
+  return hydrationLoc;
+}
+
 export function useLocation(): Loc {
   const server = useContext(ServerLocation);
-  // Na hidratação o React usa o "snapshot do servidor": no navegador ele precisa ser a URL real,
+  // Na hidratação o React usa o "snapshot do servidor": no navegador ele precisa ser o caminho real,
   // senão a página pré-renderizada de /trilha seria hidratada como se fosse a página inicial.
-  return useSyncExternalStore(subscribe, snapshot, () => server ?? (typeof window === 'undefined' ? { path: '/', search: '', hash: '' } : snapshot()));
+  return useSyncExternalStore(subscribe, snapshot, () => server ?? (typeof window === 'undefined' ? { path: '/', search: '', hash: '' } : hydrationSnapshot()));
 }
 
 export function useSearchParam(name: string): string | null {

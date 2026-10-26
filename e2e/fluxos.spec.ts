@@ -37,6 +37,40 @@ test('lição: etapas, exercício de múltipla escolha e conclusão', async ({ p
   expect(errors).toEqual([]);
 });
 
+/** A página já hidratou: o React assumiu o título da etapa (pela marca que ele põe no elemento). */
+const hidratou = (page: Page) => page.waitForFunction(() => Object.keys(document.querySelector('#stage-title') ?? {}).some((k) => k.startsWith('__reactFiber')));
+
+// O HTML pré-renderizado de /licao/:id mostra a primeira etapa. Um endereço com ?etapa= (um link
+// compartilhado, ou o clique numa etapa antes de o JavaScript assumir, que recarrega a página) precisa
+// hidratar sem erro e mostrar a etapa pedida.
+test('lição aberta direto numa etapa: a etapa pedida, sem erro de hidratação e sem roubar o foco', async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto('/licao/l0-o-que-e-computador?etapa=exercicio');
+  await hidratou(page);
+  await expect(page.locator('#stage-title')).toContainText('Exercícios');
+  expect(await page.evaluate(() => document.activeElement?.id ?? '')).not.toBe('stage-title');
+  // a primeira etapa, que só o HTML pré-renderizado mostrou, não conta como visitada
+  await expect(page.getByRole('navigation', { name: 'Etapas da lição' }).getByRole('link', { name: /Conceito/ })).not.toHaveClass(/done/);
+  expect(errors).toEqual([]);
+});
+
+test('clique numa etapa antes de o JavaScript assumir: a página abre na etapa pedida, sem erro', async ({ page }) => {
+  const errors = watchConsole(page);
+  // código da página da lição lento: o HTML pré-renderizado aparece bem antes de a página hidratar
+  await page.route(/\/assets\/Licao-[\w-]+\.js$/, async (r) => {
+    await new Promise((ok) => setTimeout(ok, 1500));
+    await r.continue();
+  });
+  await page.goto('/licao/l0-o-que-e-computador');
+  const link = page.getByRole('navigation', { name: 'Etapas da lição' }).getByRole('link', { name: /Exercícios/ });
+  expect(await link.evaluate((a) => Object.keys(a).some((k) => k.startsWith('__react')))).toBe(false);
+  await link.click();
+  await expect(page).toHaveURL(/\?etapa=exercicio$/);
+  await hidratou(page);
+  await expect(page.locator('#stage-title')).toContainText('Exercícios');
+  expect(errors).toEqual([]);
+});
+
 test('ver a solução manda o exercício para "Para refazer" na revisão', async ({ page }) => {
   const errors = watchConsole(page);
   page.on('dialog', (d) => d.accept());
@@ -45,6 +79,8 @@ test('ver a solução manda o exercício para "Para refazer" na revisão', async
   await page.locator('.module-row').first().click();
   await page.locator('a[href^="/licao/"]').first().click();
   await page.getByRole('navigation', { name: 'Etapas da lição' }).getByRole('link', { name: /Exercícios/ }).click();
+  // count() não espera: sem a etapa na tela, o laço das dicas sairia sem clicar nenhuma
+  await expect(page.locator('#stage-title')).toContainText('Exercícios');
   const ex = page.locator('section.exercise').first();
   const hint = ex.getByRole('button', { name: /Dica/ });
   while (await hint.count()) await hint.click();
@@ -288,6 +324,8 @@ test('o arquivo de "Exportar JSON" é lido pela análise do piloto (docs/PILOTO.
   page.on('dialog', (d) => d.accept());
   await page.goto('/licao/l0-o-que-e-computador');
   await page.getByRole('navigation', { name: 'Etapas da lição' }).getByRole('link', { name: /Exercícios/ }).click();
+  // count() não espera: sem a etapa na tela, o laço das dicas sairia sem clicar nenhuma
+  await expect(page.locator('#stage-title')).toContainText('Exercícios');
   const ex = page.locator('section.exercise').first();
   const hint = ex.getByRole('button', { name: /Dica/ });
   while (await hint.count()) await hint.click();
