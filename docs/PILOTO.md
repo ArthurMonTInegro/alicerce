@@ -1,6 +1,6 @@
 # Piloto: a jornada gratuita e a primeira continuação
 
-Situação em 24/10/2026: **preparado, não executado.** Nenhum convite foi enviado, nenhum participante foi registrado, nenhuma sessão aconteceu e nenhum dado foi coletado. Recrutar, convidar e conduzir as sessões cabe ao Arthur; a análise dos arquivos pode ser feita por qualquer pessoa com o repositório.
+Situação em 26/10/2026: **preparado, não executado.** Nenhum convite foi enviado, nenhum participante foi registrado, nenhuma sessão aconteceu e nenhum dado foi coletado. Recrutar, convidar e conduzir as sessões cabe ao Arthur; a análise dos arquivos pode ser feita por qualquer pessoa com o repositório.
 
 Esta é a primeira rodada com pessoas reais: 8 a 12 iniciantes, com custo zero e cabendo em duas horas por dia de quem conduz. Ela começa com **duas pessoas observadas** (a onda de ensaio), para achar os obstáculos antes de chamar as demais. Junta a observação de uso (UP18), uma parte das entrevistas (UP20) e prepara o piloto maior de 30 a 50 pessoas (UP21), que vem depois, já corrigido pelo que esta mostrar.
 
@@ -12,6 +12,7 @@ Esta é a primeira rodada com pessoas reais: 8 a 12 iniciantes, com custo zero e
 | Acesso ao conteúdo durante o piloto | [Acesso durante o piloto](#acesso-durante-o-piloto) |
 | Questionário inicial | [Questionário inicial](#questionário-inicial) |
 | Roteiro da primeira sessão | [Sessão 1](#sessão-1-observada-50-minutos) |
+| Roteiro curto das duas primeiras sessões (onda de ensaio): versão, o que se observa, o que não dá para avaliar | `docs/piloto/roteiro-primeiras-sessoes.md` |
 | Tarefas com objetivos verificáveis | [As oito tarefas](#as-oito-tarefas) |
 | Roteiro de observação e entrevista | [Como observar](#como-observar), [Sessão 2](#sessão-2-outro-dia-40-minutos) e [Conversa final](#conversa-final-20-minutos) |
 | Registro de dificuldades e defeitos | `docs/piloto/registro-dificuldades.csv`, explicado em [Registro de dificuldades e defeitos](#registro-de-dificuldades-e-defeitos) |
@@ -38,7 +39,7 @@ O que esta rodada **não mede**: se a pessoa lembra do que aprendeu um mês depo
 ## Formato
 
 - **Onde:** na demonstração pública, https://arthurmontinegro.github.io/alicerce/. Não precisa de conta, de servidor nem de nenhum gasto.
-- **Qual versão:** a que estiver publicada no dia. Em 24/10/2026, é a de 23/10/2026 (commit `a58436f`). As melhorias do tutor local e a contagem de perguntas ao tutor (branch `rodada-24-10`) só chegam aos participantes se forem publicadas antes da primeira sessão; essa decisão é do Arthur. Sem essa publicação, a tarefa do tutor (T5) observa o tutor anterior, e a linha "Uso do tutor" do relatório sai como "não registrado": o uso fica só nas anotações das sessões. Não troque de versão no meio de uma onda; se trocar entre as ondas, anote a data.
+- **Qual versão:** a que estiver publicada no dia. Em 26/10/2026, é a de 25/10/2026 (commit `f9efb1a`), que já tem as melhorias do tutor local e a contagem de perguntas ao tutor no arquivo exportado. A correção da lição aberta numa etapa (branch `rodada-26-10`, ver o [roteiro curto](piloto/roteiro-primeiras-sessoes.md)) só chega aos participantes se for publicada antes da primeira sessão; essa decisão é do Arthur. Não troque de versão no meio de uma onda; se trocar entre as ondas, anote a data e o commit.
 - **Duas ondas:**
   - **Onda 1, de ensaio:** 2 pessoas, uma que estuda mais no celular e uma no computador. Cada uma faz a sessão 1 e, em outro dia, a sessão 2. Depois delas, os [critérios preliminares](#critérios-preliminares-prosseguir-corrigir-ou-interromper) decidem se a onda 2 começa, se algo é corrigido antes ou se o piloto para.
   - **Onda 2:** as demais 6 a 10 pessoas, com o mesmo roteiro (ou o roteiro corrigido, com a mudança anotada).
@@ -422,7 +423,7 @@ A análise conta pessoas, não linhas: a mesma pessoa anotada duas vezes no mesm
 
 ## Dados e privacidade
 
-- O arquivo exportado tem as tentativas de exercício (acertou, dicas, erros, se viu a resposta, tempo), as lições visitadas e concluídas, as revisões, o resultado do diagnóstico, se foi feito, os marcos de projeto marcados e, na versão do site com a contagem do tutor (branch `rodada-24-10` em diante), quantas perguntas a pessoa fez ao tutor em cada dia (só o número). Não tem nome, e-mail, senha, o texto das perguntas nem o código que a pessoa escreveu.
+- O arquivo exportado tem as tentativas de exercício (acertou, dicas, erros, se viu a resposta, tempo), as lições visitadas e concluídas, as revisões, o resultado do diagnóstico, se foi feito, os marcos de projeto marcados e, na versão do site com a contagem do tutor (publicada desde 24/10/2026), quantas perguntas a pessoa fez ao tutor em cada dia (só o número). Não tem nome, e-mail, senha, o texto das perguntas nem o código que a pessoa escreveu.
 - Guarde os arquivos e as anotações numa pasta fora do repositório e fora de pastas compartilhadas publicamente. Se, por engano, a pasta ficar dentro do repositório com o nome `piloto-dados/`, o `.gitignore` impede que ela vá para o GitHub; em qualquer outro lugar do repositório, a análise avisa.
 - Nas anotações, nada que identifique a pessoa: só o código. A lista que liga código e nome fica só com quem conduz.
 - Gravações, só com autorização, guardadas com o mesmo cuidado e apagadas no mesmo prazo.
@@ -430,9 +431,10 @@ A análise conta pessoas, não linhas: a mesma pessoa anotada duas vezes no mesm
 
 ## Navegadores e o que foi verificado
 
-- Verificado em 24/10/2026, só no **Chromium** sem interface (o único navegador instalado no ambiente de testes), com tela de computador e com a tela de um Pixel 7 simulada pelo próprio Chromium:
+- Verificado em 24/10/2026 e de novo em 26/10/2026, só no **Chromium** sem interface (o único navegador instalado no ambiente de testes), com tela de computador e com a tela de um Pixel 7 simulada pelo próprio Chromium:
   - no build da demonstração (`e2e/pages.spec.ts`, o mesmo modo estático do GitHub Pages, servido por uma imitação dele): fazer um exercício, perguntar ao tutor, exportar em Progresso e rodar a análise sobre o arquivo baixado, com a contagem do tutor e os modelos de `docs/piloto/`;
-  - no servidor (`e2e/fluxos.spec.ts`): a mesma exportação e, entre outros fluxos, o cadastro, a sincronização e a saída de uma conta.
+  - no servidor (`e2e/fluxos.spec.ts`): a mesma exportação e, entre outros fluxos, o cadastro, a sincronização e a saída de uma conta;
+  - em 26/10/2026, o caminho do clique em "Exercícios" usado na exportação: 30 repetições, sem novas tentativas, no celular simulado e no computador, todas passaram, depois da correção da lição aberta numa etapa (ver [TESTES.md](TESTES.md), "O teste instável de 24/10/2026"). Isso vale para o build com a correção, que ainda não está publicado.
 - **Não verificado:** Firefox, Safari (Mac e iPhone), Chrome num celular de verdade e outros navegadores de celular. A tela de celular simulada não é um navegador de celular: onde o arquivo baixado vai parar e como a pessoa o encontra não foram testados. Um resultado no Chromium não vale para os outros; por isso a primeira exportação é feita junto, na sessão 1, e anotada no registro se der errado (tipo `ambiente` ou `defeito`).
 - No Safari, há uma regra conhecida de apagar o que o site guardou no navegador depois de 7 dias de uso do Safari sem abrir o site ([explicação](https://searchengineland.com/what-safaris-7-day-cap-on-script-writeable-storage-means-for-pwa-developers-332519)). Não foi testada aqui; é a razão do item 3 da mensagem de início.
 
