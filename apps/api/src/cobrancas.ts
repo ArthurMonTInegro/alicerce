@@ -171,7 +171,10 @@ export function recordCharge(db: DatabaseSync, provider: string, subscriptionId:
   }
   if (cur.subscription_id !== subscriptionId) return "proibida"; // a cobrança é de outra assinatura
   const curFrom = cur.observed_at;
-  const curUntil = cur.observed_until ?? cur.observed_at;
+  // O código anterior à migração 11 muda observed_at sem conhecer observed_until: depois de voltar
+  // de versão e avançar de novo, o fim guardado pode ter ficado antes do começo. A janela nunca
+  // termina antes de começar.
+  const curUntil = Math.max(cur.observed_until ?? curFrom, curFrom);
   if (until < curFrom) return "antiga";
   const newer = from > curUntil;
   const coversUntil = u.coversUntil ?? cur.covers_until;

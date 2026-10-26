@@ -192,6 +192,19 @@ describe('leituras que se cruzam no tempo (respostas fora de ordem)', () => {
     expect(b.rastros()).toEqual(antes);
   });
 
+  it('banco que passou pelo código anterior (só observed_at, sem observed_until): a janela termina em observed_at', () => {
+    const b = banco();
+    b.evento({ id: 'e1', ...paga, at: 200, observedUntil: 250 });
+    // voltar de versão: o código anterior grava uma contestação lida em 400 sem conhecer observed_until
+    b.db.prepare("UPDATE subscription_charges SET status = 'contestada', observed_at = 400 WHERE charge_id = 'c1'").run();
+    // de novo no código novo, uma confirmação lida entre 300 e 450 pode ser anterior à contestação:
+    // ambígua, não devolve o acesso (a janela gravada vai até 400, não até o 250 que ficou para trás)
+    expect(b.evento({ id: 'e2', ...paga, at: 300, observedUntil: 450 })).toBe('ambiguo');
+    expect(b.cobranca()).toMatchObject({ status: 'contestada', observed_at: 400 });
+    expect(b.plano(500)).toBe('free');
+    expect(b.evento({ id: 'e3', ...paga, at: 500, observedUntil: 520 })).toBe('aplicado');
+  });
+
   it('a conciliação carimba cada leitura com a hora dela, não com a hora em que a rodada começou', async () => {
     const b = banco();
     b.db.prepare("UPDATE subscriptions SET status = 'ativa' WHERE id = ?").run(b.id); // (uma tentativa pendente seria trocada pela nova)

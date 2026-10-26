@@ -801,7 +801,7 @@ function applySubscriptionEvent(db: DatabaseSync, provider: string, s: Subscript
     // A desistência: todas as cobranças pagas são estornadas, e o fim do período pago encolhe
     // até o reembolso (um reembolso de algo já vencido não o estica).
     db.prepare(
-      "UPDATE subscription_charges SET status = 'estornada', refunded_at = COALESCE(refunded_at, ?), observed_at = MAX(observed_at, ?), observed_until = MAX(COALESCE(observed_until, observed_at), ?), transitions = transitions + 1, updated_at = ? WHERE subscription_id = ? AND status IN ('paga', 'estorno_parcial', 'estorno_pedido', 'contestada')",
+      "UPDATE subscription_charges SET status = 'estornada', refunded_at = COALESCE(refunded_at, ?), observed_at = MAX(observed_at, ?), observed_until = MAX(COALESCE(observed_until, observed_at), observed_at, ?), transitions = transitions + 1, updated_at = ? WHERE subscription_id = ? AND status IN ('paga', 'estorno_parcial', 'estorno_pedido', 'contestada')",
     ).run(ev.at, ev.at, ev.at, now, s.id);
     db.prepare(
       "UPDATE subscriptions SET status = 'reembolsada', paid_until = CASE WHEN paid_until > ? THEN ? ELSE paid_until END, canceled_at = COALESCE(canceled_at, ?), updated_at = ? WHERE id = ?",
