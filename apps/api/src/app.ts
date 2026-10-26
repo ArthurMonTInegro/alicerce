@@ -2,7 +2,7 @@
  * Servidor HTTP: API JSON em /api e os arquivos estáticos pré-renderizados do
  * front-end. Uma única origem simplifica cookies, CORS (não há) e CSP.
  */
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, statSync } from 'node:fs';
 import { join, normalize, sep } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
@@ -54,9 +54,10 @@ import {
   SIGNUP_MINUTES,
   type UserRow,
 } from './auth.ts';
-import { mailerFor, MailError, type Mailer } from './email.ts';
+import { mailerFor, type Mailer } from './email.ts';
 import type { Config } from './config.ts';
 import { drainOutbox, type DrainReport } from './avisos.ts';
+import { addLinkReport, drainLinkOutbox, emptyLinkReport, enqueueLink, linkKey, linkToken, newLinkNonce, purgeFinishedLinks, replaceLinks, type LinkReport } from './links.ts';
 import { AsaasPaymentProvider, asaasRefs } from './asaas.ts';
 import { reconcile, reconcileOne, type ReconcileReport } from './conciliacao.ts';
 import { getEntitlements } from './plans.ts';
@@ -91,7 +92,13 @@ declare module 'fastify' {
     /** o provedor de pagamento em uso (null = Premium sem venda); os testes o manipulam */
     pagamentos: PaymentProvider | null;
     /** rotinas que o servidor roda de tempos em tempos (main.ts) */
-    rotinas: { conciliar(): Promise<ReconcileReport | null>; enviarEmails(): Promise<DrainReport>; limparCadastros(): number };
+    rotinas: {
+      conciliar(): Promise<ReconcileReport | null>;
+      enviarEmails(): Promise<DrainReport>;
+      /** a fila dos e-mails com link (links.ts); `now` só nos testes */
+      enviarLinks(now?: number): Promise<LinkReport>;
+      limparCadastros(): number;
+    };
   }
 }
 
@@ -125,6 +132,10 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     // Cobrança real só depois da decisão de vender, que liga PREMIUM_FOR_SALE no código (e exige as datas da transição).
     if (config.asaas.environment === 'producao' && !PREMIUM_FOR_SALE) throw new Error('Cobrança real bloqueada: ASAAS_AMBIENTE=producao só sobe com PREMIUM_FOR_SALE ligado em packages/engine/src/plans.ts.');
   }
+  // Os links do cadastro e da senha precisam sobreviver a um reinício (links.ts): em produção, com
+  // fornecedor de e-mail e sem a chave deles, melhor o servidor não subir.
+  if (config.production && mailer && !config.linkSecret)
+    throw new Error('LINKS_SEGREDO ausente: sem ela, os e-mails do cadastro e da troca de senha não podem esperar na fila. Gere uma com "openssl rand -base64 48" e guarde só no ambiente do servidor (docs/OPERACAO.md).');
   const app = Fastify({
     logger: logger ? { level: 'info', redact: ['req.headers.cookie', 'req.headers.authorization'], ...(logger === true ? {} : { stream: logger.stream }) } : false,
     bodyLimit: BODY_LIMIT,
@@ -141,6 +152,10 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
       done(Object.assign(new Error('JSON inválido.'), { statusCode: 400 }), undefined);
     }
   });
+  // Fora de produção, sem LINKS_SEGREDO, uma chave só deste processo: o que estiver na fila quando
+  // ele reiniciar é descartado ('chave_trocada'), sem enviar link que não abriria.
+  const links = linkKey(config.linkSecret ?? randomBytes(32).toString('base64url'));
+  if (mailer && !config.linkSecret) app.log.warn('LINKS_SEGREDO ausente: os links do cadastro e da senha usam uma chave temporária, e os que estiverem na fila ao reiniciar não serão enviados (docs/OPERACAO.md)');
   const offline = new OfflineTutor();
   // Totais da IA no Alicerce todo, por dia (UTC): chamadas, falhas e tokens (tutor_ai_daily).
   const today = () => new Date().toISOString().slice(0, 10);
@@ -225,6 +240,29 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     if (!u) void reply.code(401).send({ error: 'Faça login para continuar.' });
     return u;
   };
+  /**
+   * Roda `fn` numa transação; false se o banco falhou (desfeito, e o log diz só o tipo do erro:
+   * a mensagem de um erro do SQLite pode trazer valores).
+   */
+  const transaction = (req: FastifyRequest, msg: string, fn: () => void): boolean => {
+    let begun = false;
+    try {
+      db.exec('BEGIN IMMEDIATE');
+      begun = true;
+      fn();
+      db.exec('COMMIT');
+      return true;
+    } catch (e) {
+      if (begun)
+        try {
+          db.exec('ROLLBACK');
+        } catch {
+          /* o COMMIT já tinha encerrado a transação */
+        }
+      req.log.error({ err: { tipo: (e as Error)?.name ?? '?', codigo: (e as { code?: unknown })?.code ?? null } }, msg);
+      return false;
+    }
+  };
   const startSession = (reply: FastifyReply, userId: string) => {
     const { token, expires } = createSession(db, userId);
     reply.header('set-cookie', sessionCookie(token, expires, config.secureCookies));
@@ -247,8 +285,9 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
   // Cadastro em dois passos, para a resposta não revelar quem tem conta: o pedido devolve
   // sempre o mesmo 202, e o e-mail é que diz o resto. Sem conta, o e-mail traz o link que cria
   // a conta (/api/auth/confirmar); com conta, explica como entrar ou trocar a senha. A senha
-  // passa pelo scrypt nos dois casos, e o envio não é esperado, para o tempo da resposta e uma
-  // falha do fornecedor de e-mail também não revelarem nada.
+  // passa pelo scrypt nos dois casos, os dois gravam o e-mail na fila (links.ts) na mesma
+  // transação do pedido, e o envio não é esperado: nem o tempo da resposta nem uma falha do
+  // fornecedor de e-mail revelam nada, e uma falha passageira não obriga a pedir de novo.
   app.post('/api/auth/register', async (req, reply) => {
     if (!mailer) return reply.code(503).send({ error: 'O cadastro ainda não está disponível neste servidor.' });
     const b = (req.body ?? {}) as Record<string, unknown>;
@@ -261,20 +300,18 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     // NIST SP 800-63B: comprimento mínimo, sem regras de composição, aceita espaços e Unicode.
     if (password.length < 10 || password.length > 200) return reply.code(400).send({ error: 'A senha precisa ter entre 10 e 200 caracteres.' });
     const passwordHash = await hashPassword(password);
-    const exists = db.prepare('SELECT 1 FROM users WHERE email = ?').get(email);
-    const token = exists ? null : createPendingSignup(db, { email, name, passwordHash });
-    const mail = token
-      ? {
-          to: email,
-          subject: 'Alicerce: confirme o seu cadastro',
-          text: `Alguém pediu para criar uma conta do Alicerce com este e-mail.\n\nPara criar a conta, abra este link em até ${SIGNUP_MINUTES} minutos:\n${config.appUrl}/conta/confirmar#t=${token}\n\nSe não foi você, ignore esta mensagem: sem o link, a conta não é criada.`,
-        }
-      : {
-          to: email,
-          subject: 'Alicerce: você já tem uma conta',
-          text: `Alguém pediu para criar uma conta do Alicerce com este e-mail, mas ele já tem uma conta. Nenhuma conta nova foi criada.\n\nPara entrar, use a senha que você já tem:\n${config.appUrl}/conta\n\nSe esqueceu a senha, na mesma página escolha "Esqueci a senha".\n\nSe não foi você, ignore esta mensagem: nada mudou na sua conta.`,
-        };
-    mailer.send(mail).catch((e) => req.log.error({ email: { erro: e instanceof MailError ? e.code : 'erro inesperado' } }, 'falha ao enviar o e-mail do cadastro'));
+    const now = Date.now();
+    const expiresAt = now + SIGNUP_MINUTES * 60_000;
+    const ok = transaction(req, 'falha ao gravar o pedido de cadastro', () => {
+      replaceLinks(db, email, ['cadastro', 'conta_existente'], now);
+      if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(email)) return enqueueLink(db, { kind: 'conta_existente', to: email, expiresAt }, now);
+      const nonce = newLinkNonce();
+      createPendingSignup(db, { email, name, passwordHash }, now, linkToken(links, 'cadastro', email, nonce));
+      enqueueLink(db, { kind: 'cadastro', to: email, expiresAt, nonce, keyId: links.id }, now);
+    });
+    // Os dois casos gravam no banco, então uma falha nele dá a mesma resposta com ou sem conta.
+    if (!ok) return reply.code(500).send({ error: 'Não consegui registrar o pedido agora. Tente de novo em instantes.' });
+    kickLinks();
     return reply.code(202).send({ ok: true });
   });
 
@@ -367,17 +404,18 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     if (retry) return tooMany(reply, retry);
     if (!EMAIL.test(email)) return reply.code(400).send({ error: 'E-mail inválido.' });
     const row = db.prepare('SELECT id FROM users WHERE email = ?').get(email) as { id: string } | undefined;
+    // Com conta, o link entra na fila na mesma transação (links.ts); o envio não é esperado, para o
+    // tempo da resposta e uma falha do fornecedor não revelarem que a conta existe. Uma falha no
+    // banco também responde 202 (um 500 só aconteceria com conta): fica no log, e a pessoa pede de novo.
     if (row) {
-      const token = createResetToken(db, row.id);
-      // Sem esperar o envio: o tempo da resposta e uma falha do fornecedor de e-mail
-      // revelariam que o e-mail tem conta. A falha fica só no log.
-      mailer
-        .send({
-          to: email,
-          subject: 'Alicerce: trocar a senha',
-          text: `Alguém pediu para trocar a senha da conta do Alicerce com este e-mail.\n\nPara escolher uma senha nova, abra este link em até ${RESET_MINUTES} minutos:\n${config.appUrl}/conta/redefinir#t=${token}\n\nSe não foi você, ignore esta mensagem: a senha continua a mesma.`,
-        })
-        .catch((e) => req.log.error({ email: { erro: e instanceof MailError ? e.code : 'erro inesperado' } }, 'falha ao enviar o e-mail de recuperação'));
+      const now = Date.now();
+      const ok = transaction(req, 'falha ao gravar o pedido de troca de senha', () => {
+        replaceLinks(db, email, ['senha'], now);
+        const nonce = newLinkNonce();
+        createResetToken(db, row.id, now, linkToken(links, 'senha', email, nonce));
+        enqueueLink(db, { kind: 'senha', to: email, expiresAt: now + RESET_MINUTES * 60_000, nonce, keyId: links.id }, now);
+      });
+      if (ok) kickLinks();
     }
     return reply.code(202).send({ ok: true });
   });
@@ -705,6 +743,46 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
     });
   }
 
+  // A fila dos links: uma rodada por vez neste processo. Um pedido que chega durante uma rodada
+  // pede outra logo depois dela, sem esperar o relógio de main.ts.
+  let linkRun: Promise<LinkReport> | null = null;
+  let linkAgain: { now: number | undefined } | null = null;
+  const sendLinks = (now?: number): Promise<LinkReport> => {
+    if (linkRun) {
+      linkAgain = { now };
+      return linkRun;
+    }
+    const run = async () => {
+      const total = emptyLinkReport();
+      let next: { now: number | undefined } | null = { now };
+      while (next) {
+        linkAgain = null;
+        addLinkReport(total, await drainLinkOutbox(db, mailer, links, config.appUrl, next.now));
+        next = linkAgain;
+      }
+      return total;
+    };
+    linkRun = run()
+      .then((r) => {
+        logLinks(r);
+        return r;
+      })
+      .finally(() => {
+        linkRun = null;
+      });
+    return linkRun;
+  };
+  /** O que a rodada registra no log: contagens e códigos de erro, nunca endereço, link ou texto. */
+  const logLinks = (r: LinkReport) => {
+    if (r.falhas) app.log.warn({ links: { enviados: r.enviados, falhas: r.falhas, erros: r.erros } }, 'e-mails com link (cadastro, senha): falha no envio; a fila tenta de novo');
+    const perdidos = (r.encerrados.erro_permanente ?? 0) + (r.encerrados.esgotado ?? 0);
+    if (perdidos) app.log.error({ links: { encerrados: r.encerrados, erros: r.erros } }, 'e-mails com link que não serão mais tentados: a pessoa precisa pedir de novo (link_outbox, outcome e last_error)');
+    if (r.encerrados.chave_trocada) app.log.warn({ links: { chave_trocada: r.encerrados.chave_trocada } }, 'e-mails com link descartados porque a chave LINKS_SEGREDO mudou: quem pediu precisa pedir de novo');
+  };
+  /** Depois da resposta: o pedido não espera o envio. */
+  const kickLinks = () =>
+    setImmediate(() => void sendLinks().catch((e) => app.log.error({ err: { tipo: (e as Error)?.name ?? '?' } }, 'falha ao enviar os e-mails com link')));
+
   let sending: Promise<DrainReport> | null = null;
   // Uma rodada por vez neste processo; entre processos, a reserva de cada aviso (avisos.ts) evita envio duplo.
   const sendEmails = () =>
@@ -715,7 +793,11 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
   app.decorate('rotinas', {
     conciliar: async () => (payments ? reconcile(db, payments) : null),
     enviarEmails: sendEmails,
-    limparCadastros: () => purgeExpiredSignups(db),
+    enviarLinks: sendLinks,
+    limparCadastros: () => {
+      purgeFinishedLinks(db);
+      return purgeExpiredSignups(db);
+    },
   });
   return app;
 }

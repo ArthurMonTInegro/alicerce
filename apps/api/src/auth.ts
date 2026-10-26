@@ -73,9 +73,11 @@ export function deleteUserSessions(db: DatabaseSync, userId: string, now = Date.
 /** Validade do link de recuperação de senha. */
 export const RESET_MINUTES = 30;
 
-/** Novo link de recuperação: o anterior que ainda não foi usado deixa de valer. */
-export function createResetToken(db: DatabaseSync, userId: string, now = Date.now()): string {
-  const token = randomBytes(32).toString('base64url');
+/**
+ * Novo link de recuperação: o anterior que ainda não foi usado deixa de valer. O servidor passa
+ * o código feito pela chave dos links (links.ts), para a fila poder refazê-lo; sem ele, um aleatório.
+ */
+export function createResetToken(db: DatabaseSync, userId: string, now = Date.now(), token = randomBytes(32).toString('base64url')): string {
   db.prepare('DELETE FROM password_resets WHERE user_id = ? AND used_at IS NULL').run(userId);
   db.prepare('INSERT INTO password_resets (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(sha256(token), userId, now, now + RESET_MINUTES * 60_000);
   return token;
@@ -90,15 +92,20 @@ export function consumeResetToken(db: DatabaseSync, token: string, now = Date.no
   return row.user_id;
 }
 
+/** O link de recuperação ainda vale (não venceu, não foi usado nem trocado por outro)? Não o usa. */
+export function resetTokenValid(db: DatabaseSync, token: string, now = Date.now()): boolean {
+  return db.prepare('SELECT 1 FROM password_resets WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?').get(sha256(token), now) !== undefined;
+}
+
 /** Validade do link que confirma um cadastro. */
 export const SIGNUP_MINUTES = 60;
 
 /**
  * Guarda um pedido de cadastro até o link do e-mail ser aberto (a conta ainda não existe).
- * Um pedido novo para o mesmo e-mail troca o anterior, cujo link deixa de valer.
+ * Um pedido novo para o mesmo e-mail troca o anterior, cujo link deixa de valer. O código do link
+ * vem como em createResetToken.
  */
-export function createPendingSignup(db: DatabaseSync, s: { email: string; name: string; passwordHash: string }, now = Date.now()): string {
-  const token = randomBytes(32).toString('base64url');
+export function createPendingSignup(db: DatabaseSync, s: { email: string; name: string; passwordHash: string }, now = Date.now(), token = randomBytes(32).toString('base64url')): string {
   purgeExpiredSignups(db, now);
   db.prepare('DELETE FROM pending_signups WHERE email = ?').run(s.email);
   db.prepare('INSERT INTO pending_signups (email, name, password_hash, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)').run(s.email, s.name, s.passwordHash, sha256(token), now, now + SIGNUP_MINUTES * 60_000);
@@ -112,6 +119,11 @@ export function consumePendingSignup(db: DatabaseSync, token: string, now = Date
   if (!row) return null;
   db.prepare('DELETE FROM pending_signups WHERE token_hash = ?').run(sha256(token));
   return row.expires_at > now ? { email: row.email, name: row.name, passwordHash: row.password_hash } : null;
+}
+
+/** O link do cadastro ainda vale (o pedido existe, não venceu nem foi trocado ou confirmado)? Não o usa. */
+export function pendingSignupValid(db: DatabaseSync, token: string, now = Date.now()): boolean {
+  return db.prepare('SELECT 1 FROM pending_signups WHERE token_hash = ? AND expires_at > ?').get(sha256(token), now) !== undefined;
 }
 
 /** Apaga os pedidos de cadastro cujo link venceu (o servidor roda de tempos em tempos, main.ts). Devolve quantos. */

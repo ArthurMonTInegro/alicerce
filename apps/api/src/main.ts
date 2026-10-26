@@ -22,6 +22,7 @@ process.on('SIGTERM', shutdown);
 await app.listen({ port: config.port, host: config.host });
 app.log.info(`tutor: ${config.anthropicApiKey ? `IA (${config.tutorModel})` : 'offline'}`);
 app.log.info(`e-mail: ${config.resend ? 'Resend' : config.emailLogPath ? 'arquivo, só para testes' : 'nenhum fornecedor (cadastro e recuperação de senha desligados, avisos esperam na fila)'}`);
+app.log.info(`links do cadastro e da senha: ${config.linkSecret ? 'chave LINKS_SEGREDO do ambiente' : 'chave temporária deste processo (sem LINKS_SEGREDO; a fila não sobrevive a um reinício)'}`);
 
 // Conciliação com o provedor de pagamento: recupera webhooks perdidos (conciliacao.ts). O que
 // precisa de alguém sai como aviso uma vez por caso a cada 24 h; o esperado, só no resumo.
@@ -51,7 +52,15 @@ const enviar = () =>
 void enviar();
 setInterval(enviar, 60_000).unref();
 
-// Pedidos de cadastro cujo link venceu (auth.ts, SIGNUP_MINUTES): saem do banco em até 10 minutos.
+// E-mails com link (cadastro e troca de senha) que esperam na fila: links.ts. O pedido já dispara
+// um envio; aqui ficam as novas tentativas e o que sobrou de antes de o servidor reiniciar. A rodada
+// registra no log o que falhou (só contagens e códigos).
+const enviarLinks = () => app.rotinas.enviarLinks().catch((e) => app.log.error({ err: { tipo: (e as Error)?.name ?? '?' } }, 'falha ao enviar os e-mails com link'));
+void enviarLinks();
+setInterval(enviarLinks, 15_000).unref();
+
+// Pedidos de cadastro cujo link venceu (auth.ts, SIGNUP_MINUTES): saem do banco em até 10 minutos,
+// com as linhas da fila dos links terminadas há mais de 24 h (links.ts).
 setInterval(() => {
   try {
     app.rotinas.limparCadastros();

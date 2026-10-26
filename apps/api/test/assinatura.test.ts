@@ -564,6 +564,7 @@ describe("recuperação de senha", () => {
       headers: H,
       payload: { email: c.email.toUpperCase() },
     });
+    await app.rotinas.enviarLinks(); // o pedido não espera o envio (links.ts)
     expect([sem.statusCode, com.statusCode]).toEqual([202, 202]);
     expect(sem.body).toBe(com.body);
     expect(mails).toHaveLength(1);
@@ -579,6 +580,7 @@ describe("recuperação de senha", () => {
       headers: H,
       payload: { email: c.email },
     });
+    await app.rotinas.enviarLinks();
     const token = /#t=([A-Za-z0-9_-]+)/.exec(mails[0]!.text)![1]!;
     expect(
       (
@@ -640,13 +642,16 @@ describe("recuperação de senha", () => {
 
   it("link vencido ou substituído por um mais novo não vale", async () => {
     const c = await register();
-    for (let i = 0; i < 2; i++)
+    for (let i = 0; i < 2; i++) {
       await app.inject({
         method: "POST",
         url: "/api/auth/senha/recuperar",
         headers: H,
         payload: { email: c.email },
       });
+      await app.rotinas.enviarLinks();
+    }
+    expect(mails).toHaveLength(2);
     const [primeiro, segundo] = mails.map(
       (m) => /#t=([A-Za-z0-9_-]+)/.exec(m.text)![1]!,
     );

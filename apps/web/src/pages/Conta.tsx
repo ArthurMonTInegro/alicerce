@@ -40,7 +40,7 @@ export function Conta() {
         // A resposta é a mesma com ou sem conta para o e-mail: quem diz o resto é o e-mail.
         await api.register(email, password, name);
         form.reset();
-        setNotice(`Enviamos um e-mail para ${email}. Se ainda não houver conta com ele, a mensagem traz o link que cria a conta, válido por 60 minutos. Se já houver, ela explica como entrar. Não chegou em alguns minutos? Confira o spam ou faça o cadastro de novo.`);
+        setNotice(`Enviamos um e-mail para ${email}. Se ainda não houver conta com ele, a mensagem traz o link que cria a conta, válido por 60 minutos. Se já houver, ela explica como entrar. Se o envio falhar, o servidor tenta de novo sozinho por cerca de meia hora. Não chegou? Confira o spam; se fizer o cadastro de novo, só o link do e-mail mais recente vale.`);
       } else await signIn(email, password);
     } catch (err) {
       setError(
@@ -61,7 +61,7 @@ export function Conta() {
     setNotice('');
     try {
       await api.requestPasswordReset(email);
-      setNotice('Se houver uma conta com esse e-mail, enviamos um link para trocar a senha. Ele vale por 30 minutos e só pode ser usado uma vez.');
+      setNotice('Se houver uma conta com esse e-mail, enviamos um link para trocar a senha. Ele vale por 30 minutos e só pode ser usado uma vez; se pedir de novo, só o link mais recente vale.');
     } catch (err) {
       setError(err instanceof ApiError ? (err.status === 429 ? 'Muitos pedidos. Espere alguns minutos e tente de novo.' : err.message) : 'Não consegui falar com o servidor. Tente de novo em instantes.');
     } finally {

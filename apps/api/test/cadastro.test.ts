@@ -29,8 +29,8 @@ const login = (email: string, password = SENHA) => app.inject({ method: 'POST', 
 const usuarios = () => (db.prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }).n;
 const pendentes = () => (db.prepare('SELECT COUNT(*) AS n FROM pending_signups').get() as { n: number }).n;
 const cookieOf = (res: { headers: Record<string, unknown> }) => String(res.headers['set-cookie']).split(';')[0]!;
-/** o envio não é esperado pela resposta: dá uma volta no laço de eventos antes de ler os e-mails */
-const enviados = () => new Promise((r) => setImmediate(r));
+/** o envio não é esperado pela resposta (links.ts): roda a fila antes de ler os e-mails */
+const enviados = () => app.rotinas.enviarLinks();
 
 // Cada pedido passa pelo scrypt (dezenas de ms, mais com a suíte em paralelo).
 const SCRYPT = { timeout: 30_000 };

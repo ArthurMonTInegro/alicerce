@@ -82,6 +82,13 @@ describe('ResendMailer', () => {
     expect(f.pedidos).toHaveLength(2);
   });
 
+  it('com `once`, uma tentativa só: a fila dos links repete depois de conferir se o link ainda vale', async () => {
+    const f = fakeFetch(erro(503, 'service_unavailable'), { status: 200, body: { id: 'x' } });
+    const e = await new ResendMailer(CFG, f.http, wait).send({ ...MAIL, once: true }).catch((x) => x);
+    expect(e).toMatchObject({ code: 'Resend 503 service_unavailable', retry: true });
+    expect(f.pedidos).toHaveLength(1);
+  });
+
   it('cota do dia ou do mês, domínio não verificado, chave errada, corpo diferente com a mesma chave: sem nova tentativa', async () => {
     for (const r of [
       erro(429, 'daily_quota_exceeded'),
@@ -191,10 +198,12 @@ describe('recuperação de senha com o Resend fora do ar', () => {
     const sem = await app.inject({ method: 'POST', url: '/api/auth/senha/recuperar', headers: H, payload: { email: 'ninguem@exemplo.com' } });
     expect([com.statusCode, com.body]).toEqual([sem.statusCode, sem.body]);
     expect(com.statusCode).toBe(202);
-    await new Promise((r) => setTimeout(r, 20)); // o envio corre sem a resposta esperar
+    await app.rotinas.enviarLinks(); // o envio corre sem a resposta esperar (links.ts)
     const token = String(f.pedidos[0]!.body.text).match(/#t=([\w-]+)/)![1]!;
-    const falha = linhas.map((l) => JSON.parse(l)).find((l) => l.msg === 'falha ao enviar o e-mail de recuperação');
-    expect(falha?.email).toEqual({ erro: 'Resend 503 service_unavailable' });
+    const falha = linhas.map((l) => JSON.parse(l)).find((l) => l.msg?.startsWith('e-mails com link (cadastro, senha): falha no envio'));
+    expect(falha?.links).toEqual({ enviados: 0, falhas: 1, erros: { 'Resend 503 service_unavailable': 1 } });
+    // uma tentativa só por envio: a fila é que repete, conferindo antes se o link ainda vale
+    expect(f.pedidos).toHaveLength(1);
     const tudo = linhas.join('\n');
     for (const s of ['pessoa@exemplo.com', token, 're_teste_123']) expect(tudo).not.toContain(s);
     await app.close();

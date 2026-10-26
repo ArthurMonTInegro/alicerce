@@ -58,6 +58,12 @@ export interface Config {
   reconcileMinutes: number;
   /** Tentativas de cadastro e de entrada por IP em 15 minutos. Só fora de produção dá para mudar (AUTH_RATE_LIMIT, usado pelo e2e). */
   authAttempts: number;
+  /**
+   * Chave dos links do cadastro e da troca de senha (LINKS_SEGREDO, 32 caracteres ou mais), só no
+   * ambiente: o banco guarda o necessário para refazer o link na hora de cada tentativa de envio,
+   * mas não a chave (links.ts). Em produção com fornecedor de e-mail, sem ela o servidor não sobe.
+   */
+  linkSecret: string | null;
 }
 
 /**
@@ -82,6 +88,17 @@ function emailProvider(env: NodeJS.ProcessEnv): ResendConfig | null {
   // Um nome errado desligaria os e-mails sem ninguém notar: melhor o servidor não subir.
   if (p !== 'resend') throw new Error(`EMAIL_PROVEDOR desconhecido: "${p.slice(0, 40)}" (o único é "resend").`);
   return { apiKey: env.RESEND_API_KEY ?? '', from: env.EMAIL_REMETENTE ?? '', replyTo: env.EMAIL_RESPONDER_PARA?.trim() || null };
+}
+
+/** Tamanho mínimo de LINKS_SEGREDO: 32 caracteres aleatórios já passam de 128 bits. */
+export const LINK_SECRET_MIN = 32;
+
+function linkSecret(env: NodeJS.ProcessEnv): string | null {
+  const s = env.LINKS_SEGREDO?.trim();
+  if (!s) return null;
+  // Curta demais seria adivinhável; melhor o servidor não subir do que gerar links fracos.
+  if (s.length < LINK_SECRET_MIN) throw new Error(`LINKS_SEGREDO precisa ter ${LINK_SECRET_MIN} caracteres ou mais (gere com: openssl rand -base64 48).`);
+  return s;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -122,5 +139,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     sellerIdentification: env.VENDEDOR_IDENTIFICACAO?.trim() || null,
     reconcileMinutes: int(env.CONCILIACAO_MINUTOS, 60),
     authAttempts: production ? 10 : Math.max(1, int(env.AUTH_RATE_LIMIT, 10)),
+    linkSecret: linkSecret(env),
   };
 }

@@ -21,6 +21,11 @@ export interface Mail {
    * fornecedor (no Resend, por 24 h e só se o corpo for igual). Sem ela, cada envio gera a sua.
    */
   key?: string;
+  /**
+   * Uma tentativa só neste envio, sem a repetição interna do fornecedor. A fila dos links
+   * (links.ts) usa: entre uma tentativa e outra o link pode ter sido trocado, e ela confere antes.
+   */
+  once?: boolean;
 }
 
 export interface Mailer {
@@ -110,7 +115,7 @@ const RESEND_MAX_WAIT_MS = 5_000;
  * - antes de verificar um domínio, o Resend só entrega para o e-mail da própria conta (403).
  *
  * A mesma chave vale para as duas tentativas deste envio, então repetir depois de uma falha
- * de rede não duplica o e-mail.
+ * de rede não duplica o e-mail. Com `once`, só uma tentativa.
  */
 export class ResendMailer implements Mailer {
   readonly name = "resend";
@@ -132,7 +137,7 @@ export class ResendMailer implements Mailer {
       try {
         return await this.sendOnce(mail, key);
       } catch (e) {
-        if (!(e instanceof MailError) || !e.retry || attempt >= RESEND_ATTEMPTS) throw e;
+        if (!(e instanceof MailError) || !e.retry || mail.once || attempt >= RESEND_ATTEMPTS) throw e;
         await this.wait(Math.min(e.retryAfterMs ?? 1_000, RESEND_MAX_WAIT_MS));
       }
     }

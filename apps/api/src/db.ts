@@ -186,6 +186,29 @@ export const MIGRATIONS: string[] = [
   // o começo dessa janela, e observed_until, o fim (cobrancas.ts, recordCharge). Null: a leitura
   // foi um instante só (observed_at). Só acrescenta; o código anterior ignora a coluna.
   `ALTER TABLE subscription_charges ADD COLUMN observed_until INTEGER;`,
+  // Fila dos e-mails com link (cadastro e troca de senha) e do aviso "você já tem uma conta"
+  // (links.ts). A linha entra na mesma transação do pedido, então um pedido nunca fica sem e-mail
+  // por uma falha do fornecedor, e o envio continua depois de o servidor reiniciar. O link não fica
+  // guardado: só link_nonce, de onde a chave do ambiente (LINKS_SEGREDO) o refaz, e key_id, que diz
+  // com qual chave ele foi feito (não serve para refazer nada). finished_at marca o fim, com o
+  // motivo em outcome; linhas terminadas saem do banco em 24 h. Só acrescenta.
+  `CREATE TABLE link_outbox (
+     id INTEGER PRIMARY KEY,
+     kind TEXT NOT NULL CHECK (kind IN ('cadastro', 'conta_existente', 'senha')),
+     to_address TEXT NOT NULL COLLATE NOCASE,
+     link_nonce TEXT,
+     key_id TEXT,
+     created_at INTEGER NOT NULL,
+     expires_at INTEGER NOT NULL,
+     attempts INTEGER NOT NULL DEFAULT 0,
+     next_attempt_at INTEGER NOT NULL,
+     sent_at INTEGER,
+     finished_at INTEGER,
+     outcome TEXT,
+     last_error TEXT
+   );
+   CREATE INDEX link_outbox_due ON link_outbox(finished_at, next_attempt_at);
+   CREATE INDEX link_outbox_address ON link_outbox(to_address, kind);`,
 ];
 
 /** Maior versão de esquema que este código conhece (a restauração recusa backup mais novo). */
