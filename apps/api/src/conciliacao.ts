@@ -6,7 +6,11 @@
  * não aplica nada duas vezes, e o webhook original que chegar depois não muda o resultado.
  *
  * Com um provedor que lista as cobranças (o Asaas), a conferência é cobrança por cobrança: cada
- * cobrança que mudou lá vira o evento dela, e só ela muda aqui (cobrancas.ts).
+ * cobrança lida lá vira uma leitura dela, aplicada aqui pela regra das cobranças (cobrancas.ts),
+ * inclusive quando só confirma a situação gravada: é o que impede um evento mais antigo, que
+ * chegue depois, de desfazê-la. A leitura não fica em payment_events (applyProviderReading): ler
+ * de novo a mesma situação não muda nada. Cada leitura leva a própria janela de tempo (do pedido
+ * à resposta do provedor), e não a hora em que a rodada começou.
  *
  * A conciliação só faz o banco alcançar o provedor. Ela nunca desfaz um estorno concluído nem
  * faz uma cobrança voltar atrás numa transição que não vale; o que pediria isso vai para
@@ -19,12 +23,13 @@
 import type { DatabaseSync } from "node:sqlite";
 import {
   applyPaymentEvent,
+  applyProviderReading,
   replaceLegacyCharges,
   type PaymentEvent,
   type PaymentProvider,
   type SubscriptionStatus,
 } from "./assinatura.ts";
-import { canMove, chargesOf, eventTypeFor, WAS_PAID } from "./cobrancas.ts";
+import { canMove, chargesOf, eventTypeFor, readClock, WAS_PAID } from "./cobrancas.ts";
 
 /**
  * Tentativas pendentes ou recusadas, reembolsos e cancelamentos vencidos há mais que isto não
@@ -60,20 +65,28 @@ interface Row {
 }
 const COLUMNS = "id, status, paid_until, first_paid_at";
 
+/**
+ * `now`: para os testes, congela o relógio nesse instante. Sem ele, cada leitura do provedor é
+ * carimbada com a hora em que aconteceu (readClock).
+ */
 export async function reconcile(
   db: DatabaseSync,
   provider: PaymentProvider,
-  now = Date.now(),
+  now?: number,
 ): Promise<ReconcileReport> {
+  const clock = clockAt(now);
+  const t = clock();
   const rows = db
     .prepare(
       `SELECT ${COLUMNS} FROM subscriptions WHERE provider = ? AND (status = 'ativa' OR (status = 'cancelada' AND paid_until > ?) OR (status IN ('pendente', 'recusada', 'reembolsada') AND updated_at > ?)) ORDER BY created_at, rowid`,
     )
-    .all(provider.name, now - ABANDONED_AFTER_MS, now - ABANDONED_AFTER_MS) as unknown as Row[];
+    .all(provider.name, t - ABANDONED_AFTER_MS, t - ABANDONED_AFTER_MS) as unknown as Row[];
   const report = emptyReport();
-  for (const s of rows) await reconcileRow(db, provider, s, now, report);
+  for (const s of rows) await reconcileRow(db, provider, s, clock, report);
   return report;
 }
+
+const clockAt = (now: number | undefined) => (now === undefined ? readClock : () => now);
 
 /**
  * Concilia uma assinatura só, logo depois de cancelar ou estornar nela: a tela já mostra o
@@ -83,13 +96,13 @@ export async function reconcileOne(
   db: DatabaseSync,
   provider: PaymentProvider,
   id: string,
-  now = Date.now(),
+  now?: number,
 ): Promise<ReconcileReport> {
   const report = emptyReport();
   const s = db
     .prepare(`SELECT ${COLUMNS} FROM subscriptions WHERE id = ? AND provider = ?`)
     .get(id, provider.name) as Row | undefined;
-  if (s) await reconcileRow(db, provider, s, now, report);
+  if (s) await reconcileRow(db, provider, s, clockAt(now), report);
   return report;
 }
 
@@ -107,16 +120,20 @@ async function reconcileRow(
   db: DatabaseSync,
   provider: PaymentProvider,
   s: Row,
-  now: number,
+  clock: () => number,
   report: ReconcileReport,
 ) {
   let p;
+  // a leitura aconteceu em algum ponto entre estes dois instantes (cobrancas.ts, recordCharge)
+  const read = { from: clock(), until: 0 };
   try {
     p = await provider.fetchState(s.id);
   } catch (e) {
     report.falhas.push({ assinatura: s.id, erro: (e as Error).message });
     return;
   }
+  read.until = clock();
+  const now = read.until;
   report.conferidas++;
   if (!p) {
     report.desconhecidas.push(s.id);
@@ -124,7 +141,7 @@ async function reconcileRow(
       report.semVinculo.push({ assinatura: s.id, situacao: s.status });
     return;
   }
-  if (p.charges) return reconcileCharges(db, provider, s, p, now, report);
+  if (p.charges) return reconcileCharges(db, provider, s, p, read, report);
   const events: PaymentEvent[] = [];
   if (p.paidUntil !== null && p.paidUntil > (s.paid_until ?? 0))
     events.push({
@@ -189,16 +206,17 @@ function reconcileCharges(
   provider: PaymentProvider,
   s: Row,
   p: NonNullable<Awaited<ReturnType<PaymentProvider["fetchState"]>>>,
-  now: number,
+  read: { from: number; until: number },
   report: ReconcileReport,
 ) {
+  const now = read.until;
   const local = new Map(chargesOf(db, s.id).map((c) => [c.charge_id, c]));
   const events: PaymentEvent[] = [];
   for (const c of p.charges!) {
     const type = eventTypeFor(c.status);
     if (!type) continue; // pendente ou removida: nada a registrar
     const cur = local.get(c.id);
-    if (cur && cur.status === c.status && (cur.covers_until === c.coversUntil || !WAS_PAID.has(c.status))) continue;
+    // A mesma situação também vai: a leitura confirma a gravada e passa a ser a mais nova.
     if (cur && !canMove(cur.status, c.status)) {
       report.divergencias.push({
         assinatura: s.id,
@@ -210,8 +228,8 @@ function reconcileCharges(
       continue;
     }
     events.push({
-      // a mesma correção tem sempre o mesmo id; uma volta (contestação ganha, por exemplo) tem outro
-      id: `conciliacao:${s.id}:${c.id}:${c.status}:${cur?.transitions ?? 0}`,
+      // só para os logs: a leitura não fica em payment_events (applyProviderReading)
+      id: `conciliacao:${s.id}:${c.id}:${c.status}:${read.from}`,
       type,
       subscriptionId: s.id,
       chargeId: c.id,
@@ -219,10 +237,11 @@ function reconcileCharges(
       ...(c.providerStatus ? { providerStatus: c.providerStatus } : {}),
       ...(WAS_PAID.has(c.status) && c.coversUntil !== null ? { coversFrom: c.coversFrom ?? undefined, paidUntil: c.coversUntil } : {}),
       ...(c.paidAt !== null ? { paidAt: c.paidAt } : {}),
-      at: now,
+      at: read.from,
+      observedUntil: read.until,
     });
   }
-  const applied = events.filter((ev) => applyPaymentEvent(db, provider.name, ev, now) === "aplicado");
+  const applied = events.filter((ev) => applyProviderReading(db, provider.name, ev, now) === "aplicado");
   // A cobrança 'legado:' da migração 9 sai quando o provedor lista as cobranças de verdade.
   if (p.charges!.some((c) => WAS_PAID.has(c.status))) replaceLegacyCharges(db, provider.name, s.id, now);
   // Depois das cobranças, a assinatura: parou de renovar lá e aqui ainda não?

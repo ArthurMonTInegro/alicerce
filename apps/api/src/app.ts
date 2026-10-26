@@ -601,6 +601,12 @@ export async function buildApp({ config, db, tutor, content = publicContent, log
       req.log.warn({ pagamento: { assinatura: ev.subscriptionId, cobranca: ev.chargeId ?? null, evento: ev.type } }, `${ev.type === 'contestacao' ? 'contestação no cartão' : 'estorno parcial'}: aplicada a regra proposta, à espera da decisão do Arthur (docs/PAGAMENTO.md)`);
     // E-mails que o evento pôs na fila: saem logo, sem segurar a resposta ao provedor.
     if (result === 'aplicado') setImmediate(() => void sendEmails().catch((e) => app.log.error({ err: e }, 'falha ao enviar os e-mails da fila')));
+    // Duas leituras ao mesmo tempo com situações diferentes: nenhuma é sabidamente a mais nova, então
+    // nada mudou. Uma leitura nova, feita depois das duas, decide (cobrancas.ts, recordCharge).
+    if (result === 'ambiguo') {
+      req.log.info({ pagamento: { assinatura: ev.subscriptionId, cobranca: ev.chargeId ?? null, evento: ev.type } }, 'leituras simultâneas do provedor com situações diferentes: nada mudou; conferindo de novo');
+      setImmediate(() => void settle(ev.subscriptionId, app.log));
+    }
     return { ok: true, result };
   });
 

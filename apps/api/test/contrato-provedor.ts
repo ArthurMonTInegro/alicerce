@@ -88,7 +88,8 @@ export function providerContract(name: string, make: (db: DatabaseSync) => Promi
         expect(t.raw).not.toBe(d.raw);
         const r = await parse(t).catch(() => 'recusado' as const);
         // aceito só se o adaptador conferiu no provedor e chegou ao mesmo evento do original
-        if (r !== 'recusado' && r !== null) expect(r).toEqual({ ...ev, at: r.at });
+        // (a janela da leitura, at e observedUntil, é a hora em que cada conferência aconteceu)
+        if (r !== 'recusado' && r !== null) expect(r).toEqual({ ...ev, at: r.at, ...(r.observedUntil !== undefined ? { observedUntil: r.observedUntil } : {}) });
       }
       const semAutenticacao = Object.fromEntries(Object.entries(d.headers).filter(([k]) => k === 'content-type'));
       await expect(parse({ raw: d.raw, headers: semAutenticacao })).rejects.toThrow();

@@ -182,6 +182,10 @@ export const MIGRATIONS: string[] = [
      created_at INTEGER NOT NULL,
      expires_at INTEGER NOT NULL
    );`,
+  // Uma leitura do provedor acontece em algum ponto entre o pedido e a resposta: observed_at é
+  // o começo dessa janela, e observed_until, o fim (cobrancas.ts, recordCharge). Null: a leitura
+  // foi um instante só (observed_at). Só acrescenta; o código anterior ignora a coluna.
+  `ALTER TABLE subscription_charges ADD COLUMN observed_until INTEGER;`,
 ];
 
 /** Maior versão de esquema que este código conhece (a restauração recusa backup mais novo). */

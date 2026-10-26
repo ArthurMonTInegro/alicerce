@@ -19,9 +19,19 @@
  * - estornada: devolvida por inteiro (inclusive a contestação perdida). Final: nada a desfaz;
  * - pendente, vencida, recusada, removida: nada pago, nenhum acesso.
  *
- * Eventos repetidos, atrasados ou fora de ordem: cada mudança guarda quando a situação foi lida
- * no provedor (`observed_at`); uma leitura mais antiga que a já aplicada não muda nada, e só as
- * transições da lista `NEXT` valem (uma cobrança paga não volta a pendente).
+ * Eventos repetidos, atrasados ou fora de ordem: cada cobrança guarda a leitura mais nova que se
+ * conhece dela no provedor, como uma janela (`observed_at` a `observed_until`): a leitura aconteceu
+ * em algum ponto entre o pedido e a resposta, e o provedor não diz qual. Uma leitura nova vale
+ * mesmo quando só confirma a situação gravada, para que uma leitura mais antiga que chegue depois
+ * não a desfaça. Comparando com a gravada:
+ * - terminou antes de a gravada começar: é mais antiga, nada muda ("antiga");
+ * - começou depois de a gravada terminar: é mais nova. Situação igual: só a janela é atualizada,
+ *   sem e-mail, sem contar transição e sem recalcular o acesso ("confirmada"); situação diferente:
+ *   muda, se a transição da lista `NEXT` vale ("mudou"; uma cobrança paga não volta a pendente);
+ * - as janelas se cruzam (inclusive no mesmo instante): não há como saber qual é a mais nova. Com a
+ *   mesma situação, as duas valem; com situações diferentes, nada muda ("ambigua"), e quem
+ *   recebeu a leitura pede uma leitura nova ao provedor (app.ts) em vez de escolher uma ordem
+ *   que o provedor não dá.
  */
 import type { DatabaseSync } from "node:sqlite";
 
@@ -78,6 +88,8 @@ export interface ChargeRow {
   paid_at: number | null;
   refunded_at: number | null;
   observed_at: number;
+  /** fim da janela da leitura mais nova; null: a leitura foi o instante observed_at */
+  observed_until: number | null;
   transitions: number;
   updated_at: number;
 }
@@ -92,8 +104,30 @@ export interface ChargeUpdate {
   coversUntil?: number | null;
   paidAt?: number | null;
   refundedAt?: number | null;
-  /** quando a situação foi lida no provedor */
+  /** quando a leitura da situação no provedor começou (o pedido saiu) */
   observedAt: number;
+  /** quando ela terminou (a resposta chegou); sem isso, a leitura foi o instante observedAt */
+  observedUntil?: number;
+}
+
+/**
+ * O que recordCharge fez: "mudou" (situação ou período, uma mudança comercial); "confirmada" (a
+ * mesma situação numa leitura mais nova: só a janela da leitura e a situação escrita pelo
+ * provedor foram gravadas); "igual" (nada a gravar); "antiga" (leitura mais antiga que a
+ * gravada); "ambigua" (leituras que se cruzam com situações diferentes); "proibida" (a transição
+ * não vale, ex.: estornada para paga, ou a cobrança é de outra assinatura).
+ */
+export type RecordResult = "mudou" | "confirmada" | "igual" | "antiga" | "ambigua" | "proibida";
+
+let lastRead = 0;
+/**
+ * Relógio das leituras do provedor: a hora do servidor, mas sem repetir nem voltar dentro do
+ * processo. Duas leituras feitas uma depois da outra aqui ficam sempre em ordem, mesmo no mesmo
+ * milissegundo; só as que de fato acontecem ao mesmo tempo (as janelas se cruzam) ficam ambíguas.
+ */
+export function readClock(): number {
+  lastRead = Math.max(Date.now(), lastRead + 1);
+  return lastRead;
 }
 
 export function chargesOf(db: DatabaseSync, subscriptionId: string): ChargeRow[] {
@@ -109,21 +143,16 @@ export function getCharge(db: DatabaseSync, provider: string, chargeId: string):
 }
 
 /**
- * Grava a situação de uma cobrança. "mudou": gravou; "igual": já estava assim; "antiga": a
- * leitura é mais antiga que a já aplicada; "proibida": a transição não vale (ex.: estornada
- * para paga). Nos dois últimos, nada muda. Chamar dentro da transação do evento.
+ * Grava uma leitura da situação de uma cobrança, pela regra do comentário do topo (RecordResult).
+ * Só "mudou" pede recalcular a assinatura e o acesso. Chamar dentro da transação do evento.
  */
-export function recordCharge(
-  db: DatabaseSync,
-  provider: string,
-  subscriptionId: string,
-  u: ChargeUpdate,
-  now: number,
-): "mudou" | "igual" | "antiga" | "proibida" {
+export function recordCharge(db: DatabaseSync, provider: string, subscriptionId: string, u: ChargeUpdate, now: number): RecordResult {
+  const from = u.observedAt;
+  const until = Math.max(u.observedUntil ?? from, from);
   const cur = getCharge(db, provider, u.chargeId);
   if (!cur) {
     db.prepare(
-      "INSERT INTO subscription_charges (provider, charge_id, subscription_id, status, provider_status, covers_from, covers_until, paid_at, refunded_at, observed_at, transitions, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)",
+      "INSERT INTO subscription_charges (provider, charge_id, subscription_id, status, provider_status, covers_from, covers_until, paid_at, refunded_at, observed_at, observed_until, transitions, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)",
     ).run(
       provider,
       u.chargeId,
@@ -132,40 +161,59 @@ export function recordCharge(
       u.providerStatus ?? null,
       u.coversFrom ?? null,
       u.coversUntil ?? null,
-      u.paidAt ?? (WAS_PAID.has(u.status) ? u.observedAt : null),
-      u.refundedAt ?? (u.status === "estornada" ? u.observedAt : null),
-      u.observedAt,
+      u.paidAt ?? (WAS_PAID.has(u.status) ? from : null),
+      u.refundedAt ?? (u.status === "estornada" ? from : null),
+      from,
+      until,
       now,
     );
     return "mudou";
   }
   if (cur.subscription_id !== subscriptionId) return "proibida"; // a cobrança é de outra assinatura
-  if (u.observedAt < cur.observed_at) return "antiga";
-  if (!canMove(cur.status, u.status)) return "proibida";
+  const curFrom = cur.observed_at;
+  const curUntil = cur.observed_until ?? cur.observed_at;
+  if (until < curFrom) return "antiga";
+  const newer = from > curUntil;
   const coversUntil = u.coversUntil ?? cur.covers_until;
   const coversFrom = u.coversFrom === undefined ? cur.covers_from : u.coversFrom;
-  const same =
-    cur.status === u.status &&
-    cur.covers_until === coversUntil &&
-    cur.covers_from === coversFrom &&
-    (u.providerStatus === undefined || u.providerStatus === cur.provider_status);
-  if (same) return "igual";
-  db.prepare(
-    "UPDATE subscription_charges SET status = ?, provider_status = ?, covers_from = ?, covers_until = ?, paid_at = COALESCE(paid_at, ?), refunded_at = COALESCE(refunded_at, ?), observed_at = ?, transitions = transitions + ?, updated_at = ? WHERE provider = ? AND charge_id = ?",
-  ).run(
-    u.status,
-    u.providerStatus === undefined ? cur.provider_status : u.providerStatus,
-    coversFrom,
-    coversUntil,
-    u.paidAt ?? (WAS_PAID.has(u.status) ? u.observedAt : null),
-    u.refundedAt ?? (u.status === "estornada" ? u.observedAt : null),
-    u.observedAt,
-    cur.status === u.status ? 0 : 1,
+  const sameState = cur.status === u.status && cur.covers_until === coversUntil && cur.covers_from === coversFrom;
+  if (!sameState) {
+    if (!newer) return "ambigua";
+    if (!canMove(cur.status, u.status)) return "proibida";
+    db.prepare(
+      "UPDATE subscription_charges SET status = ?, provider_status = ?, covers_from = ?, covers_until = ?, paid_at = COALESCE(paid_at, ?), refunded_at = COALESCE(refunded_at, ?), observed_at = ?, observed_until = ?, transitions = transitions + ?, updated_at = ? WHERE provider = ? AND charge_id = ?",
+    ).run(
+      u.status,
+      u.providerStatus === undefined ? cur.provider_status : u.providerStatus,
+      coversFrom,
+      coversUntil,
+      u.paidAt ?? (WAS_PAID.has(u.status) ? from : null),
+      u.refundedAt ?? (u.status === "estornada" ? from : null),
+      from,
+      until,
+      cur.status === u.status ? 0 : 1,
+      now,
+      provider,
+      u.chargeId,
+    );
+    return "mudou";
+  }
+  // A mesma situação: só os dados da leitura. A janela guardada passa a terminar no fim mais
+  // tardio e a começar no começo mais tardio (ela ainda contém a leitura que começou por último);
+  // a situação escrita pelo provedor (CONFIRMED, RECEIVED...) só muda numa leitura mais nova.
+  const obsFrom = Math.max(curFrom, from);
+  const obsUntil = Math.max(curUntil, until);
+  const providerStatus = newer && u.providerStatus !== undefined ? u.providerStatus : cur.provider_status;
+  if (obsFrom === curFrom && obsUntil === curUntil && providerStatus === cur.provider_status) return "igual";
+  db.prepare("UPDATE subscription_charges SET provider_status = ?, observed_at = ?, observed_until = ?, updated_at = ? WHERE provider = ? AND charge_id = ?").run(
+    providerStatus,
+    obsFrom,
+    obsUntil,
     now,
     provider,
     u.chargeId,
   );
-  return "mudou";
+  return "confirmada";
 }
 
 /**

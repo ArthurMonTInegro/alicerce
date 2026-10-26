@@ -26,15 +26,22 @@ import { AsaasSimulado, nextCycle } from './asaas-simulado.ts';
 
 const DIA = 86_400_000;
 
-/** Banco, simulação e adaptador ligados, com uma conta (u1); o relógio é o da simulação. */
+/**
+ * Banco, simulação e adaptador ligados, com uma conta (u1); o relógio é o da simulação. Cada
+ * leitura do Asaas (webhook ou conciliação) acontece um milissegundo depois da anterior, como numa
+ * rede de verdade: leituras no mesmo instante com situações diferentes são ambíguas (cobrancas.ts).
+ */
 function cenario() {
   const sim = new AsaasSimulado();
+  const agora = () => ++sim.now;
   const db = openDb(':memory:');
   db.prepare("INSERT INTO users (id, email, password_hash, created_at) VALUES ('u1', 'a@exemplo.com', 'x', 0)").run();
   const provider = new AsaasPaymentProvider(
     { apiKey: sim.apiKey, environment: 'sandbox', webhookToken: sim.token, appUrl: 'https://alicerce.exemplo', billingTypes: ['CREDIT_CARD', 'PIX'] },
     asaasRefs(db),
     sim.fetch,
+    undefined,
+    agora,
   );
   const abrir = async (period: Period = 'mensal') => {
     const sub = createSubscription(db, 'u1', 'asaas', period, sim.now);
@@ -52,7 +59,7 @@ function cenario() {
     return out;
   };
   const plano = (at = sim.now) => computeAccess(db, 'u1', at);
-  return { sim, db, provider, abrir, drain, plano, sub: (id: string) => getSubscription(db, id)!, chargesOf: (id: string) => chargesOf(db, id) };
+  return { sim, db, provider, abrir, drain, plano, agora, sub: (id: string) => getSubscription(db, id)!, chargesOf: (id: string) => chargesOf(db, id) };
 }
 
 /** Assinatura mensal paga e renovada uma vez; o relógio fica no segundo ciclo. */
@@ -80,7 +87,7 @@ describe('reembolso de uma cobrança antiga na mesma assinatura (regressão)', (
     expect(c.plano()).toEqual({ plan: 'premium', expiresAt: fim2 });
     expect(await c.provider.fetchState(id, c.sim.now)).toMatchObject({ status: 'ativa', paidUntil: fim2 });
     // e a conciliação não "corrige" nada nem acusa divergência
-    const r = await reconcile(c.db, c.provider, c.sim.now);
+    const r = await reconcile(c.db, c.provider, c.agora());
     expect(r).toMatchObject({ corrigidas: [], divergencias: [] });
     expect(c.plano()).toEqual({ plan: 'premium', expiresAt: fim2 });
   });
@@ -133,7 +140,7 @@ describe('listagens do Asaas com mais de uma página (regressão)', () => {
     const fim = coverageEnd(ultima.dueDate, 'mensal');
     expect(c.sub(id).paid_until).toBe(fim);
     expect(await c.provider.fetchState(id, c.sim.now)).toMatchObject({ status: 'ativa', paidUntil: fim });
-    expect((await reconcile(c.db, c.provider, c.sim.now)).divergencias).toEqual([]);
+    expect((await reconcile(c.db, c.provider, c.agora())).divergencias).toEqual([]);
   });
 });
 
@@ -331,11 +338,11 @@ describe('divergência entre o banco e o Asaas (conciliação cobrança por cobr
     c.sim.perderProximos = 10;
     c.sim.estornarNoPainel(primeira);
     expect(c.chargesOf(id).find((x) => x.charge_id === primeira)!.status).toBe('paga');
-    const r = await reconcile(c.db, c.provider, c.sim.now);
+    const r = await reconcile(c.db, c.provider, c.agora());
     expect(r.corrigidas).toEqual([{ assinatura: id, eventos: ['reembolso'] }]);
     expect(c.chargesOf(id).find((x) => x.charge_id === primeira)!.status).toBe('estornada');
     expect(c.plano()).toEqual({ plan: 'premium', expiresAt: fim2 });
-    expect((await reconcile(c.db, c.provider, c.sim.now)).corrigidas).toEqual([]); // de novo: nada
+    expect((await reconcile(c.db, c.provider, c.agora())).corrigidas).toEqual([]); // de novo: nada
   });
 
   it('9b. estornada no banco e paga no Asaas: divergência, sem desfazer o estorno', async () => {
@@ -344,7 +351,7 @@ describe('divergência entre o banco e o Asaas (conciliação cobrança por cobr
     c.sim.estornarNoPainel(primeira);
     await c.drain();
     c.sim.mudarSemAviso(primeira, 'RECEIVED');
-    const r = await reconcile(c.db, c.provider, c.sim.now);
+    const r = await reconcile(c.db, c.provider, c.agora());
     expect(r.corrigidas).toEqual([]);
     expect(r.divergencias).toEqual([{ assinatura: id, motivo: expect.stringMatching(new RegExp(`cobrança ${primeira}: estornada no banco, mas o provedor diz RECEIVED`)) }]);
   });
@@ -360,7 +367,7 @@ describe('divergência entre o banco e o Asaas (conciliação cobrança por cobr
     expect(c.plano().plan).toBe('free');
     c.sim.perderProximos = 10; // a disputa é ganha, e nenhum aviso chega
     c.sim.encerrarDisputa(cobranca, 'ganha');
-    const r = await reconcile(c.db, c.provider, c.sim.now);
+    const r = await reconcile(c.db, c.provider, c.agora());
     expect(r.corrigidas).toEqual([{ assinatura: id, eventos: ['pagamento_aprovado'] }]);
     expect(c.plano().plan).toBe('premium');
   });
@@ -383,10 +390,10 @@ describe('divergência entre o banco e o Asaas (conciliação cobrança por cobr
     await c.drain();
     c.sim.perderProximos = 10;
     c.sim.estornarNoPainel(cobranca, 5);
-    const r = await reconcile(c.db, c.provider, c.sim.now);
+    const r = await reconcile(c.db, c.provider, c.agora());
     expect(r.avisos).toEqual([{ assinatura: id, cobranca, evento: 'reembolso_parcial' }]);
     expect(c.plano().plan).toBe('premium');
-    expect((await reconcile(c.db, c.provider, c.sim.now)).avisos).toEqual([]);
+    expect((await reconcile(c.db, c.provider, c.agora())).avisos).toEqual([]);
   });
 
   it('a cobrança legado da migração sai quando o Asaas lista as cobranças de verdade', async () => {
@@ -394,7 +401,7 @@ describe('divergência entre o banco e o Asaas (conciliação cobrança por cobr
     const { id, fim2 } = await renovada(c);
     c.db.prepare("INSERT INTO subscription_charges (provider, charge_id, subscription_id, status, covers_from, covers_until, observed_at, updated_at) VALUES ('asaas', ?, ?, 'paga', NULL, ?, 0, 0)").run(`legado:${id}`, id, fim2 + 90 * DIA);
     expect(c.plano().expiresAt).toBe(fim2 + 90 * DIA);
-    await reconcile(c.db, c.provider, c.sim.now);
+    await reconcile(c.db, c.provider, c.agora());
     expect(c.chargesOf(id).some((x) => x.charge_id.startsWith('legado:'))).toBe(false);
     expect(c.plano()).toEqual({ plan: 'premium', expiresAt: fim2 });
   });
@@ -406,7 +413,7 @@ describe('observabilidade da conciliação', () => {
   it('tentativa que nunca foi paga e o Asaas não conhece: esperada, só no resumo', async () => {
     const c = cenario();
     const id = await c.abrir(); // a página de pagamento foi aberta e abandonada
-    const r = await reconcile(c.db, c.provider, c.sim.now);
+    const r = await reconcile(c.db, c.provider, c.agora());
     expect(r).toMatchObject({ desconhecidas: [id], semVinculo: [] });
     const linhas = new ReconcileAlerts().lines(r, c.sim.now);
     expect(linhas.filter((l) => l.nivel === 'warn')).toEqual([]);
@@ -418,7 +425,7 @@ describe('observabilidade da conciliação', () => {
     const { id } = await renovada(c);
     c.db.prepare("UPDATE subscriptions SET provider_subscription = 'sub_que_sumiu' WHERE id = ?").run(id);
     c.sim.foraDoAr = false;
-    const r = await reconcile(c.db, c.provider, c.sim.now);
+    const r = await reconcile(c.db, c.provider, c.agora());
     expect(r.falhas).toEqual([]);
     expect(r.semVinculo).toEqual([{ assinatura: id, situacao: 'ativa' }]);
     const alertas = new ReconcileAlerts();

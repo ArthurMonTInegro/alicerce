@@ -39,9 +39,11 @@ import {
   eventTypeFor,
   getCharge,
   latestCoverage,
+  readClock,
   recordCharge,
   WAS_PAID,
   type ChargeStatus,
+  type RecordResult,
 } from "./cobrancas.ts";
 import { recomputeAccess } from "./plans.ts";
 
@@ -93,8 +95,13 @@ export interface PaymentEvent {
   paidUntil?: number;
   /** quando a cobrança foi paga (o prazo de desistência conta daqui); sem isso, `at` */
   paidAt?: number;
-  /** quando a situação foi lida no provedor */
+  /**
+   * quando a situação foi lida no provedor; para quem lê a API do provedor, o começo da leitura
+   * (o pedido saiu), com o fim em `observedUntil` (cobrancas.ts, recordCharge)
+   */
   at: number;
+  /** quando a resposta da leitura chegou; sem isso, a leitura foi o instante `at` */
+  observedUntil?: number;
 }
 
 /** Uma cobrança segundo o provedor (conciliação). */
@@ -371,7 +378,7 @@ export class TestPaymentProvider implements PaymentProvider {
   async simulate(
     sub: { id: string; period: Period; paidUntil: number | null },
     result: TestResult,
-    now = Date.now(),
+    now = readClock(),
   ) {
     if (result === "aprovar" || result === "renovar") {
       const from =
@@ -403,7 +410,7 @@ export class TestPaymentProvider implements PaymentProvider {
     subscriptionId: string,
     chargeId: string,
     type: "reembolso" | "reembolso_pedido" | "reembolso_parcial" | "contestacao" | "pagamento_aprovado",
-    now = Date.now(),
+    now = readClock(),
   ) {
     const c = this.state.get(subscriptionId)?.charges.find((x) => x.id === chargeId);
     if (!c) throw new Error(`provedor de teste: cobrança ${chargeId} desconhecida`);
@@ -492,16 +499,25 @@ export class TestPaymentProvider implements PaymentProvider {
     st.firstPaidAt = d.firstPaidAt;
     if (st.status === "reembolsada") st.refundedAt ??= now;
   }
-  private async emit(ev: Omit<PaymentEvent, "id" | "at">, now = Date.now()) {
-    this.record(ev, now);
+  private lastAt = 0;
+  /**
+   * O provedor de teste sabe a ordem dos próprios eventos: cada um sai com um `at` maior que o do
+   * anterior, mesmo dentro do mesmo milissegundo (o Alicerce não ordena leituras do mesmo instante).
+   * Sem `now`, a hora vem do mesmo relógio das leituras (readClock), e a conciliação feita depois
+   * de um evento lê sempre num instante posterior a ele.
+   */
+  private async emit(ev: Omit<PaymentEvent, "id" | "at">, now = readClock()) {
+    const at = Math.max(now, this.lastAt + 1);
+    this.lastAt = at;
+    this.record(ev, at);
     if (this.lostDeliveries > 0) {
       this.lostDeliveries--;
       return;
     }
-    const body = JSON.stringify({ id: `evt_${randomUUID()}`, at: now, ...ev });
+    const body = JSON.stringify({ id: `evt_${randomUUID()}`, at, ...ev });
     await this.deliver(body, {
       "content-type": "application/json",
-      [SIGNATURE_HEADER]: signWebhook(this.secret, body, now),
+      [SIGNATURE_HEADER]: signWebhook(this.secret, body, at),
     });
   }
 }
@@ -660,32 +676,54 @@ export function subscriptionView(
  * ignorado); um pagamento que chega depois do cancelamento conta, mas a assinatura continua sem
  * renovar.
  *
- * "aplicado": mudou algo; "ignorado": nada a mudar (assinatura desconhecida, leitura antiga,
- * transição proibida); "repetido": o mesmo id já veio.
+ * "aplicado": mudou algo; "ignorado": nada comercial a mudar (assinatura desconhecida, leitura
+ * antiga, transição proibida, a mesma situação lida de novo, que só atualiza a janela da leitura);
+ * "repetido": o mesmo id já veio; "ambiguo": a leitura cruza com a gravada e diz outra situação,
+ * então nada muda e quem chamou pede uma leitura nova ao provedor (cobrancas.ts, recordCharge).
  */
-export function applyPaymentEvent(
-  db: DatabaseSync,
-  provider: string,
-  ev: PaymentEvent,
-  now = Date.now(),
-): "aplicado" | "repetido" | "ignorado" {
+export function applyPaymentEvent(db: DatabaseSync, provider: string, ev: PaymentEvent, now = Date.now()): PaymentEventResult {
+  return applyEvent(db, provider, ev, now, true);
+}
+
+export type PaymentEventResult = "aplicado" | "repetido" | "ignorado" | "ambiguo";
+
+/**
+ * Aplica uma leitura do provedor feita aqui (a conciliação lê a cobrança na API), pelo mesmo
+ * caminho de applyPaymentEvent, mas sem registrar um id em payment_events: ler de novo a mesma
+ * situação não muda nada pela própria regra das cobranças, e cada rodada da conciliação lê todas
+ * as cobranças (um id por leitura encheria a tabela).
+ */
+export function applyProviderReading(db: DatabaseSync, provider: string, ev: PaymentEvent, now = Date.now()): PaymentEventResult {
+  return applyEvent(db, provider, ev, now, false);
+}
+
+function applyEvent(db: DatabaseSync, provider: string, ev: PaymentEvent, now: number, dedupe: boolean): PaymentEventResult {
   db.exec("BEGIN IMMEDIATE");
   try {
-    if (db.prepare("SELECT 1 FROM payment_events WHERE id = ?").get(ev.id)) {
-      db.exec("ROLLBACK");
-      return "repetido";
+    if (dedupe) {
+      if (db.prepare("SELECT 1 FROM payment_events WHERE id = ?").get(ev.id)) {
+        db.exec("ROLLBACK");
+        return "repetido";
+      }
+      db.prepare("INSERT INTO payment_events (id, provider, type, subscription_id, received_at) VALUES (?, ?, ?, ?, ?)").run(
+        ev.id,
+        provider,
+        ev.type,
+        ev.subscriptionId,
+        now,
+      );
     }
-    db.prepare(
-      "INSERT INTO payment_events (id, provider, type, subscription_id, received_at) VALUES (?, ?, ?, ?, ?)",
-    ).run(ev.id, provider, ev.type, ev.subscriptionId, now);
     const s = db
       .prepare("SELECT * FROM subscriptions WHERE id = ? AND provider = ?")
       .get(ev.subscriptionId, provider) as SubscriptionRow | undefined;
-    const changed = s
+    const outcome = s
       ? ev.chargeId && ev.type !== "assinatura_cancelada"
         ? applyChargeEvent(db, provider, s, ev, now)
         : applySubscriptionEvent(db, provider, s, ev, now)
-      : false;
+          ? "mudou"
+          : "igual"
+      : "igual";
+    const changed = outcome === "mudou";
     if (s && changed) {
       const access = recomputeAccess(
         db,
@@ -696,17 +734,21 @@ export function applyPaymentEvent(
       queueSubscriptionEmail(db, ev, s, getSubscription(db, s.id)!, access, now);
     }
     db.exec("COMMIT");
-    return changed ? "aplicado" : "ignorado";
+    return changed ? "aplicado" : outcome === "ambigua" ? "ambiguo" : "ignorado";
   } catch (e) {
     db.exec("ROLLBACK");
     throw e;
   }
 }
 
-/** Evento de uma cobrança: grava a cobrança e recalcula a assinatura a partir das cobranças. */
-function applyChargeEvent(db: DatabaseSync, provider: string, s: SubscriptionRow, ev: PaymentEvent, now: number) {
+/**
+ * Evento de uma cobrança: grava a leitura da cobrança e, se ela mudou de situação ou de período,
+ * recalcula a assinatura a partir das cobranças. A mesma situação lida de novo só atualiza a
+ * janela da leitura (recordCharge): sem recalcular nada, sem e-mail.
+ */
+function applyChargeEvent(db: DatabaseSync, provider: string, s: SubscriptionRow, ev: PaymentEvent, now: number): RecordResult {
   const status = ev.chargeStatus ?? chargeStatusOf(ev.type, ev.providerStatus);
-  if (!status || eventTypeFor(status) !== ev.type) return false; // situação que não combina com o tipo: nada muda
+  if (!status || eventTypeFor(status) !== ev.type) return "proibida"; // situação que não combina com o tipo: nada muda
   const r = recordCharge(
     db,
     provider,
@@ -719,12 +761,12 @@ function applyChargeEvent(db: DatabaseSync, provider: string, s: SubscriptionRow
       ...(WAS_PAID.has(status) ? { paidAt: ev.paidAt ?? ev.at } : {}),
       ...(status === "estornada" ? { refundedAt: ev.at } : {}),
       observedAt: ev.at,
+      ...(ev.observedUntil !== undefined ? { observedUntil: ev.observedUntil } : {}),
     },
     now,
   );
-  if (r !== "mudou") return false;
-  syncSubscription(db, s.id, ev, now);
-  return true;
+  if (r === "mudou") syncSubscription(db, s.id, ev, now);
+  return r;
 }
 
 /** Evento da assinatura toda (provedor sem cobranças, desistência, cancelamento). */
@@ -759,8 +801,8 @@ function applySubscriptionEvent(db: DatabaseSync, provider: string, s: Subscript
     // A desistência: todas as cobranças pagas são estornadas, e o fim do período pago encolhe
     // até o reembolso (um reembolso de algo já vencido não o estica).
     db.prepare(
-      "UPDATE subscription_charges SET status = 'estornada', refunded_at = COALESCE(refunded_at, ?), observed_at = MAX(observed_at, ?), transitions = transitions + 1, updated_at = ? WHERE subscription_id = ? AND status IN ('paga', 'estorno_parcial', 'estorno_pedido', 'contestada')",
-    ).run(ev.at, ev.at, now, s.id);
+      "UPDATE subscription_charges SET status = 'estornada', refunded_at = COALESCE(refunded_at, ?), observed_at = MAX(observed_at, ?), observed_until = MAX(COALESCE(observed_until, observed_at), ?), transitions = transitions + 1, updated_at = ? WHERE subscription_id = ? AND status IN ('paga', 'estorno_parcial', 'estorno_pedido', 'contestada')",
+    ).run(ev.at, ev.at, ev.at, now, s.id);
     db.prepare(
       "UPDATE subscriptions SET status = 'reembolsada', paid_until = CASE WHEN paid_until > ? THEN ? ELSE paid_until END, canceled_at = COALESCE(canceled_at, ?), updated_at = ? WHERE id = ?",
     ).run(ev.at, ev.at, ev.at, now, s.id);

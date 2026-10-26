@@ -40,7 +40,7 @@ import {
   type ProviderCharge,
   type ProviderSubscriptionState,
 } from "./assinatura.ts";
-import { deriveSubscription, eventTypeFor, WAS_PAID, type ChargeStatus } from "./cobrancas.ts";
+import { deriveSubscription, eventTypeFor, readClock, WAS_PAID, type ChargeStatus } from "./cobrancas.ts";
 
 export type AsaasEnvironment = "sandbox" | "producao";
 export type AsaasBillingType = "CREDIT_CARD" | "PIX";
@@ -172,14 +172,23 @@ export class AsaasPaymentProvider implements PaymentProvider {
   private readonly refs: AsaasRefs;
   private readonly http: typeof fetch;
   private readonly notify: AsaasNotify;
+  /** relógio das leituras (cobrancas.ts, recordCharge); os testes passam o da simulação */
+  private readonly clock: () => number;
   /** um estorno por vez para cada assinatura neste processo (dois cliques não pedem dois) */
   private readonly refunding = new Map<string, Promise<void>>();
 
-  constructor(cfg: AsaasConfig, refs: AsaasRefs, http: typeof fetch = globalThis.fetch, notify: AsaasNotify = () => {}) {
+  constructor(
+    cfg: AsaasConfig,
+    refs: AsaasRefs,
+    http: typeof fetch = globalThis.fetch,
+    notify: AsaasNotify = () => {},
+    clock: () => number = readClock,
+  ) {
     this.cfg = cfg;
     this.refs = refs;
     this.http = http;
     this.notify = notify;
+    this.clock = clock;
     if (!cfg.apiKey.startsWith(ASAAS_KEY_PREFIX[cfg.environment]))
       throw new Error(`A chave do Asaas não é do ambiente ${cfg.environment} (deveria começar com ${ASAAS_KEY_PREFIX[cfg.environment]}).`);
     if (cfg.webhookToken.length < 32 || /\s/.test(cfg.webhookToken))
@@ -232,9 +241,16 @@ export class AsaasPaymentProvider implements PaymentProvider {
     return null; // Checkout, split e o resto: o que vale chega pelos eventos da cobrança
   }
 
-  /** O evento que a cobrança pede, pela situação dela na API (o corpo do webhook só aponta qual é). */
+  /**
+   * O evento que a cobrança pede, pela situação dela na API (o corpo do webhook só aponta qual é).
+   * A leitura aconteceu entre o pedido à API e a resposta: as duas pontas vão no evento (at,
+   * observedUntil), porque duas leituras simultâneas podem responder fora de ordem e o Asaas não
+   * diz em que instante cada uma foi feita.
+   */
   private async fromPayment(id: string, event: string, paymentId: string, now: number): Promise<PaymentEvent | null> {
+    const readFrom = this.clock();
     const p = await this.getOrNull<AsaasPayment>(`/payments/${encodeURIComponent(paymentId)}`);
+    const readUntil = this.clock();
     if (!p) {
       this.notify("cobranca_desconhecida", { cobranca: paymentId.slice(0, 80), evento: event.slice(0, 60) });
       return null; // cobrança que a API não conhece: nada muda
@@ -262,7 +278,8 @@ export class AsaasPaymentProvider implements PaymentProvider {
       chargeId: p.id,
       chargeStatus: c.status,
       providerStatus: p.status,
-      at: now,
+      at: readFrom,
+      observedUntil: readUntil,
       ...(WAS_PAID.has(c.status) ? { coversFrom: c.coversFrom!, paidUntil: c.coversUntil!, paidAt: c.paidAt! } : {}),
     };
   }
